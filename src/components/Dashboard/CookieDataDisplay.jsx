@@ -9,6 +9,16 @@ import CookieGrid from "./cookie/CookieGrid";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+// Shared helper to format relative time
+const getRelativeTime = (timestamp, now) => {
+  const diffInSeconds = Math.floor((now - new Date(timestamp).getTime()) / 1000);
+  if (diffInSeconds < 30) return "Just now";
+  if (diffInSeconds < 60) return `${diffInSeconds} sec ago`;
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hr ago`;
+  return new Date(timestamp).toLocaleDateString();
+};
+
 export default function CookieDataDisplay() {
   const [cookies, setCookies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +26,9 @@ export default function CookieDataDisplay() {
   const [viewMode, setViewMode] = useState("active");
 
   const [selectedCookies, setSelectedCookies] = useState([]);
+  // 🔥 New state hoisted from CookieMap to control KPIs
+  const [activeMapMarker, setActiveMapMarker] = useState(null); 
+  
   const [toast, setToast] = useState({ visible: false, message: "", type: "info" });
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: "", message: "", onConfirm: null, confirmText: "Confirm", confirmColor: "bg-[var(--primary)]" });
 
@@ -96,16 +109,19 @@ export default function CookieDataDisplay() {
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === "active" ? "archived" : "active"));
     setSelectedCookies([]);
+    setActiveMapMarker(null); // Reset map marker on tab switch
   };
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setSelectedCookies([]);
+    setActiveMapMarker(null); // Reset map marker on filter change
   };
 
   const clearFilters = () => {
     setFilters({ device: "All", region: "All", language: "All", location: "All" });
     setSelectedCookies([]);
+    setActiveMapMarker(null);
   };
 
   const toggleSelection = (id) => {
@@ -212,6 +228,9 @@ export default function CookieDataDisplay() {
     );
   }
 
+  // Find the selected cookie if a map pin is clicked
+  const selectedPinCookie = activeMapMarker ? mappedCookies.find(c => c.id === activeMapMarker) : null;
+
   return (
     <section className="w-full max-w-7xl mx-auto p-6 fade-in">
       {/* Header */}
@@ -258,24 +277,67 @@ export default function CookieDataDisplay() {
 
       {/* Map & Stats Card */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-        <CookieMap mappedCookies={mappedCookies} viewMode={viewMode} now={now} />
+        <CookieMap 
+          mappedCookies={mappedCookies} 
+          viewMode={viewMode} 
+          now={now} 
+          activeMapMarker={activeMapMarker}
+          setActiveMapMarker={setActiveMapMarker}
+        />
 
-        {/* Stats Column */}
+        {/* Stats Column - Swaps out when a pin is clicked */}
         <div className="flex flex-col gap-4">
-          <div className="theme-glass-card p-6 flex flex-col justify-center flex-1 border-l-4 border-l-[var(--foreground-muted)] hover:shadow-lg transition-all shadow-sm">
-            <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">{viewMode === "active" ? "Total Sessions" : "Archived Sessions"}</span>
-            <span className="text-4xl font-bold text-[var(--foreground)]">{displayCookies.length}</span>
-          </div>
-          <div className="theme-glass-card p-6 flex flex-col justify-center flex-1 border-l-4 border-l-emerald-500 relative overflow-hidden hover:shadow-lg transition-all shadow-sm">
-            <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl"></div>
-            <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">Active Now (60s)</span>
-            <span className="text-4xl font-bold text-emerald-500">{activeCount}</span>
-          </div>
-          <div className="theme-glass-card p-6 flex flex-col justify-center flex-1 border-l-4 border-l-[var(--primary)] relative overflow-hidden hover:shadow-lg transition-all shadow-sm">
-            <div className="absolute -right-4 -top-4 w-16 h-16 bg-[var(--primary)]/10 rounded-full blur-xl"></div>
-            <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">Locations Tracked</span>
-            <span className="text-4xl font-bold text-[var(--primary)]">{mappedCookies.length}</span>
-          </div>
+          {selectedPinCookie ? (
+            <>
+              {/* Selected Pin Data View */}
+              <div className="theme-glass-card p-5 flex flex-col justify-center flex-1 border-l-4 border-l-[var(--primary)] shadow-sm animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider font-mono">Selected Visitor</span>
+                  <button onClick={() => setActiveMapMarker(null)} className="text-[10px] bg-[var(--background)] border border-[var(--border-color)] px-2 py-0.5 rounded-full hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors">Close</button>
+                </div>
+                <span className="text-xl font-bold text-[var(--foreground)] truncate mt-1" title={selectedPinCookie.username}>{selectedPinCookie.username}</span>
+                <span className="text-xs text-[var(--foreground-muted)] mt-1.5 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                  {selectedPinCookie.ipAddress || "Unknown IP"}
+                </span>
+              </div>
+              
+              <div className="theme-glass-card p-5 flex flex-col justify-center flex-1 border-l-4 border-l-[var(--accent-blue)] shadow-sm animate-in fade-in slide-in-from-right-4 duration-300 delay-75">
+                <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">Device Details</span>
+                <span className="text-lg font-bold text-[var(--foreground)] truncate mt-1" title={selectedPinCookie.deviceName}>{selectedPinCookie.deviceName}</span>
+                <span className="text-xs text-[var(--foreground-muted)] mt-1.5 uppercase tracking-wide">{selectedPinCookie.language} • {selectedPinCookie.timeZone}</span>
+              </div>
+
+              <div className="theme-glass-card p-5 flex flex-col justify-center flex-1 border-l-4 border-l-emerald-500 shadow-sm animate-in fade-in slide-in-from-right-4 duration-300 delay-150">
+                <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">Status & Consent</span>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest border flex items-center gap-1.5 shadow-sm transition-colors ${selectedPinCookie.consentStatus === 'accepted' ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${selectedPinCookie.consentStatus === 'accepted' ? "bg-emerald-500" : "bg-amber-500"}`} />
+                    {selectedPinCookie.consentStatus}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-[var(--foreground-muted)] mt-3">Active: <span className="text-[var(--foreground)]">{getRelativeTime(selectedPinCookie.updatedAt, now)}</span></span>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Global Stats View (Default) */}
+              <div className="theme-glass-card p-6 flex flex-col justify-center flex-1 border-l-4 border-l-[var(--foreground-muted)] hover:shadow-lg transition-all shadow-sm animate-in fade-in duration-300">
+                <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">{viewMode === "active" ? "Total Sessions" : "Archived Sessions"}</span>
+                <span className="text-4xl font-bold text-[var(--foreground)]">{displayCookies.length}</span>
+              </div>
+              <div className="theme-glass-card p-6 flex flex-col justify-center flex-1 border-l-4 border-l-emerald-500 relative overflow-hidden hover:shadow-lg transition-all shadow-sm animate-in fade-in duration-300 delay-75">
+                <div className="absolute -right-4 -top-4 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl"></div>
+                <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">Active Now (60s)</span>
+                <span className="text-4xl font-bold text-emerald-500">{activeCount}</span>
+              </div>
+              <div className="theme-glass-card p-6 flex flex-col justify-center flex-1 border-l-4 border-l-[var(--primary)] relative overflow-hidden hover:shadow-lg transition-all shadow-sm animate-in fade-in duration-300 delay-150">
+                <div className="absolute -right-4 -top-4 w-16 h-16 bg-[var(--primary)]/10 rounded-full blur-xl"></div>
+                <span className="text-[var(--foreground-muted)] text-xs uppercase tracking-wider mb-1 font-mono">Locations Tracked</span>
+                <span className="text-4xl font-bold text-[var(--primary)]">{mappedCookies.length}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -342,4 +404,3 @@ export default function CookieDataDisplay() {
     </section>
   );
 }
-

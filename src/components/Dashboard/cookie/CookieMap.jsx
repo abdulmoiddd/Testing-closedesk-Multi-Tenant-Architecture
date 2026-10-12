@@ -62,12 +62,12 @@ const CustomGoogleMarker = memo(({ cookie, isJustNow, isActive, onMarkerClick })
           )}
         </div>
 
-        {/* Selected Marker Detail Card */}
+        {/* Selected Marker Detail Card - FIXED TOOLTIP CSS OVERRIDE BUG */}
         {isActive && (
-          <div className="absolute bottom-[34px] flex flex-col items-center pointer-events-none bg-[var(--background)]/95 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-2xl border border-[var(--primary)]/40 min-w-max animate-in fade-in zoom-in-95 duration-200 z-50">
-            <span className="text-xs font-bold text-[var(--foreground)] tracking-wide leading-tight">{cookie.username}</span>
+          <div className="absolute bottom-[34px] flex flex-col items-center pointer-events-none bg-white dark:bg-gray-900 px-3 py-1.5 rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 min-w-max animate-in fade-in zoom-in-95 duration-200 z-50">
+            <span className="text-xs font-bold text-gray-900 dark:text-white tracking-wide leading-tight">{cookie.username}</span>
             <span className="text-[10px] font-semibold text-[var(--primary)] leading-tight mt-0.5">{placeName || "Fetching location..."}</span>
-            <div className="w-2 h-2 bg-[var(--background)] border-r border-b border-[var(--primary)]/40 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
+            <div className="w-2 h-2 bg-white dark:bg-gray-900 border-r border-b border-gray-200 dark:border-gray-800 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
           </div>
         )}
       </div>
@@ -134,10 +134,11 @@ const HeatmapLayer = memo(({ mappedCookies }) => {
   return null;
 });
 
-export default function CookieMap({ mappedCookies, viewMode, now }) {
+export default function CookieMap({ mappedCookies, viewMode, now, activeMapMarker, setActiveMapMarker }) {
   const [mapCenter, setMapCenter] = useState({ lat: 20, lng: 0 });
   const [mapZoom, setMapZoom] = useState(3);
-  const [activeMapMarker, setActiveMapMarker] = useState(null);
+
+  // Removed the local state `const [activeMapMarker, setActiveMapMarker]` that was blocking the prop!
 
   const handleZoomIn = (e) => { e.stopPropagation(); setMapZoom((prev) => Math.min(prev + 1, 15)); };
   const handleZoomOut = (e) => { e.stopPropagation(); setMapZoom((prev) => Math.max(prev - 1, 2)); };
@@ -148,14 +149,13 @@ export default function CookieMap({ mappedCookies, viewMode, now }) {
     setActiveMapMarker(null);
   };
 
-  // 🔥 Zoom-to-Pin logic added here
   const handleMarkerClick = useCallback((id, location) => {
     setActiveMapMarker((prev) => (prev === id ? null : id));
     if (location) {
       setMapCenter({ lat: Number(location.lat), lng: Number(location.lng) });
-      setMapZoom(14); // 14 gives a great street/neighborhood view of nearby areas
+      setMapZoom(14); 
     }
-  }, []);
+  }, [setActiveMapMarker]);
 
   return (
     <div className="lg:col-span-3 theme-glass-card border border-[var(--border-color)] rounded-3xl relative overflow-hidden flex items-center justify-center min-h-[420px] shadow-sm group bg-[var(--card-bg)]">

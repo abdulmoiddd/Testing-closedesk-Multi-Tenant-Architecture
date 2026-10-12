@@ -5,11 +5,23 @@ import { APIProvider, Map, AdvancedMarker, useMap } from "@vis.gl/react-google-m
 
 // High-Tech Custom Marker with Sonar Radar Wave Rings
 const CustomGoogleMarker = memo(({ cookie, isJustNow, isActive, onMarkerClick }) => {
-  const [placeName, setPlaceName] = useState("");
+  // 1. Instantly fallback to the IP location data we already saved to avoid loading lag
+  const fallbackLocation = cookie.ipLocation?.city 
+    ? `${cookie.ipLocation.city}, ${cookie.ipLocation.country || ""}`.replace(/,\s*$/, "")
+    : "";
+
+  const [placeName, setPlaceName] = useState(fallbackLocation);
+  const [isLoading, setIsLoading] = useState(!fallbackLocation);
 
   useEffect(() => {
-    if (!isActive || placeName) return;
+    // Only fetch if we are active AND we don't have a place name yet
+    if (!isActive || placeName) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchPlaceName = async () => {
+      setIsLoading(true);
       try {
         const res = await fetch(
           `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${cookie.location.lat}&longitude=${cookie.location.lng}&localityLanguage=en`
@@ -18,12 +30,24 @@ const CustomGoogleMarker = memo(({ cookie, isJustNow, isActive, onMarkerClick })
           const data = await res.json();
           const city = data.city || data.locality || data.principalSubdivision || "";
           const country = data.countryName || "";
-          if (city || country) setPlaceName([city, country].filter(Boolean).join(", "));
+          
+          if (city || country) {
+            setPlaceName([city, country].filter(Boolean).join(", "));
+          } else {
+            // Graceful fallback if API succeeds but has no readable city name
+            setPlaceName(`Lat: ${Number(cookie.location.lat).toFixed(2)}, Lng: ${Number(cookie.location.lng).toFixed(2)}`);
+          }
+        } else {
+          setPlaceName(`Lat: ${Number(cookie.location.lat).toFixed(2)}, Lng: ${Number(cookie.location.lng).toFixed(2)}`);
         }
       } catch (error) {
         console.error("Failed to reverse geocode for map:", error);
+        setPlaceName(`Lat: ${Number(cookie.location.lat).toFixed(2)}, Lng: ${Number(cookie.location.lng).toFixed(2)}`);
+      } finally {
+        setIsLoading(false);
       }
     };
+    
     fetchPlaceName();
   }, [isActive, cookie.location.lat, cookie.location.lng, placeName]);
 
@@ -62,11 +86,13 @@ const CustomGoogleMarker = memo(({ cookie, isJustNow, isActive, onMarkerClick })
           )}
         </div>
 
-        {/* Selected Marker Detail Card - FIXED TOOLTIP CSS OVERRIDE BUG */}
+        {/* Selected Marker Detail Card */}
         {isActive && (
           <div className="absolute bottom-[34px] flex flex-col items-center pointer-events-none bg-white dark:bg-gray-900 px-3 py-1.5 rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 min-w-max animate-in fade-in zoom-in-95 duration-200 z-50">
             <span className="text-xs font-bold text-gray-900 dark:text-white tracking-wide leading-tight">{cookie.username}</span>
-            <span className="text-[10px] font-semibold text-[var(--primary)] leading-tight mt-0.5">{placeName || "Fetching location..."}</span>
+            <span className="text-[10px] font-semibold text-[var(--primary)] leading-tight mt-0.5">
+              {placeName || (isLoading ? "Fetching location..." : "Location unknown")}
+            </span>
             <div className="w-2 h-2 bg-white dark:bg-gray-900 border-r border-b border-gray-200 dark:border-gray-800 rotate-45 absolute -bottom-1 left-1/2 -translate-x-1/2"></div>
           </div>
         )}

@@ -79,24 +79,10 @@ export default function CookieGrid({
   selectedCookies,
   toggleSelection,
   hasActiveFilters,
-  clearFilters,
-  searchQuery,
-  setSearchQuery
+  clearFilters
 }) {
   
   if (displayCookies.length === 0) {
-    if (searchQuery) {
-      return (
-        <div className="text-center py-16 theme-glass-card border-dashed">
-          <p className="text-[var(--foreground-muted)] font-medium">
-            No results found for "{searchQuery}"
-          </p>
-          <button onClick={() => setSearchQuery("")} className="mt-4 text-sm text-[var(--primary)] hover:underline">
-            Clear search
-          </button>
-        </div>
-      );
-    }
     return (
       <div className="text-center py-20 theme-glass-card border-dashed">
         <p className="text-[var(--foreground-muted)] font-medium">

@@ -30,7 +30,7 @@ const CustomGoogleMarker = memo(({ cookie, isJustNow, isActive, onMarkerClick })
   return (
     <AdvancedMarker
       position={{ lat: Number(cookie.location.lat), lng: Number(cookie.location.lng) }}
-      onClick={() => onMarkerClick(cookie.id)}
+      onClick={() => onMarkerClick(cookie.id, cookie.location)}
       zIndex={isActive ? 100 : isJustNow ? 50 : 1}
     >
       <div className="relative flex flex-col items-center justify-center cursor-pointer select-none">
@@ -148,8 +148,13 @@ export default function CookieMap({ mappedCookies, viewMode, now }) {
     setActiveMapMarker(null);
   };
 
-  const handleMarkerClick = useCallback((id) => {
+  // 🔥 Zoom-to-Pin logic added here
+  const handleMarkerClick = useCallback((id, location) => {
     setActiveMapMarker((prev) => (prev === id ? null : id));
+    if (location) {
+      setMapCenter({ lat: Number(location.lat), lng: Number(location.lng) });
+      setMapZoom(14); // 14 gives a great street/neighborhood view of nearby areas
+    }
   }, []);
 
   return (

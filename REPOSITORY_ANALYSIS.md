@@ -1,10 +1,14 @@
 # CloseDesk / AicyroNext — Repository Analysis
 
-Updated: 22 September 2026, from workspace `d:\Software House 01\CloseDesk-Aicyro-GIT`.
+Updated: 13 October 2026, reflecting the current workspace sync at `d:\Software House 01\CloseDesk-Aicyro-GIT`.
+
+**Repository sync snapshot:** This document reflects the current Next.js application, Firebase-backed admin dashboard, observability logs, and Cloud Functions as they exist in the synced workspace. It is intended as a living architecture map for onboarding, review, and dependency tracking.
 
 **Product:** CloseDesk (branded publicly as Aicyro) — a marketing site plus an AI front-desk widget (text chat, OpenAI Realtime voice, and Vision image diagnostics), a Pulse admin dashboard (`/lg`), structured logging (`/logs`), and Firebase-backed lead/email automation.
 
 **Runtime:** Next.js 16 pages router, React 19, Tailwind 3, Firebase Realtime Database + Storage, OpenAI (chat JSON, Vision `gpt-4o-mini`, Realtime WebRTC), AWS Polly (TTS preview), Firebase Cloud Functions (dynamic Gmail SMTP).
+
+**Current repo highlights (2026 refresh):** This workspace includes live OAuth-based email provider setup for Google and Microsoft365 alongside the earlier SMTP flow, a dedicated superadmin email protocol UI, and additional dashboard cookie-management screens. The platform still uses the classic pages router, but the admin surface now spans email configuration, OAuth connection flows, and more granular cookie/analytics views than the original analysis captured.
 
 ---
 
@@ -110,6 +114,8 @@ api/
   generate-audit.js, generate-email.js, insights.js, leads.js
   login.js, openai-token.js, openai-token copy.js, openai-token copy 2.js
   sync-voice.js, tts.js, upload-logo.js
+  auth/google/{login.js, callback.js}
+  auth/microsoft/{login.js, callback.js}
   cron/retention-cleanup.js
 ```
 
@@ -128,18 +134,18 @@ auditTracer.js, activityTracker.js, notificationHelper.js
 ```text
 ThemeProvider.jsx, ThemeToggle.jsx, GlobalActivityTracker.jsx
 Chatbot/AicyroChatbot.jsx
-Essential/{Navbar, Navbar copy, Footer, Seo, CookieConsentBanner}.jsx
+Essential/{Navbar, Navbar copy, Footer, Seo, CookieConsentBanner, Secondary_navbar}.jsx
 Form/{Popupform, PopupModel}.jsx
 Home/{Hero, Problem, TheTurn, NightScene, Pricing, Compare, NotFor, Trust, Offer, Faq, Cta}.jsx
 Home/OLD/{Speed, Solution, LivePreviewSection, Process, Industries, Pulse,
           Founding, DoneForYou, TheDifference, FaqAndFooter}.jsx
 Dashboard/{LoginScreen, HomeScreen, TerminalScreen, NewScreen, Booking, Insight,
            Conversations, Report, OperatingHours, LiveNotifications,
-           CookieDataDisplay, SettingsScreen}.jsx
+           CookieDataDisplay, SettingsScreen, cookie/CookieGrid, cookie/CookieMap}.jsx
 Dashboard/Settings/{PasswordChange, BusinessProfile, Chatbotsetting,
                     notification-settings, apearance}.jsx
 Dashboard/superadmin/{superadminlogin, SuperAdminDashboard, ClientManagement}.jsx
-Dashboard/superadmin/Settings/SuperAdminAppearance.jsx
+Dashboard/superadmin/Settings/{SuperAdminAppearance, SuperAdminEmailProtocol}.jsx
 ```
 
 ---
@@ -156,12 +162,13 @@ Dashboard/superadmin/Settings/SuperAdminAppearance.jsx
 | `openai` ^6.37.0                           | Chat Completions, Vision (`image_url`), Realtime client secrets     |
 | `@aws-sdk/client-polly`                    | `/api/tts` MP3 synthesis for dashboard voice preview                |
 | `@aws-sdk/client-transcribe`               | Declared; **not imported** by application source                    |
+| `@vis.gl/react-google-maps`               | Map-based cookie/geolocation display in the dashboard               |
 | `formidable`                               | Declared; **not used** (`upload-logo.js` is a misplaced token mint) |
 | `framer-motion`                            | Landing motion (`Home/OLD/DoneForYou` and similar)                  |
 | `jspdf`                                    | PDF export on `/free-website-audit`                                 |
 | `lucide-react`                             | Icons                                                               |
+| `node-fetch`                               | Used in OAuth callback code for Google/Microsoft token exchange      |
 | `react-hot-toast`                          | Still in package.json; notification settings now use a custom toast |
-| `react-simple-maps`                        | CookieDataDisplay geo visualization                                 |
 | `recharts`                                 | Insight charts                                                      |
 | `tailwindcss` + `postcss` + `autoprefixer` | Styling                                                             |
 | `eslint` + `eslint-config-next`            | Lint                                                                |
@@ -520,12 +527,13 @@ Legacy blocks still imported by `index.jsx` but commented out in the return: Spe
 - **Pages router only** — no `src/app/`.
 - **Observability is first-class**: almost every API is `withApiLogger`; UI uses presets; logs land in RTDB and `/logs`.
 - **RAG is stubbed**: chat wraps a mock vector search when `retrievedKnowledge` is passed from the client.
-- **Auth is not Firebase Auth**: dashboard uses RTDB password tables + `localStorage`. `/api/app-query` trusts client-supplied `role`/`userId`.
+- **Auth is not Firebase Auth**: dashboard uses RTDB password tables + `localStorage`; some admin flows also rely on OAuth-backed mail providers. `/api/app-query` still trusts client-supplied `role`/`userId`.
 - **Voice rollback**: `settings/chatbot_config.voiceEnabled = false` hides UI and 403s token mint.
 - **Vision is domain-gated**: off-topic photos are rejected in-model (`is_irrelevant`) and never stored as defects.
-- **SMTP is dashboard-owned**: functions no longer hard-bind only to env Gmail; `settings/email_config` wins.
-- **SMTP secrets live in RTDB** (`smtpPassword`) if an admin saves them from Pulse — treat that node as highly sensitive.
+- **SMTP is dashboard-owned**: functions no longer hard-bind only to env Gmail; `settings/email_config` wins, and Google/Microsoft OAuth providers can populate SMTP identity + refresh token state.
+- **SMTP secrets live in RTDB** (`smtpPassword`, OAuth `refreshToken`, `clientId`, `clientSecret`) if an admin saves them from Pulse — treat that node as highly sensitive.
 - **Notification schema drift**: Pulse UI fields (`emailAlerts`, `urgentOnly`) do not match Function gates (`urgentAlerts`, `afterHoursAlerts`). Receiver does use `adminEmail`.
+- **Superadmin email protocol support**: `SuperAdminEmailProtocol.jsx` exposes provider presets for Google, Microsoft 365, Hostinger, Namecheap, cPanel, and custom SMTP, then persists them in `settings/email_config`.
 
 ---
 

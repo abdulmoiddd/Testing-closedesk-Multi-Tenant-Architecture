@@ -1,5 +1,5 @@
 // src/lib/notificationHelper.js
-import { db } from "./firebase";
+import { db } from "./firebase.js";
 import { ref, push, set } from "firebase/database";
 
 // Also log silently to internal UI history

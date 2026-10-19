@@ -146,6 +146,12 @@ ${clientConfig.custom_rules ? `  - Custom Policy:\n${clientConfig.custom_rules}`
 ${Array.isArray(clientConfig.business_intelligence_fields) && clientConfig.business_intelligence_fields.length > 0 ? `  - Target Business Intelligence to naturally collect:\n${clientConfig.business_intelligence_fields.map((f) => `    * ${f}`).join("\n")}` : ""}
 
 
+* ACTION EXECUTION ("APIs ARE TRUTH"):
+  You cannot directly write records to the CRM or database. When the customer confirms their request or booking, or when you have collected sufficient information to officially create their ticket, request an authoritative backend tool:
+  - To submit a service inquiry or repair ticket: set "requested_tool": { "name": "create_service_request", "args": { "name": "...", "phone": "...", "email": "...", "address": "...", "category": "...", "problem_description": "...", "urgency": "Low|Medium|High|Emergency", "preferred_time": "..." } }
+  - To lock in an appointment: set "requested_tool": { "name": "create_booking", "args": { "name": "...", "phone": "...", "email": "...", "date": "...", "time": "...", "service_type": "..." } }
+  - If no backend tool is ready or required this turn, set "requested_tool": null.
+
 -------------------------------------------------------------------------------
 4. KNOWN SESSION CONTEXT & STRUCTURED MEMORY
 -------------------------------------------------------------------------------
@@ -164,6 +170,10 @@ You MUST respond with a valid JSON object strictly matching this schema:
   "urgency": "Low | Medium | High | Emergency",
   "is_emergency": boolean,
   "suggested_shortcuts": ["string (max 3 short reply options for the user)"],
+  "requested_tool": {
+    "name": "create_service_request | create_booking | null",
+    "args": {}
+  },
   "context_patch": {
     "customer": {
       "name": "string or null",
@@ -191,3 +201,4 @@ You MUST respond with a valid JSON object strictly matching this schema:
 }
 `.trim();
 }
+

@@ -1,9 +1,303 @@
 {
+  "analytics": {},
+  "analytics_events": {},
+  "archived_notifications": {},
+  "audits": {},
+  "email_alerts": {
+    "alert_sample_01": {
+      "event_type": "end",
+      "lead_data": {
+        "email": "moid@aicyro.com",
+        "name": "Moid",
+        "phone": "03472539535",
+        "urgency_level": "High"
+      },
+      "message": "Urgent consultation requested for AI Business Systems.",
+      "status": "pending",
+      "timestamp": "2026-10-19T14:00:00.000Z",
+      "title": "New Lead Alert"
+    }
+  },
+  "founding_applications": {},
+  "leads": {
+    "lead_sample_01": {
+      "after_hours_flag": false,
+      "booking_status": "In Progress",
+      "business_name": "Aicyro",
+      "business_problem": "Need to automate incoming sales inquiries and lead qualification.",
+      "business_type": "SaaS",
+      "conversation_started_at": "2026-10-19T13:50:00.000Z",
+      "conversation_summary": "Visitor inquired about AI business systems and wants a demo.",
+      "created_at": "2026-10-19T13:50:00.000Z",
+      "email": "lead@example.com",
+      "lead_id": "lead_sample_01",
+      "lead_score": "High",
+      "name": "Sarah Connor",
+      "phone": "+1-555-0199",
+      "service_requested": "Automated Lead Capture",
+      "source": "Website AI Front Desk",
+      "source_page": "https://www.aicyro.com",
+      "urgency_level": "High"
+    }
+  },
+  "login": [
+    null,
+    {
+      "name": "root",
+      "password": "root"
+    },
+    {
+      "name": "admin",
+      "password": "root"
+    },
+    {
+      "name": "saad",
+      "password": "saad"
+    },
+    {
+      "name": "team",
+      "password": "root"
+    }
+  ],
+  "logs": {},
+  "notifications": {},
+  "prospects": {},
+  "session_actions": {},
+  "settings": {
+    "business_profile": {
+      "basic_info": {
+        "address": "Rawalpindi, Pakistan",
+        "avgJobValue": "200",
+        "businessName": "Aicyro",
+        "email": "info@aicyro.com",
+        "industry": "SaaS",
+        "phone": "03472539535",
+        "website": "www.aicyro.com"
+      },
+      "operating_hours": {
+        "Monday": {
+          "active": true,
+          "close": "17:00",
+          "open": "09:00"
+        },
+        "Tuesday": {
+          "active": true,
+          "close": "17:00",
+          "open": "09:00"
+        },
+        "Wednesday": {
+          "active": true,
+          "close": "17:00",
+          "open": "09:00"
+        },
+        "Thursday": {
+          "active": true,
+          "close": "17:00",
+          "open": "09:00"
+        },
+        "Friday": {
+          "active": true,
+          "close": "17:00",
+          "open": "09:00"
+        },
+        "Saturday": {
+          "active": false,
+          "close": "17:00",
+          "open": "09:00"
+        },
+        "Sunday": {
+          "active": false,
+          "close": "17:00",
+          "open": "09:00"
+        }
+      },
+      "timezone": "Asia/Karachi",
+      "updated_at": "2026-09-25T14:04:09.234Z"
+    },
+    "chatbot_config": {
+      "additionalConversationalRules": "1. Always end your message with a question.\n2. Never use emojis.\n3. CRITICAL: Keep all answers short. Never write more than 2 or 3 short sentences. Be punchy and get straight to the point.",
+      "aiModel": "gpt-4o-mini",
+      "basePrompt": "Operate a strict, funnel-based lead capture system. Give precise answers and use as few tokens as possible.",
+      "bookingRule": "require_all",
+      "botAvatar": "human_agent",
+      "botIdentity": "the raja for Aicyro",
+      "botName": "Aicyro",
+      "botVoice": "Justin",
+      "businessIntelligenceFields": [
+        "Industry Type",
+        "Primary Business Problem",
+        "Current CRM/Software",
+        "Meeting Preference (Demo vs. Consultation)",
+        "Location",
+        "Website"
+      ],
+      "companyContext": "We provide automated AI business systems and digital products.",
+      "customAvatarSvg": "<svg width=\"512\" height=\"512\" viewBox=\"0 0 512 512\"\n     xmlns=\"http://www.w3.org/2000/svg\">\n\n  <defs>\n    <!-- Main gradients -->\n    <linearGradient id=\"helmet\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#ffffff\"/>\n      <stop offset=\"0.45\" stop-color=\"#dfe7f5\"/>\n      <stop offset=\"1\" stop-color=\"#aebbd2\"/>\n    </linearGradient>\n\n    <linearGradient id=\"helmetDark\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#17243e\"/>\n      <stop offset=\"0.5\" stop-color=\"#080f23\"/>\n      <stop offset=\"1\" stop-color=\"#27385c\"/>\n    </linearGradient>\n\n    <linearGradient id=\"visor\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#071126\"/>\n      <stop offset=\"0.5\" stop-color=\"#101d3d\"/>\n      <stop offset=\"1\" stop-color=\"#17284d\"/>\n    </linearGradient>\n\n    <linearGradient id=\"body\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#ffffff\"/>\n      <stop offset=\"0.5\" stop-color=\"#e5ebf5\"/>\n      <stop offset=\"1\" stop-color=\"#aab8cf\"/>\n    </linearGradient>\n\n    <linearGradient id=\"shoulder\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#f7f9ff\"/>\n      <stop offset=\"0.55\" stop-color=\"#cbd5e7\"/>\n      <stop offset=\"1\" stop-color=\"#8797b1\"/>\n    </linearGradient>\n\n    <linearGradient id=\"neck\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">\n      <stop offset=\"0\" stop-color=\"#26395f\"/>\n      <stop offset=\"1\" stop-color=\"#080f22\"/>\n    </linearGradient>\n\n    <!-- Cyan glow -->\n    <filter id=\"glow\" x=\"-100%\" y=\"-100%\" width=\"300%\" height=\"300%\">\n      <feGaussianBlur stdDeviation=\"5\" result=\"blur\"/>\n      <feMerge>\n        <feMergeNode in=\"blur\"/>\n        <feMergeNode in=\"SourceGraphic\"/>\n      </feMerge>\n    </filter>\n\n    <filter id=\"softGlow\" x=\"-100%\" y=\"-100%\" width=\"300%\" height=\"300%\">\n      <feGaussianBlur stdDeviation=\"10\"/>\n    </filter>\n\n    <!-- Subtle shadow -->\n    <filter id=\"shadow\" x=\"-30%\" y=\"-30%\" width=\"160%\" height=\"170%\">\n      <feDropShadow dx=\"0\" dy=\"10\" stdDeviation=\"12\"\n                    flood-color=\"#00102e\" flood-opacity=\"0.35\"/>\n    </filter>\n\n    <clipPath id=\"visorClip\">\n      <rect x=\"105\" y=\"126\" width=\"302\" height=\"220\" rx=\"82\"/>\n    </clipPath>\n  </defs>\n\n\n  <!-- ===================================================== -->\n  <!-- CYAN AMBIENT GLOW                                     -->\n  <!-- ===================================================== -->\n\n  <ellipse cx=\"256\" cy=\"465\"\n           rx=\"155\" ry=\"24\"\n           fill=\"#00cfff\"\n           opacity=\"0.18\"\n           filter=\"url(#softGlow)\"/>\n\n\n  <!-- ===================================================== -->\n  <!-- HEAD / HELMET                                         -->\n  <!-- ===================================================== -->\n\n  <g filter=\"url(#shadow)\">\n\n    <!-- Outer helmet -->\n    <rect x=\"69\" y=\"54\"\n          width=\"374\"\n          height=\"320\"\n          rx=\"145\"\n          fill=\"url(#helmetDark)\"\n          stroke=\"#34466e\"\n          stroke-width=\"4\"/>\n\n    <!-- Cyan outer rim -->\n    <path d=\"\n      M256 66\n      C151 66 78 132 78 231\n      C78 317 145 364 256 364\n      C367 364 434 317 434 231\n      C434 132 361 66 256 66Z\"\n      fill=\"none\"\n      stroke=\"#12cfff\"\n      stroke-width=\"3\"\n      opacity=\"0.8\"\n      filter=\"url(#glow)\"\n    />\n\n    <!-- Main helmet -->\n    <rect x=\"83\" y=\"72\"\n          width=\"346\"\n          height=\"292\"\n          rx=\"132\"\n          fill=\"url(#helmet)\"\n          stroke=\"#f9fbff\"\n          stroke-width=\"3\"/>\n\n    <!-- Helmet top panel -->\n    <path d=\"\n      M190 80\n      C193 69 203 64 216 64\n      H296\n      C309 64 319 69 322 80\n      L315 108\n      H197Z\"\n      fill=\"url(#helmetDark)\"\n      stroke=\"#34466e\"\n      stroke-width=\"3\"/>\n\n    <!-- Top cyan light -->\n    <rect x=\"218\" y=\"82\"\n          width=\"76\"\n          height=\"8\"\n          rx=\"4\"\n          fill=\"#5beaff\"\n          filter=\"url(#glow)\"/>\n\n\n    <!-- ================================================= -->\n    <!-- VISOR                                             -->\n    <!-- ================================================= -->\n\n    <rect x=\"102\" y=\"123\"\n          width=\"308\"\n          height=\"224\"\n          rx=\"84\"\n          fill=\"#020817\"\n          opacity=\"0.35\"/>\n\n    <rect x=\"105\" y=\"119\"\n          width=\"302\"\n          height=\"226\"\n          rx=\"82\"\n          fill=\"url(#visor)\"\n          stroke=\"#27385e\"\n          stroke-width=\"4\"/>\n\n    <!-- Visor reflection -->\n    <g clip-path=\"url(#visorClip)\">\n      <path d=\"\n        M110 130\n        C180 105 265 105 350 124\n        C292 151 229 168 142 169Z\"\n        fill=\"#ffffff\"\n        opacity=\"0.055\"/>\n\n      <path d=\"\n        M270 115\n        C330 120 378 137 407 163\n        L407 215\n        C354 174 319 148 270 115Z\"\n        fill=\"#ffffff\"\n        opacity=\"0.045\"/>\n    </g>\n\n\n    <!-- ================================================= -->\n    <!-- FACE / EYES                                      -->\n    <!-- ================================================= -->\n\n    <!-- Eye glow -->\n    <path d=\"M142 220 Q171 182 201 220\"\n          fill=\"none\"\n          stroke=\"#00d9ff\"\n          stroke-width=\"15\"\n          stroke-linecap=\"round\"\n          opacity=\"0.35\"\n          filter=\"url(#softGlow)\"/>\n\n    <path d=\"M311 220 Q341 182 370 220\"\n          fill=\"none\"\n          stroke=\"#00d9ff\"\n          stroke-width=\"15\"\n          stroke-linecap=\"round\"\n          opacity=\"0.35\"\n          filter=\"url(#softGlow)\"/>\n\n    <!-- Eyes -->\n    <path d=\"M142 220 Q171 187 201 220\"\n          fill=\"none\"\n          stroke=\"#63edff\"\n          stroke-width=\"8\"\n          stroke-linecap=\"round\"\n          filter=\"url(#glow)\"/>\n\n    <path d=\"M311 220 Q341 187 370 220\"\n          fill=\"none\"\n          stroke=\"#63edff\"\n          stroke-width=\"8\"\n          stroke-linecap=\"round\"\n          filter=\"url(#glow)\"/>\n\n\n    <!-- Smile glow -->\n    <path d=\"M218 265 Q256 292 294 265\"\n          fill=\"none\"\n          stroke=\"#00d9ff\"\n          stroke-width=\"13\"\n          stroke-linecap=\"round\"\n          opacity=\"0.4\"\n          filter=\"url(#softGlow)\"/>\n\n    <!-- Smile -->\n    <path d=\"M218 265 Q256 292 294 265\"\n          fill=\"none\"\n          stroke=\"#61efff\"\n          stroke-width=\"7\"\n          stroke-linecap=\"round\"\n          filter=\"url(#glow)\"/>\n\n\n    <!-- ================================================= -->\n    <!-- SIDE HEADPHONES                                   -->\n    <!-- ================================================= -->\n\n    <!-- Left ear -->\n    <rect x=\"69\" y=\"172\"\n          width=\"43\"\n          height=\"119\"\n          rx=\"20\"\n          fill=\"url(#helmetDark)\"\n          stroke=\"#4b5c7d\"\n          stroke-width=\"3\"/>\n\n    <rect x=\"77\" y=\"195\"\n          width=\"7\"\n          height=\"65\"\n          rx=\"3.5\"\n          fill=\"#20d9ff\"\n          filter=\"url(#glow)\"/>\n\n    <!-- Right ear -->\n    <rect x=\"400\" y=\"172\"\n          width=\"43\"\n          height=\"119\"\n          rx=\"20\"\n          fill=\"url(#helmetDark)\"\n          stroke=\"#4b5c7d\"\n          stroke-width=\"3\"/>\n\n    <rect x=\"428\" y=\"195\"\n          width=\"7\"\n          height=\"65\"\n          rx=\"3.5\"\n          fill=\"#20d9ff\"\n          filter=\"url(#glow)\"/>\n\n\n    <!-- ================================================= -->\n    <!-- MICROPHONE                                        -->\n    <!-- ================================================= -->\n\n    <path d=\"\n      M395 284\n      C407 294 407 307 397 318\n      L366 342\"\n      fill=\"none\"\n      stroke=\"#101c35\"\n      stroke-width=\"8\"\n      stroke-linecap=\"round\"/>\n\n    <rect x=\"347\" y=\"330\"\n          width=\"58\"\n          height=\"38\"\n          rx=\"19\"\n          fill=\"url(#helmetDark)\"\n          stroke=\"#40547b\"\n          stroke-width=\"3\"/>\n\n    <rect x=\"365\" y=\"345\"\n          width=\"23\"\n          height=\"5\"\n          rx=\"2.5\"\n          fill=\"#5cecff\"\n          filter=\"url(#glow)\"/>\n\n  </g>\n\n\n  <!-- ===================================================== -->\n  <!-- NECK                                                   -->\n  <!-- ===================================================== -->\n\n  <path d=\"\n    M208 350\n    H304\n    L316 419\n    H196Z\"\n    fill=\"url(#neck)\"\n    stroke=\"#1e3155\"\n    stroke-width=\"4\"/>\n\n  <!-- Neck cyan ring -->\n  <path d=\"\n    M198 393\n    Q256 417 314 393\"\n    fill=\"none\"\n    stroke=\"#18ddff\"\n    stroke-width=\"7\"\n    opacity=\"0.9\"\n    filter=\"url(#glow)\"/>\n\n\n  <!-- ===================================================== -->\n  <!-- BODY                                                   -->\n  <!-- ===================================================== -->\n\n  <path d=\"\n    M196 393\n    C166 398 137 409 111 427\n    C82 447 65 473 61 512\n    H451\n    C447 473 430 447 401 427\n    C375 409 346 398 316 393\n    C295 410 217 410 196 393Z\"\n    fill=\"url(#body)\"\n    stroke=\"#aab8cd\"\n    stroke-width=\"3\"\n    filter=\"url(#shadow)\"/>\n\n\n  <!-- ===================================================== -->\n  <!-- LEFT SHOULDER                                           -->\n  <!-- ===================================================== -->\n\n  <path d=\"\n    M196 407\n    C159 410 126 427 101 452\n    C84 469 76 492 74 512\n    H165\n    C181 488 193 455 196 407Z\"\n    fill=\"url(#shoulder)\"\n    stroke=\"#899ab5\"\n    stroke-width=\"3\"/>\n\n  <!-- Left shoulder cyan accent -->\n  <path d=\"\n    M108 466\n    C95 481 89 496 87 512\"\n    fill=\"none\"\n    stroke=\"#22ddff\"\n    stroke-width=\"7\"\n    stroke-linecap=\"round\"\n    filter=\"url(#glow)\"/>\n\n\n  <!-- ===================================================== -->\n  <!-- RIGHT SHOULDER                                          -->\n  <!-- ===================================================== -->\n\n  <path d=\"\n    M316 407\n    C353 410 386 427 411 452\n    C428 469 436 492 438 512\n    H347\n    C331 488 319 455 316 407Z\"\n    fill=\"url(#shoulder)\"\n    stroke=\"#899ab5\"\n    stroke-width=\"3\"/>\n\n  <!-- Right shoulder cyan accent -->\n  <path d=\"\n    M404 466\n    C417 481 423 496 425 512\"\n    fill=\"none\"\n    stroke=\"#22ddff\"\n    stroke-width=\"7\"\n    stroke-linecap=\"round\"\n    filter=\"url(#glow)\"/>\n\n\n  <!-- ===================================================== -->\n  <!-- CHEST PANEL                                             -->\n  <!-- ===================================================== -->\n\n  <path d=\"\n    M197 420\n    C218 431 294 431 315 420\n    L337 512\n    H175Z\"\n    fill=\"#eef3fa\"\n    opacity=\"0.9\"/>\n\n  <path d=\"\n    M218 447\n    Q256 462 294 447\"\n    fill=\"none\"\n    stroke=\"#b5c4d9\"\n    stroke-width=\"4\"\n    opacity=\"0.7\"/>\n\n  <!-- Chest center light -->\n  <circle cx=\"256\" cy=\"472\"\n          r=\"7\"\n          fill=\"#48eaff\"\n          filter=\"url(#glow)\"/>\n\n</svg>",
+      "customRules": "Never mention competitors. Keep answers extremely brief.",
+      "escalationRule": "email_admin",
+      "faqs": [
+        {
+          "answer": "I am the broker for your booking.",
+          "question": "who are you?"
+        }
+      ],
+      "greetingMessage": "hey there, want to know how i can help you close more leads ?",
+      "launcherText": "Need Help?",
+      "leadCaptureFields": [
+        "Name",
+        "Email",
+        "Phone"
+      ],
+      "serviceCategory": "General",
+      "services": [
+        "Saas"
+      ],
+      "strictValidation": true,
+      "temperature": "0.2",
+      "themeColor": "#101bb7",
+      "tone": "Casual & Enthusiastic",
+      "unavailableBehavior": "collect_lead",
+      "updated_at": "2026-10-17T04:54:07.694Z"
+    },
+    "email_config": {
+      "provider": "custom",
+      "senderName": "Aicyro Pro",
+      "smtpEmail": "",
+      "smtpHost": "",
+      "smtpPassword": "",
+      "smtpPort": "",
+      "smtpService": "custom_smtp"
+    },
+    "log_retention": {
+      "AI": 60,
+      "APPLICATION": 30,
+      "DEBUG": 7,
+      "ERROR": 90,
+      "SECURITY_AUDIT": 365,
+      "approved_by": "Product Owner Name",
+      "approved_date": "2026-09-17",
+      "is_approved": true
+    }
+  },
+  "superAdmin": [
+    null,
+    {
+      "name": "admin",
+      "password": "admin",
+      "pin": "1234"
+    }
+  ],
+  "superAdminSettings": {
+    "admin": {
+      "appearance": {
+        "hue": "default",
+        "mode": "light",
+        "shade": 500
+      }
+    }
+  },
+  "system_alerts": {},
+  "system_logs": {},
+  "transcripts": {},
+  "user_cookies": {},
+  "users": {
+    "admin": {
+      "appearance": {
+        "applyScope": "dashboard",
+        "hue": "indigo",
+        "mode": "light",
+        "shade": 500
+      }
+    },
+    "root": {
+      "appearance": {
+        "applyScope": "dashboard",
+        "hue": "default",
+        "mode": "light",
+        "shade": 500
+      },
+      "notifications": {
+        "adminEmail": "moid@aicyro.com",
+        "adminPhone": "",
+        "afterHoursAlerts": true,
+        "dailySummary": true,
+        "emailAlerts": true,
+        "leadReceivers": "moid@aicyro.com",
+        "smsAlerts": false,
+        "urgentAlerts": true,
+        "urgentOnly": true,
+        "weeklySummary": true
+      }
+    }
+  },
+  "voice_errors": {},
+  "voice_telemetry": {},
+
   "industry_packs": {
+    "saas": {
+      "category": "technology_and_software",
+      "emergency_triggers": [
+        "security breach",
+        "database error",
+        "server outage",
+        "data loss",
+        "account compromised"
+      ],
+      "industry_name": "SaaS & AI Business Systems",
+      "pack_id": "saas",
+      "pricing_benchmarks": {
+        "avg_job_value": "200",
+        "currency": "USD"
+      },
+      "qualification_questions": [
+        {
+          "id": "business_problem",
+          "question": "What primary business bottleneck or challenge are you looking to automate?",
+          "required": true,
+          "type": "text"
+        },
+        {
+          "id": "current_software",
+          "options": ["HubSpot", "Salesforce", "ServiceTitan", "Housecall Pro", "Custom", "None"],
+          "question": "Which CRM or software stack does your team currently use?",
+          "required": false,
+          "type": "choice"
+        },
+        {
+          "id": "meeting_preference",
+          "options": ["Quick Demo", "Consultation"],
+          "question": "Would you prefer a 15-minute quick demo or a full workflow consultation?",
+          "required": true,
+          "type": "choice"
+        }
+      ],
+      "safety_protocols": {
+        "outage": {
+          "action": "ESCALATE_TO_ENGINEERING",
+          "script": "Our systems monitor critical services 24/7. I have flagged this incident directly to our on-call engineering team for immediate triage.",
+          "severity": "Emergency"
+        }
+      },
+      "services": [
+        {
+          "description": "Custom autonomous AI workers, front-desk triage, and automated scheduling.",
+          "id": "ai_business_systems",
+          "name": "Automated AI Business Systems"
+        },
+        {
+          "description": "High-conversion conversational funnels with structured qualification.",
+          "id": "lead_funnels",
+          "name": "Strict Lead Capture Funnels"
+        },
+        {
+          "description": "Deep synchronization between conversational AI and CRM database records.",
+          "id": "crm_integration",
+          "name": "CRM & Workflow Automations"
+        }
+      ],
+      "version": "1.0.0"
+    },
     "hvac": {
-      "pack_id": "hvac",
-      "version": "1.0.0",
-      "industry_name": "Heating, Ventilation & Air Conditioning",
       "category": "home_services",
       "emergency_triggers": [
         "smell gas",
@@ -17,181 +311,105 @@
         "sub-zero indoor temperature",
         "infant or elderly in extreme heat"
       ],
-      "safety_protocols": {
-        "gas_leak": {
-          "severity": "Emergency",
-          "action": "IMMEDIATE_EVACUATION",
-          "script": "If you smell natural gas or your carbon monoxide alarm is going off, please evacuate everyone from the home immediately. Do not flip any light switches or light any flames. Once you are safely outside, call 911 or your local gas utility.",
-          "allow_troubleshooting": false,
-          "allow_self_booking": false
-        },
-        "electrical_sparks": {
-          "severity": "Emergency",
-          "action": "POWER_DISCONNECT",
-          "script": "If you see active sparks or smoke coming from your HVAC unit, shut off the breaker for the system immediately if it is safe to reach. Please step away from the equipment.",
-          "allow_troubleshooting": false
-        }
+      "industry_name": "Heating, Ventilation & Air Conditioning",
+      "pack_id": "hvac",
+      "pricing_benchmarks": {
+        "currency": "USD",
+        "diagnostic_fee": 89,
+        "emergency_dispatch_fee": 169
       },
-      "services": [
-        {
-          "id": "ac_repair",
-          "name": "Air Conditioning Repair",
-          "description": "Diagnosis and repair of non-cooling AC units, refrigerant leaks, or frozen coils."
-        },
-        {
-          "id": "furnace_repair",
-          "name": "Heating & Furnace Repair",
-          "description": "Troubleshooting non-heating furnaces, pilot lights, blowers, or heat exchangers."
-        },
-        {
-          "id": "heat_pump_service",
-          "name": "Heat Pump Installation & Service",
-          "description": "Dual-fuel and ductless mini-split heat pump repair, maintenance, and new installations."
-        },
-        {
-          "id": "annual_tuneup",
-          "name": "Seasonal System Maintenance",
-          "description": "Comprehensive multi-point inspection, filter change, coil cleaning, and electrical check."
-        },
-        {
-          "id": "duct_cleaning",
-          "name": "Air Duct Cleaning & Sanitization",
-          "description": "Whole-home duct sanitization, debris extraction, and airflow balancing."
-        }
-      ],
       "qualification_questions": [
         {
           "id": "homeownership",
           "question": "Are you the owner of the property where service is needed?",
-          "type": "boolean",
-          "required": true
+          "required": true,
+          "type": "boolean"
         },
         {
           "id": "system_type",
-          "question": "What type of heating or cooling system do you have (Central AC, Heat Pump, Gas Furnace, or Mini-Split)?",
-          "type": "choice",
           "options": ["Central AC", "Gas Furnace", "Electric Furnace", "Heat Pump", "Ductless Mini-Split", "Boiler", "Unsure"],
-          "required": true
+          "question": "What type of heating or cooling system do you have (Central AC, Heat Pump, Gas Furnace, or Mini-Split)?",
+          "required": true,
+          "type": "choice"
         },
         {
           "id": "system_age",
-          "question": "Approximately how old is your current equipment?",
-          "type": "choice",
           "options": ["Under 5 years", "5-10 years", "10-15 years", "15+ years", "Unknown"],
-          "required": false
+          "question": "Approximately how old is your current equipment?",
+          "required": false,
+          "type": "choice"
         }
       ],
-      "pricing_benchmarks": {
-        "diagnostic_fee": 89,
-        "emergency_dispatch_fee": 169,
-        "currency": "USD"
-      }
-    },
-    "saas": {
-      "pack_id": "saas",
-      "version": "1.0.0",
-      "industry_name": "SaaS & AI Business Systems",
-      "category": "technology_and_software",
-      "emergency_triggers": [
-        "security breach",
-        "database error",
-        "server outage",
-        "data loss",
-        "account compromised"
-      ],
       "safety_protocols": {
-        "outage": {
-          "severity": "Emergency",
-          "action": "ESCALATE_TO_ENGINEERING",
-          "script": "Our systems monitor critical services 24/7. I have flagged this incident directly to our on-call engineering team for immediate triage."
+        "electrical_sparks": {
+          "action": "POWER_DISCONNECT",
+          "allow_troubleshooting": false,
+          "script": "If you see active sparks or smoke coming from your HVAC unit, shut off the breaker for the system immediately if it is safe to reach. Please step away from the equipment.",
+          "severity": "Emergency"
+        },
+        "gas_leak": {
+          "action": "IMMEDIATE_EVACUATION",
+          "allow_self_booking": false,
+          "allow_troubleshooting": false,
+          "script": "If you smell natural gas or your carbon monoxide alarm is going off, please evacuate everyone from the home immediately. Do not flip any light switches or light any flames. Once you are safely outside, call 911 or your local gas utility.",
+          "severity": "Emergency"
         }
       },
       "services": [
         {
-          "id": "ai_business_systems",
-          "name": "Automated AI Business Systems",
-          "description": "Custom autonomous AI workers, front-desk triage, and automated scheduling."
+          "description": "Diagnosis and repair of non-cooling AC units, refrigerant leaks, or frozen coils.",
+          "id": "ac_repair",
+          "name": "Air Conditioning Repair"
         },
         {
-          "id": "lead_funnels",
-          "name": "Strict Lead Capture Funnels",
-          "description": "High-conversion conversational funnels with structured qualification."
+          "description": "Troubleshooting non-heating furnaces, pilot lights, blowers, or heat exchangers.",
+          "id": "furnace_repair",
+          "name": "Heating & Furnace Repair"
         },
         {
-          "id": "crm_integration",
-          "name": "CRM & Workflow Automations",
-          "description": "Deep synchronization between conversational AI and CRM database records."
+          "description": "Dual-fuel and ductless mini-split heat pump repair, maintenance, and new installations.",
+          "id": "heat_pump_service",
+          "name": "Heat Pump Installation & Service"
+        },
+        {
+          "description": "Comprehensive multi-point inspection, filter change, coil cleaning, and electrical check.",
+          "id": "annual_tuneup",
+          "name": "Seasonal System Maintenance"
+        },
+        {
+          "description": "Whole-home duct sanitization, debris extraction, and airflow balancing.",
+          "id": "duct_cleaning",
+          "name": "Air Duct Cleaning & Sanitization"
         }
       ],
-      "qualification_questions": [
-        {
-          "id": "business_problem",
-          "question": "What primary business bottleneck or challenge are you looking to automate?",
-          "type": "text",
-          "required": true
-        },
-        {
-          "id": "current_software",
-          "question": "Which CRM or software stack does your team currently use?",
-          "type": "choice",
-          "options": ["HubSpot", "Salesforce", "ServiceTitan", "Housecall Pro", "Custom", "None"],
-          "required": false
-        },
-        {
-          "id": "meeting_preference",
-          "question": "Would you prefer a 15-minute quick demo or a full workflow consultation?",
-          "type": "choice",
-          "options": ["Quick Demo", "Consultation"],
-          "required": true
-        }
-      ],
-      "pricing_benchmarks": {
-        "avg_job_value": "200",
-        "currency": "USD"
-      }
+      "version": "1.0.0"
     }
   },
+
   "tenants": {
     "tenant_aicyro": {
-      "tenant_id": "tenant_aicyro",
-      "name": "Aicyro",
-      "status": "active",
-      "industry_pack_id": "saas",
-      "tier": "enterprise",
-      "created_at": 1773000000000,
-      "updated_at": 1773900000000,
       "client_config": {
-        "business_name": "Aicyro",
-        "industry": "SaaS",
+        "actions": ["create_service_request", "create_booking"],
+        "additional_rules": "1. Always end your message with a question.\n2. Never use emojis.\n3. CRITICAL: Keep all answers short. Never write more than 2 or 3 short sentences. Be punchy and get straight to the point.",
         "address": "Rawalpindi, Pakistan",
-        "phone": "03472539535",
-        "email": "info@aicyro.com",
-        "website": "www.aicyro.com",
-        "timezone": "Asia/Karachi",
-        "operating_hours": {
-          "monday": { "open": "09:00", "close": "17:00", "active": true },
-          "tuesday": { "open": "09:00", "close": "17:00", "active": true },
-          "wednesday": { "open": "09:00", "close": "17:00", "active": true },
-          "thursday": { "open": "09:00", "close": "17:00", "active": true },
-          "friday": { "open": "09:00", "close": "17:00", "active": true },
-          "saturday": { "open": "09:00", "close": "17:00", "active": false },
-          "sunday": { "open": "09:00", "close": "17:00", "active": false }
-        },
         "ai_persona": {
-          "name": "Aicyro",
-          "bot_identity": "the raja for Aicyro",
           "avatar_url": "human_agent",
-          "voice": "Justin",
-          "voice_enabled": true,
-          "tone": "Casual & Enthusiastic",
+          "bot_identity": "the raja for Aicyro",
+          "custom_avatar_svg": "<svg width=\"512\" height=\"512\" viewBox=\"0 0 512 512\" xmlns=\"http://www.w3.org/2000/svg\"><ellipse cx=\"256\" cy=\"465\" rx=\"155\" ry=\"24\" fill=\"#00cfff\" opacity=\"0.18\"/><rect x=\"69\" y=\"54\" width=\"374\" height=\"320\" rx=\"145\" fill=\"#17243e\" stroke=\"#34466e\" stroke-width=\"4\"/><rect x=\"83\" y=\"72\" width=\"346\" height=\"292\" rx=\"132\" fill=\"#ffffff\" stroke=\"#f9fbff\" stroke-width=\"3\"/><rect x=\"105\" y=\"119\" width=\"302\" height=\"226\" rx=\"82\" fill=\"#071126\" stroke=\"#27385e\" stroke-width=\"4\"/></svg>",
           "greeting_message": "hey there, want to know how i can help you close more leads ?",
           "launcher_text": "Need Help?",
-          "theme_color": "#101bb7"
+          "name": "Aicyro",
+          "theme_color": "#101bb7",
+          "tone": "Casual & Enthusiastic",
+          "voice": "Justin",
+          "voice_enabled": true
         },
         "base_prompt": "Operate a strict, funnel-based lead capture system. Give precise answers and use as few tokens as possible.",
-        "additional_rules": "1. Always end your message with a question.\n2. Never use emojis.\n3. CRITICAL: Keep all answers short. Never write more than 2 or 3 short sentences. Be punchy and get straight to the point.",
-        "custom_rules": "Never mention competitors. Keep answers extremely brief.",
-        "lead_capture_fields": ["Name", "Email", "Phone"],
+        "booking_rules": {
+          "allow_direct_booking": true,
+          "buffer_time_minutes": 30,
+          "rule_type": "require_all"
+        },
         "business_intelligence_fields": [
           "Industry Type",
           "Primary Business Problem",
@@ -200,68 +418,102 @@
           "Location",
           "Website"
         ],
-        "services_offered": ["Saas"],
+        "business_name": "Aicyro",
+        "company_context": "We provide automated AI business systems and digital products.",
+        "custom_rules": "Never mention competitors. Keep answers extremely brief.",
+        "email": "info@aicyro.com",
+        "emergency_rules": {
+          "after_hours_policy": "next_business_day_priority_booking",
+          "protocol": "Acknowledge urgency, collect contact info, and notify leadership immediately.",
+          "supports_24_7_dispatch": false
+        },
+        "faqs": [
+          {
+            "answer": "I am the broker for your booking.",
+            "question": "who are you?"
+          }
+        ],
+        "industry": "SaaS",
+        "lead_capture_fields": ["Name", "Email", "Phone"],
+        "operating_hours": {
+          "Friday": { "active": true, "close": "17:00", "open": "09:00" },
+          "Monday": { "active": true, "close": "17:00", "open": "09:00" },
+          "Saturday": { "active": false, "close": "17:00", "open": "09:00" },
+          "Sunday": { "active": false, "close": "17:00", "open": "09:00" },
+          "Thursday": { "active": true, "close": "17:00", "open": "09:00" },
+          "Tuesday": { "active": true, "close": "17:00", "open": "09:00" },
+          "Wednesday": { "active": true, "close": "17:00", "open": "09:00" }
+        },
+        "phone": "03472539535",
         "pricing": {
           "avg_job_value": "200",
           "currency": "USD"
         },
-        "emergency_rules": {
-          "supports_24_7_dispatch": false,
-          "after_hours_policy": "next_business_day_priority_booking"
+        "services_offered": ["Saas"],
+        "temperature": 0.2,
+        "timezone": "Asia/Karachi",
+        "website": "www.aicyro.com"
+      },
+      "created_at": 1773000000000,
+      "industry_pack_id": "saas",
+      "name": "Aicyro",
+      "secrets": {
+        "admin_email": "moid@aicyro.com",
+        "after_hours_alerts": true,
+        "daily_summary": true,
+        "email_alerts": true,
+        "lead_receivers": "moid@aicyro.com",
+        "sms_alerts": false,
+        "urgent_alerts": true,
+        "weekly_summary": true
+      },
+      "status": "active",
+      "tenant_id": "tenant_aicyro",
+      "tier": "enterprise",
+      "updated_at": 1773900000000
+    },
+    "tenant_apex_air_01": {
+      "client_config": {
+        "actions": ["create_service_request", "create_booking"],
+        "address": "400 Industrial Parkway, Suite 100, Denver, CO 80216",
+        "ai_persona": {
+          "avatar_url": "/avatars/human-agent.svg",
+          "name": "Apex Dispatch AI",
+          "tone": "Urgent, reassuring, and decisive",
+          "voice": "onyx"
         },
         "booking_rules": {
           "allow_direct_booking": true,
-          "buffer_time_minutes": 30,
-          "rule_type": "require_all"
-        }
-      },
-      "secrets": {
-        "admin_email": "moid@aicyro.com",
-        "lead_receivers": "moid@aicyro.com",
-        "urgent_alerts": true,
-        "after_hours_alerts": true,
-        "email_alerts": true
-      }
-    },
-    "tenant_apex_air_01": {
-      "tenant_id": "tenant_apex_air_01",
-      "name": "Apex Heating & Air Conditioning",
-      "status": "active",
-      "industry_pack_id": "hvac",
-      "tier": "enterprise",
-      "created_at": 1773000000000,
-      "updated_at": 1773900000000,
-      "client_config": {
-        "business_name": "Apex Heating & Air Conditioning",
-        "tagline": "24/7 Rapid Emergency Response & Commercial HVAC",
-        "phone": "+1-555-273-9000",
-        "email": "dispatch@apexairhvac.com",
-        "address": "400 Industrial Parkway, Suite 100, Denver, CO 80216",
-        "service_area": ["Denver", "Aurora", "Lakewood", "Arvada", "Westminster", "Centennial"],
-        "operating_hours": {
-          "monday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
-          "tuesday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
-          "wednesday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
-          "thursday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
-          "friday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
-          "saturday": { "open": "08:00", "close": "16:00", "emergency_dispatch": true },
-          "sunday": { "open": "09:00", "close": "14:00", "emergency_dispatch": true },
-          "after_hours_policy": "live_emergency_dispatch"
+          "buffer_time_minutes": 45
         },
+        "business_name": "Apex Heating & Air Conditioning",
+        "email": "dispatch@apexairhvac.com",
         "emergency_rules": {
-          "supports_24_7_dispatch": true,
+          "after_hours_policy": "live_emergency_dispatch",
           "emergency_dispatch_fee": 189,
           "max_response_time_minutes": 90,
           "on_call_phone": "+1-555-273-9911",
-          "protocol": "Collect caller name, street address, and active hazard. Advise power or gas shutoff if safe. Instantly trigger on-call technician SMS and reserve emergency calendar block."
+          "protocol": "Collect caller name, street address, and active hazard. Advise power or gas shutoff if safe. Instantly trigger on-call technician SMS and reserve emergency calendar block.",
+          "supports_24_7_dispatch": true
         },
+        "operating_hours": {
+          "friday": { "close": "19:00", "emergency_dispatch": true, "open": "07:00" },
+          "monday": { "close": "19:00", "emergency_dispatch": true, "open": "07:00" },
+          "saturday": { "close": "16:00", "emergency_dispatch": true, "open": "08:00" },
+          "sunday": { "close": "14:00", "emergency_dispatch": true, "open": "09:00" },
+          "thursday": { "close": "19:00", "emergency_dispatch": true, "open": "07:00" },
+          "tuesday": { "close": "19:00", "emergency_dispatch": true, "open": "07:00" },
+          "wednesday": { "close": "19:00", "emergency_dispatch": true, "open": "07:00" }
+        },
+        "phone": "+1-555-273-9000",
         "pricing": {
+          "currency": "USD",
           "diagnostic_fee": 89,
-          "waive_diagnostic_with_repair": true,
-          "minimum_repair_threshold_for_waiver": 250,
           "emergency_fee": 189,
-          "currency": "USD"
+          "minimum_repair_threshold_for_waiver": 250,
+          "waive_diagnostic_with_repair": true
         },
+        "service_area": ["Denver", "Aurora", "Lakewood", "Arvada", "Westminster", "Centennial"],
         "services_offered": [
           "ac_repair",
           "furnace_repair",
@@ -270,65 +522,66 @@
           "geothermal_heating",
           "annual_tuneup"
         ],
-        "booking_rules": {
-          "allow_direct_booking": true,
-          "slot_duration_minutes": 120,
-          "buffer_time_minutes": 30,
-          "calendar_integration": "servicetitan"
-        },
-        "ai_persona": {
-          "name": "Apex Dispatch Bot",
-          "tone": "Direct, urgent, professional, and reassuring",
-          "voice": "ash",
-          "avatar_url": "/avatars/ai-spark.svg"
-        }
+        "tagline": "24/7 Rapid Emergency Response & Commercial HVAC"
       },
+      "created_at": 1773000000000,
+      "industry_pack_id": "hvac",
+      "name": "Apex Heating & Air Conditioning",
       "secrets": {
-        "webhook_secret": "sec_apex_live_839f201e74b",
-        "smtp_host": "smtp.sendgrid.net",
-        "smtp_user": "apikey",
-        "smtp_password": "SG.mock_apex_smtp_token_1294819",
-        "crm_api_key": "st_live_994019284019284"
-      }
+        "admin_email": "dispatch@apexairhvac.com",
+        "google_client_id": "90218491.apps.googleusercontent.com",
+        "google_client_secret": "GOCSPX-mock_apex_secret",
+        "google_refresh_token": "1//04_mock_google_oauth_token_apex",
+        "webhook_secret": "sec_apex_89324bc91e"
+      },
+      "status": "active",
+      "tenant_id": "tenant_apex_air_01",
+      "tier": "enterprise",
+      "updated_at": 1773900000000
     },
     "tenant_cool_breeze_02": {
-      "tenant_id": "tenant_cool_breeze_02",
-      "name": "Cool Breeze Comfort Club",
-      "status": "active",
-      "industry_pack_id": "hvac",
-      "tier": "standard",
-      "created_at": 1773100000000,
-      "updated_at": 1773950000000,
       "client_config": {
-        "business_name": "Cool Breeze Comfort Club",
-        "tagline": "Residential Comfort Care & Planned Maintenance",
-        "phone": "+1-555-882-3344",
-        "email": "care@coolbreezecomfort.com",
+        "actions": ["create_service_request"],
         "address": "1248 Magnolia Blvd, Orlando, FL 32801",
-        "service_area": ["Orlando", "Winter Park", "Altamonte Springs", "Kissimmee"],
+        "ai_persona": {
+          "avatar_url": "/avatars/bot-classic.svg",
+          "name": "Breezy",
+          "tone": "Warm, consultative, family-oriented, and friendly",
+          "voice": "alloy"
+        },
+        "booking_rules": {
+          "allow_direct_booking": false,
+          "buffer_time_minutes": 45,
+          "calendar_integration": "google_calendar",
+          "slot_duration_minutes": 90
+        },
+        "business_name": "Cool Breeze Comfort Club",
+        "email": "care@coolbreezecomfort.com",
+        "emergency_rules": {
+          "after_hours_policy": "next_business_day_priority_booking",
+          "emergency_dispatch_fee": null,
+          "protocol": "We do not offer after-hours emergency dispatches. If gas smell is reported, immediately mandate 911 evacuation. For non-hazardous no-cooling or no-heating after-hours calls, express empathy and offer the first priority arrival slot on the next business morning at 8:00 AM.",
+          "supports_24_7_dispatch": false
+        },
         "operating_hours": {
-          "monday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
-          "tuesday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
-          "wednesday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
-          "thursday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
-          "friday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
+          "friday": { "close": "17:00", "emergency_dispatch": false, "open": "08:00" },
+          "monday": { "close": "17:00", "emergency_dispatch": false, "open": "08:00" },
           "saturday": { "closed": true, "emergency_dispatch": false },
           "sunday": { "closed": true, "emergency_dispatch": false },
-          "after_hours_policy": "next_business_day_priority_booking"
+          "thursday": { "close": "17:00", "emergency_dispatch": false, "open": "08:00" },
+          "tuesday": { "close": "17:00", "emergency_dispatch": false, "open": "08:00" },
+          "wednesday": { "close": "17:00", "emergency_dispatch": false, "open": "08:00" }
         },
-        "emergency_rules": {
-          "supports_24_7_dispatch": false,
-          "emergency_dispatch_fee": null,
-          "protocol": "We do not offer after-hours emergency dispatches. If gas smell is reported, immediately mandate 911 evacuation. For non-hazardous no-cooling or no-heating after-hours calls, express empathy and offer the first priority arrival slot on the next business morning at 8:00 AM."
-        },
+        "phone": "+1-555-882-3344",
         "pricing": {
-          "diagnostic_fee": 99,
-          "waive_diagnostic_with_repair": false,
-          "club_members_discount_percent": 15,
           "club_diagnostic_fee": 0,
+          "club_members_discount_percent": 15,
           "currency": "USD",
-          "financing_promo": "0% APR for 18 months on system replacements over $4,500"
+          "diagnostic_fee": 99,
+          "financing_promo": "0% APR for 18 months on system replacements over $4,500",
+          "waive_diagnostic_with_repair": false
         },
+        "service_area": ["Orlando", "Winter Park", "Altamonte Springs", "Kissimmee"],
         "services_offered": [
           "ac_repair",
           "heat_pump_service",
@@ -336,216 +589,148 @@
           "duct_cleaning",
           "filter_delivery_club"
         ],
-        "booking_rules": {
-          "allow_direct_booking": true,
-          "slot_duration_minutes": 90,
-          "buffer_time_minutes": 45,
-          "calendar_integration": "google_calendar"
-        },
-        "ai_persona": {
-          "name": "Breezy",
-          "tone": "Warm, consultative, family-oriented, and friendly",
-          "voice": "alloy",
-          "avatar_url": "/avatars/bot-classic.svg"
-        }
+        "tagline": "Residential Comfort Care & Planned Maintenance"
       },
+      "created_at": 1773100000000,
+      "industry_pack_id": "hvac",
+      "name": "Cool Breeze Comfort Club",
       "secrets": {
-        "webhook_secret": "sec_coolbreeze_92810ab72f",
-        "google_refresh_token": "1//04_mock_google_oauth_token_coolbreeze",
+        "admin_email": "care@coolbreezecomfort.com",
         "google_client_id": "8840192.apps.googleusercontent.com",
-        "google_client_secret": "GOCSPX-mock_coolbreeze_secret"
-      }
+        "google_client_secret": "GOCSPX-mock_coolbreeze_secret",
+        "google_refresh_token": "1//04_mock_google_oauth_token_coolbreeze",
+        "webhook_secret": "sec_coolbreeze_92810ab72f"
+      },
+      "status": "active",
+      "tenant_id": "tenant_cool_breeze_02",
+      "tier": "standard",
+      "updated_at": 1773950000000
     }
   },
+
   "sessions": {
     "sess_1773950100000_a1b2c3": {
-      "session_id": "sess_1773950100000_a1b2c3",
-      "tenant_id": "tenant_apex_air_01",
       "channel": "chat",
-      "status": "escalated",
-      "current_state": "ESCALATED",
       "context": {
         "customer": {
-          "name": "Marcus Vance",
-          "phone": "+1-303-555-0199",
-          "email": "mvance@example.com",
           "address": "742 Evergreen Terrace, Denver, CO 80218",
-          "is_homeowner": true
-        },
-        "service_request": {
-          "category": "Furnace Emergency",
-          "problem_description": "Furnace is vibrating violently and emitting a heavy burning plastic smell in the basement.",
-          "urgency": "Emergency",
-          "equipment_type": "Gas Furnace",
-          "is_emergency": true,
-          "photos": [
-            "https://firebasestorage.googleapis.com/v0/b/aichatbot-a6217.appspot.com/o/chat_images%2Fsess_1773950100000_a1b2c3%2F1773950150.jpg?alt=media"
-          ]
-        },
-        "scheduling": {
-          "requested_time": "Immediate / Emergency",
-          "confirmed_slot": "Tonight within 90 minutes",
-          "booking_id": "bk_apex_99201",
-          "status": "confirmed"
-        },
-        "pricing_quoted": {
-          "diagnostic_fee": 189,
-          "estimate": null,
-          "currency": "USD",
-          "fee_waived_with_repair": false
-        },
-        "qualification_answers": {
-          "homeownership": true,
-          "system_type": "Gas Furnace",
-          "system_age": "10-15 years"
+          "email": "mvance@example.com",
+          "is_homeowner": true,
+          "name": "Marcus Vance",
+          "phone": "+1-303-555-0199"
         },
         "escalation": {
-          "reason": "gas_burning_odor_emergency",
-          "urgency": "Emergency",
           "escalated_at": 1773950220000,
           "metadata": {
             "on_call_tech_notified": true,
             "sms_dispatch_sent": true
-          }
-        }
-      },
-      "history": [
-        {
-          "role": "assistant",
-          "content": "Hello! Welcome to Apex Heating & Air Conditioning. How can we help your home stay comfortable today?",
-          "timestamp": 1773950101000,
-          "channel_metadata": null
-        },
-        {
-          "role": "user",
-          "content": "My furnace is making a loud buzzing sound and there's a strong burning plastic smell in the basement!",
-          "timestamp": 1773950120000,
-          "channel_metadata": null
-        },
-        {
-          "role": "assistant",
-          "content": "Please step away from the basement immediately and shut off the furnace breaker if it is safe to do so. We have a 24/7 emergency dispatch team on call in Denver. Are you the homeowner, and what is your address?",
-          "timestamp": 1773950125000,
-          "channel_metadata": null
-        },
-        {
-          "role": "user",
-          "content": "Yes, I own the home. I'm Marcus Vance at 742 Evergreen Terrace, Denver. My number is 303-555-0199.",
-          "timestamp": 1773950180000,
-          "channel_metadata": null
-        },
-        {
-          "role": "assistant",
-          "content": "Got it Marcus. I have dispatched an emergency high-priority alert to our on-call technician. Our emergency diagnostic fee is $189. A technician is on their way within 90 minutes.",
-          "timestamp": 1773950220000,
-          "channel_metadata": null
-        }
-      ],
-      "telemetry": {
-        "turn_count": 5,
-        "tools_executed": ["escalate_to_human", "create_emergency_booking"],
-        "voice_latency_ms": [],
-        "started_at": 1773950100000,
-        "last_interaction_at": 1773950220000
-      },
-      "metadata": {
-        "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X)",
-        "ip_hash": "e9c1048b62",
-        "referrer": "https://google.com/search?q=24+7+furnace+repair+denver",
-        "industry_pack_id": "hvac",
-        "environment": "production"
-      },
-      "created_at": 1773950100000,
-      "updated_at": 1773950220000
-    },
-    "sess_1773950300000_b2c3d4": {
-      "session_id": "sess_1773950300000_b2c3d4",
-      "tenant_id": "tenant_cool_breeze_02",
-      "channel": "voice",
-      "status": "completed",
-      "current_state": "CONFIRMED",
-      "context": {
-        "customer": {
-          "name": "Sarah Jenkins",
-          "phone": "+1-407-555-8321",
-          "email": "sarah.j@example.net",
-          "address": "1802 Lake Como Dr, Orlando, FL 32803",
-          "is_homeowner": true
-        },
-        "service_request": {
-          "category": "Annual Maintenance & Tune-Up",
-          "problem_description": "AC is blowing mildly cool air, wants routine pre-summer tune-up and duct cleaning quote.",
-          "urgency": "Low",
-          "equipment_type": "Central AC",
-          "is_emergency": false,
-          "photos": []
-        },
-        "scheduling": {
-          "requested_time": "Tuesday morning between 9am and 11am",
-          "confirmed_slot": "Tuesday Oct 21, 2026, 09:00 - 10:30",
-          "booking_id": "bk_cb_44012",
-          "status": "confirmed"
+          },
+          "reason": "gas_burning_odor_emergency",
+          "urgency": "Emergency"
         },
         "pricing_quoted": {
-          "diagnostic_fee": 99,
-          "estimate": null,
           "currency": "USD",
+          "diagnostic_fee": 189,
+          "estimate": null,
           "fee_waived_with_repair": false
         },
         "qualification_answers": {
           "homeownership": true,
-          "system_type": "Central AC",
-          "system_age": "5-10 years"
+          "system_age": "10-15 years",
+          "system_type": "Gas Furnace"
+        },
+        "scheduling": {
+          "booking_id": "bk_apex_99201",
+          "confirmed_slot": "Tonight within 90 minutes",
+          "requested_time": "Immediate / Emergency",
+          "status": "confirmed"
+        },
+        "service_request": {
+          "category": "Furnace Emergency",
+          "equipment_type": "Gas Furnace",
+          "is_emergency": true,
+          "photos": [
+            "https://firebasestorage.googleapis.com/v0/b/aichatbot-a6217.appspot.com/o/chat_images%2Fsess_1773950100000_a1b2c3%2F1773950150.jpg?alt=media"
+          ],
+          "problem_description": "Furnace is vibrating violently and emitting a heavy burning plastic smell in the basement.",
+          "urgency": "Emergency"
         }
       },
+      "created_at": 1773950100000,
+      "current_state": "ESCALATED",
       "history": [
         {
+          "channel_metadata": null,
+          "content": "Hello! Welcome to Apex Heating & Air Conditioning. How can we help your home stay comfortable today?",
           "role": "assistant",
-          "content": "Hi there! Thanks for calling Cool Breeze Comfort Club. This is Breezy. How can I help you with your air conditioning today?",
-          "timestamp": 1773950302000,
-          "channel_metadata": { "audio_duration_seconds": 4.1 }
+          "timestamp": 1773950101000
         },
         {
+          "channel_metadata": null,
+          "content": "My furnace is making a loud buzzing sound and there's a strong burning plastic smell in the basement!",
           "role": "user",
-          "content": "Hi! My AC isn't cooling quite as well as it used to and I'd like to schedule a tune-up for next Tuesday morning.",
-          "timestamp": 1773950315000,
-          "channel_metadata": { "audio_duration_seconds": 5.8 }
+          "timestamp": 1773950120000
         },
         {
+          "channel_metadata": null,
+          "content": "Please step away from the basement immediately and shut off the furnace breaker if it is safe to do so. We have a 24/7 emergency dispatch team on call in Denver. Are you the homeowner, and what is your address?",
           "role": "assistant",
-          "content": "I would love to set that up for you! We have an opening next Tuesday between 9 and 11 AM. May I get your name and service address?",
-          "timestamp": 1773950322000,
-          "channel_metadata": { "audio_duration_seconds": 5.2 }
+          "timestamp": 1773950125000
         },
         {
+          "channel_metadata": null,
+          "content": "Yes, I own the home. I'm Marcus Vance at 742 Evergreen Terrace, Denver. My number is 303-555-0199.",
           "role": "user",
-          "content": "Sure, it's Sarah Jenkins at 1802 Lake Como Drive in Orlando. Phone is 407-555-8321.",
-          "timestamp": 1773950340000,
-          "channel_metadata": { "audio_duration_seconds": 6.3 }
+          "timestamp": 1773950180000
         },
         {
+          "channel_metadata": null,
+          "content": "Got it Marcus. I have dispatched an emergency high-priority alert to our on-call technician. Our emergency diagnostic fee is $189. A technician is on their way within 90 minutes.",
           "role": "assistant",
-          "content": "Perfect, Sarah! You're confirmed for Tuesday morning at 9:00 AM with our certified technician. Our standard diagnostic visit is $99. We'll send a text confirmation to 407-555-8321.",
-          "timestamp": 1773950352000,
-          "channel_metadata": { "audio_duration_seconds": 7.4 }
+          "timestamp": 1773950220000
         }
       ],
-      "telemetry": {
-        "turn_count": 5,
-        "tools_executed": ["check_availability", "create_booking"],
-        "voice_latency_ms": [310, 285, 305],
-        "started_at": 1773950300000,
-        "last_interaction_at": 1773950352000
-      },
       "metadata": {
-        "user_agent": "TwilioVoiceGateway/v1",
-        "ip_hash": "77a839f012",
-        "referrer": "telephony:inbound_pstn",
+        "environment": "production",
         "industry_pack_id": "hvac",
-        "environment": "production"
+        "ip_hash": "e9c1048b62",
+        "referrer": "https://google.com/search?q=24+7+furnace+repair+denver",
+        "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X)"
       },
-      "created_at": 1773950300000,
-      "updated_at": 1773950352000
+      "session_id": "sess_1773950100000_a1b2c3",
+      "status": "escalated",
+      "telemetry": {
+        "last_interaction_at": 1773950220000,
+        "started_at": 1773950100000,
+        "tools_executed": ["escalate_to_human", "create_emergency_booking"],
+        "turn_count": 5,
+        "voice_latency_ms": []
+      },
+      "tenant_id": "tenant_apex_air_01",
+      "updated_at": 1773950220000
+    }
+  },
+
+  "session_tokens": {
+    "tok_a1b2c3d4-e5f6-7890-abcd-ef1234567890": {
+      "created_at": 1773950100000,
+      "expires_at": 1774036500000,
+      "session_id": "sess_1773950100000_a1b2c3",
+      "tenant_id": "tenant_apex_air_01"
+    }
+  },
+
+  "idempotency_keys": {
+    "idemp_sample_key_01": {
+      "completed_at": 1773950220000,
+      "result": {
+        "lead_id": "lead_sample_01",
+        "service_request_id": "sr_sample_01",
+        "status": "submitted",
+        "success": true
+      },
+      "started_at": 1773950219000,
+      "status": "completed"
     }
   }
 }

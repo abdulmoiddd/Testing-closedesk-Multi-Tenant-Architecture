@@ -264,6 +264,7 @@ async function handler(req, res, apiLogger) {
     const sanitizedResponse = await withRetryTrace(
       apiLogger,
       "openai_chat_orchestrator",
+      { maxAttempts: 2, delayMs: 500 },
       async () => {
         const completionPromise = openai.chat.completions.create({
           model: aiModel,

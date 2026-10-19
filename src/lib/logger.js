@@ -1,5 +1,5 @@
 // src/lib/logger.js
-import { processSmartAlert } from "./alertManager"; // 🔥 TICKET 21
+import { processSmartAlert } from "./alertManager.js"; // 🔥 TICKET 21
 
 export const LOG_LEVELS = {
   DEBUG: "DEBUG",

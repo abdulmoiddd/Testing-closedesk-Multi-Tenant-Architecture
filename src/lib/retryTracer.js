@@ -10,15 +10,21 @@
  * @param {Function} operationFn - The async function to execute. Receives `attemptNumber` as an argument.
  */
 export async function withRetryTrace(apiLogger, operationName, options, operationFn) {
-    const maxAttempts = options.maxAttempts || 3;
-    const baseDelayMs = options.delayMs || 1000;
+    let opts = options;
+    let fn = operationFn;
+    if (typeof options === "function") {
+      fn = options;
+      opts = {};
+    }
+    const maxAttempts = opts?.maxAttempts || 3;
+    const baseDelayMs = opts?.delayMs || 1000;
     let attempt = 1;
   
     while (attempt <= maxAttempts) {
       const startTime = Date.now();
       
       try {
-        const result = await operationFn(attempt);
+        const result = await fn(attempt);
         
         // If it succeeded but required retries, log the recovery so it's not invisible
         if (attempt > 1) {

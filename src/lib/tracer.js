@@ -1,6 +1,6 @@
 // src/lib/tracer.js
-import { getOrCreateAnonId } from "./cookiePersonalization";
-import { createWebsiteLogger } from "./loggerPresets";
+import { getOrCreateAnonId } from "./cookiePersonalization.js";
+import { createWebsiteLogger } from "./loggerPresets.js";
 
 const tracerLogger = createWebsiteLogger("NetworkTracer");
 

@@ -1,6 +1,6 @@
 // src/lib/apiMiddleware.js
-import { createApiLogger } from "./loggerPresets";
-import { generateCorrelationId } from "./tracer";
+import { createApiLogger } from "./loggerPresets.js";
+import { generateCorrelationId } from "./tracer.js";
 
 /**
  * Universal Next.js API Wrapper to satisfy Jira Ticket #004.

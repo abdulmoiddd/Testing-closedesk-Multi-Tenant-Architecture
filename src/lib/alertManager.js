@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { db } from "./firebase.js";
 import { ref, push } from "firebase/database";
 
 // In-memory cache provides burst protection during serverless container lifecycles

@@ -1037,6 +1037,7 @@ export default function AicyroChatbot() {
           session_id: firebaseDbIdRef.current || firebaseDbId,
           session_token: sessionTokenRef.current,
           current_lead_data: leadData,
+          message: val,
           messages: aiHistory,
         };
 
@@ -1046,8 +1047,15 @@ export default function AicyroChatbot() {
           txId
         );
 
-        if (!response.ok) throw new Error(`API returned status ${response.status}`);
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (data && data.reply) {
+            const fallbackButtons = (data.suggested_shortcuts || []).map((shortcut) => ({ label: shortcut, value: `shortcut_${shortcut}` }));
+            addBotMessage(data.reply, fallbackButtons);
+            return;
+          }
+          throw new Error(`API returned status ${response.status}`);
+        }
 
         const dynamicButtons = (data.suggested_shortcuts || []).map((shortcut) => ({ label: shortcut, value: `shortcut_${shortcut}` }));
         addBotMessage(data.reply, dynamicButtons);

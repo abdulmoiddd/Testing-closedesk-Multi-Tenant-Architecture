@@ -86,9 +86,143 @@
         "emergency_dispatch_fee": 169,
         "currency": "USD"
       }
+    },
+    "saas": {
+      "pack_id": "saas",
+      "version": "1.0.0",
+      "industry_name": "SaaS & AI Business Systems",
+      "category": "technology_and_software",
+      "emergency_triggers": [
+        "security breach",
+        "database error",
+        "server outage",
+        "data loss",
+        "account compromised"
+      ],
+      "safety_protocols": {
+        "outage": {
+          "severity": "Emergency",
+          "action": "ESCALATE_TO_ENGINEERING",
+          "script": "Our systems monitor critical services 24/7. I have flagged this incident directly to our on-call engineering team for immediate triage."
+        }
+      },
+      "services": [
+        {
+          "id": "ai_business_systems",
+          "name": "Automated AI Business Systems",
+          "description": "Custom autonomous AI workers, front-desk triage, and automated scheduling."
+        },
+        {
+          "id": "lead_funnels",
+          "name": "Strict Lead Capture Funnels",
+          "description": "High-conversion conversational funnels with structured qualification."
+        },
+        {
+          "id": "crm_integration",
+          "name": "CRM & Workflow Automations",
+          "description": "Deep synchronization between conversational AI and CRM database records."
+        }
+      ],
+      "qualification_questions": [
+        {
+          "id": "business_problem",
+          "question": "What primary business bottleneck or challenge are you looking to automate?",
+          "type": "text",
+          "required": true
+        },
+        {
+          "id": "current_software",
+          "question": "Which CRM or software stack does your team currently use?",
+          "type": "choice",
+          "options": ["HubSpot", "Salesforce", "ServiceTitan", "Housecall Pro", "Custom", "None"],
+          "required": false
+        },
+        {
+          "id": "meeting_preference",
+          "question": "Would you prefer a 15-minute quick demo or a full workflow consultation?",
+          "type": "choice",
+          "options": ["Quick Demo", "Consultation"],
+          "required": true
+        }
+      ],
+      "pricing_benchmarks": {
+        "avg_job_value": "200",
+        "currency": "USD"
+      }
     }
   },
   "tenants": {
+    "tenant_aicyro": {
+      "tenant_id": "tenant_aicyro",
+      "name": "Aicyro",
+      "status": "active",
+      "industry_pack_id": "saas",
+      "tier": "enterprise",
+      "created_at": 1773000000000,
+      "updated_at": 1773900000000,
+      "client_config": {
+        "business_name": "Aicyro",
+        "industry": "SaaS",
+        "address": "Rawalpindi, Pakistan",
+        "phone": "03472539535",
+        "email": "info@aicyro.com",
+        "website": "www.aicyro.com",
+        "timezone": "Asia/Karachi",
+        "operating_hours": {
+          "monday": { "open": "09:00", "close": "17:00", "active": true },
+          "tuesday": { "open": "09:00", "close": "17:00", "active": true },
+          "wednesday": { "open": "09:00", "close": "17:00", "active": true },
+          "thursday": { "open": "09:00", "close": "17:00", "active": true },
+          "friday": { "open": "09:00", "close": "17:00", "active": true },
+          "saturday": { "open": "09:00", "close": "17:00", "active": false },
+          "sunday": { "open": "09:00", "close": "17:00", "active": false }
+        },
+        "ai_persona": {
+          "name": "Aicyro",
+          "bot_identity": "the raja for Aicyro",
+          "avatar_url": "human_agent",
+          "voice": "Justin",
+          "voice_enabled": true,
+          "tone": "Casual & Enthusiastic",
+          "greeting_message": "hey there, want to know how i can help you close more leads ?",
+          "launcher_text": "Need Help?",
+          "theme_color": "#101bb7"
+        },
+        "base_prompt": "Operate a strict, funnel-based lead capture system. Give precise answers and use as few tokens as possible.",
+        "additional_rules": "1. Always end your message with a question.\n2. Never use emojis.\n3. CRITICAL: Keep all answers short. Never write more than 2 or 3 short sentences. Be punchy and get straight to the point.",
+        "custom_rules": "Never mention competitors. Keep answers extremely brief.",
+        "lead_capture_fields": ["Name", "Email", "Phone"],
+        "business_intelligence_fields": [
+          "Industry Type",
+          "Primary Business Problem",
+          "Current CRM/Software",
+          "Meeting Preference (Demo vs. Consultation)",
+          "Location",
+          "Website"
+        ],
+        "services_offered": ["Saas"],
+        "pricing": {
+          "avg_job_value": "200",
+          "currency": "USD"
+        },
+        "emergency_rules": {
+          "supports_24_7_dispatch": false,
+          "after_hours_policy": "next_business_day_priority_booking"
+        },
+        "booking_rules": {
+          "allow_direct_booking": true,
+          "buffer_time_minutes": 30,
+          "rule_type": "require_all"
+        }
+      },
+      "secrets": {
+        "admin_email": "moid@aicyro.com",
+        "lead_receivers": "moid@aicyro.com",
+        "urgent_alerts": true,
+        "after_hours_alerts": true,
+        "email_alerts": true
+      }
+    },
     "tenant_apex_air_01": {
       "tenant_id": "tenant_apex_air_01",
       "name": "Apex Heating & Air Conditioning",

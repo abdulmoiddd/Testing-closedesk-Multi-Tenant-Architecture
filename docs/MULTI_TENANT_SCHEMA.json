@@ -1,0 +1,417 @@
+{
+  "industry_packs": {
+    "hvac": {
+      "pack_id": "hvac",
+      "version": "1.0.0",
+      "industry_name": "Heating, Ventilation & Air Conditioning",
+      "category": "home_services",
+      "emergency_triggers": [
+        "smell gas",
+        "gas leak",
+        "carbon monoxide",
+        "co detector",
+        "sparks from unit",
+        "burning odor",
+        "water leaking through ceiling",
+        "freezing indoors",
+        "sub-zero indoor temperature",
+        "infant or elderly in extreme heat"
+      ],
+      "safety_protocols": {
+        "gas_leak": {
+          "severity": "Emergency",
+          "action": "IMMEDIATE_EVACUATION",
+          "script": "If you smell natural gas or your carbon monoxide alarm is going off, please evacuate everyone from the home immediately. Do not flip any light switches or light any flames. Once you are safely outside, call 911 or your local gas utility.",
+          "allow_troubleshooting": false,
+          "allow_self_booking": false
+        },
+        "electrical_sparks": {
+          "severity": "Emergency",
+          "action": "POWER_DISCONNECT",
+          "script": "If you see active sparks or smoke coming from your HVAC unit, shut off the breaker for the system immediately if it is safe to reach. Please step away from the equipment.",
+          "allow_troubleshooting": false
+        }
+      },
+      "services": [
+        {
+          "id": "ac_repair",
+          "name": "Air Conditioning Repair",
+          "description": "Diagnosis and repair of non-cooling AC units, refrigerant leaks, or frozen coils."
+        },
+        {
+          "id": "furnace_repair",
+          "name": "Heating & Furnace Repair",
+          "description": "Troubleshooting non-heating furnaces, pilot lights, blowers, or heat exchangers."
+        },
+        {
+          "id": "heat_pump_service",
+          "name": "Heat Pump Installation & Service",
+          "description": "Dual-fuel and ductless mini-split heat pump repair, maintenance, and new installations."
+        },
+        {
+          "id": "annual_tuneup",
+          "name": "Seasonal System Maintenance",
+          "description": "Comprehensive multi-point inspection, filter change, coil cleaning, and electrical check."
+        },
+        {
+          "id": "duct_cleaning",
+          "name": "Air Duct Cleaning & Sanitization",
+          "description": "Whole-home duct sanitization, debris extraction, and airflow balancing."
+        }
+      ],
+      "qualification_questions": [
+        {
+          "id": "homeownership",
+          "question": "Are you the owner of the property where service is needed?",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "id": "system_type",
+          "question": "What type of heating or cooling system do you have (Central AC, Heat Pump, Gas Furnace, or Mini-Split)?",
+          "type": "choice",
+          "options": ["Central AC", "Gas Furnace", "Electric Furnace", "Heat Pump", "Ductless Mini-Split", "Boiler", "Unsure"],
+          "required": true
+        },
+        {
+          "id": "system_age",
+          "question": "Approximately how old is your current equipment?",
+          "type": "choice",
+          "options": ["Under 5 years", "5-10 years", "10-15 years", "15+ years", "Unknown"],
+          "required": false
+        }
+      ],
+      "pricing_benchmarks": {
+        "diagnostic_fee": 89,
+        "emergency_dispatch_fee": 169,
+        "currency": "USD"
+      }
+    }
+  },
+  "tenants": {
+    "tenant_apex_air_01": {
+      "tenant_id": "tenant_apex_air_01",
+      "name": "Apex Heating & Air Conditioning",
+      "status": "active",
+      "industry_pack_id": "hvac",
+      "tier": "enterprise",
+      "created_at": 1773000000000,
+      "updated_at": 1773900000000,
+      "client_config": {
+        "business_name": "Apex Heating & Air Conditioning",
+        "tagline": "24/7 Rapid Emergency Response & Commercial HVAC",
+        "phone": "+1-555-273-9000",
+        "email": "dispatch@apexairhvac.com",
+        "address": "400 Industrial Parkway, Suite 100, Denver, CO 80216",
+        "service_area": ["Denver", "Aurora", "Lakewood", "Arvada", "Westminster", "Centennial"],
+        "operating_hours": {
+          "monday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
+          "tuesday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
+          "wednesday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
+          "thursday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
+          "friday": { "open": "07:00", "close": "19:00", "emergency_dispatch": true },
+          "saturday": { "open": "08:00", "close": "16:00", "emergency_dispatch": true },
+          "sunday": { "open": "09:00", "close": "14:00", "emergency_dispatch": true },
+          "after_hours_policy": "live_emergency_dispatch"
+        },
+        "emergency_rules": {
+          "supports_24_7_dispatch": true,
+          "emergency_dispatch_fee": 189,
+          "max_response_time_minutes": 90,
+          "on_call_phone": "+1-555-273-9911",
+          "protocol": "Collect caller name, street address, and active hazard. Advise power or gas shutoff if safe. Instantly trigger on-call technician SMS and reserve emergency calendar block."
+        },
+        "pricing": {
+          "diagnostic_fee": 89,
+          "waive_diagnostic_with_repair": true,
+          "minimum_repair_threshold_for_waiver": 250,
+          "emergency_fee": 189,
+          "currency": "USD"
+        },
+        "services_offered": [
+          "ac_repair",
+          "furnace_repair",
+          "heat_pump_service",
+          "commercial_rooftop_units",
+          "geothermal_heating",
+          "annual_tuneup"
+        ],
+        "booking_rules": {
+          "allow_direct_booking": true,
+          "slot_duration_minutes": 120,
+          "buffer_time_minutes": 30,
+          "calendar_integration": "servicetitan"
+        },
+        "ai_persona": {
+          "name": "Apex Dispatch Bot",
+          "tone": "Direct, urgent, professional, and reassuring",
+          "voice": "ash",
+          "avatar_url": "/avatars/ai-spark.svg"
+        }
+      },
+      "secrets": {
+        "webhook_secret": "sec_apex_live_839f201e74b",
+        "smtp_host": "smtp.sendgrid.net",
+        "smtp_user": "apikey",
+        "smtp_password": "SG.mock_apex_smtp_token_1294819",
+        "crm_api_key": "st_live_994019284019284"
+      }
+    },
+    "tenant_cool_breeze_02": {
+      "tenant_id": "tenant_cool_breeze_02",
+      "name": "Cool Breeze Comfort Club",
+      "status": "active",
+      "industry_pack_id": "hvac",
+      "tier": "standard",
+      "created_at": 1773100000000,
+      "updated_at": 1773950000000,
+      "client_config": {
+        "business_name": "Cool Breeze Comfort Club",
+        "tagline": "Residential Comfort Care & Planned Maintenance",
+        "phone": "+1-555-882-3344",
+        "email": "care@coolbreezecomfort.com",
+        "address": "1248 Magnolia Blvd, Orlando, FL 32801",
+        "service_area": ["Orlando", "Winter Park", "Altamonte Springs", "Kissimmee"],
+        "operating_hours": {
+          "monday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
+          "tuesday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
+          "wednesday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
+          "thursday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
+          "friday": { "open": "08:00", "close": "17:00", "emergency_dispatch": false },
+          "saturday": { "closed": true, "emergency_dispatch": false },
+          "sunday": { "closed": true, "emergency_dispatch": false },
+          "after_hours_policy": "next_business_day_priority_booking"
+        },
+        "emergency_rules": {
+          "supports_24_7_dispatch": false,
+          "emergency_dispatch_fee": null,
+          "protocol": "We do not offer after-hours emergency dispatches. If gas smell is reported, immediately mandate 911 evacuation. For non-hazardous no-cooling or no-heating after-hours calls, express empathy and offer the first priority arrival slot on the next business morning at 8:00 AM."
+        },
+        "pricing": {
+          "diagnostic_fee": 99,
+          "waive_diagnostic_with_repair": false,
+          "club_members_discount_percent": 15,
+          "club_diagnostic_fee": 0,
+          "currency": "USD",
+          "financing_promo": "0% APR for 18 months on system replacements over $4,500"
+        },
+        "services_offered": [
+          "ac_repair",
+          "heat_pump_service",
+          "annual_tuneup",
+          "duct_cleaning",
+          "filter_delivery_club"
+        ],
+        "booking_rules": {
+          "allow_direct_booking": true,
+          "slot_duration_minutes": 90,
+          "buffer_time_minutes": 45,
+          "calendar_integration": "google_calendar"
+        },
+        "ai_persona": {
+          "name": "Breezy",
+          "tone": "Warm, consultative, family-oriented, and friendly",
+          "voice": "alloy",
+          "avatar_url": "/avatars/bot-classic.svg"
+        }
+      },
+      "secrets": {
+        "webhook_secret": "sec_coolbreeze_92810ab72f",
+        "google_refresh_token": "1//04_mock_google_oauth_token_coolbreeze",
+        "google_client_id": "8840192.apps.googleusercontent.com",
+        "google_client_secret": "GOCSPX-mock_coolbreeze_secret"
+      }
+    }
+  },
+  "sessions": {
+    "sess_1773950100000_a1b2c3": {
+      "session_id": "sess_1773950100000_a1b2c3",
+      "tenant_id": "tenant_apex_air_01",
+      "channel": "chat",
+      "status": "escalated",
+      "current_state": "ESCALATED",
+      "context": {
+        "customer": {
+          "name": "Marcus Vance",
+          "phone": "+1-303-555-0199",
+          "email": "mvance@example.com",
+          "address": "742 Evergreen Terrace, Denver, CO 80218",
+          "is_homeowner": true
+        },
+        "service_request": {
+          "category": "Furnace Emergency",
+          "problem_description": "Furnace is vibrating violently and emitting a heavy burning plastic smell in the basement.",
+          "urgency": "Emergency",
+          "equipment_type": "Gas Furnace",
+          "is_emergency": true,
+          "photos": [
+            "https://firebasestorage.googleapis.com/v0/b/aichatbot-a6217.appspot.com/o/chat_images%2Fsess_1773950100000_a1b2c3%2F1773950150.jpg?alt=media"
+          ]
+        },
+        "scheduling": {
+          "requested_time": "Immediate / Emergency",
+          "confirmed_slot": "Tonight within 90 minutes",
+          "booking_id": "bk_apex_99201",
+          "status": "confirmed"
+        },
+        "pricing_quoted": {
+          "diagnostic_fee": 189,
+          "estimate": null,
+          "currency": "USD",
+          "fee_waived_with_repair": false
+        },
+        "qualification_answers": {
+          "homeownership": true,
+          "system_type": "Gas Furnace",
+          "system_age": "10-15 years"
+        },
+        "escalation": {
+          "reason": "gas_burning_odor_emergency",
+          "urgency": "Emergency",
+          "escalated_at": 1773950220000,
+          "metadata": {
+            "on_call_tech_notified": true,
+            "sms_dispatch_sent": true
+          }
+        }
+      },
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hello! Welcome to Apex Heating & Air Conditioning. How can we help your home stay comfortable today?",
+          "timestamp": 1773950101000,
+          "channel_metadata": null
+        },
+        {
+          "role": "user",
+          "content": "My furnace is making a loud buzzing sound and there's a strong burning plastic smell in the basement!",
+          "timestamp": 1773950120000,
+          "channel_metadata": null
+        },
+        {
+          "role": "assistant",
+          "content": "Please step away from the basement immediately and shut off the furnace breaker if it is safe to do so. We have a 24/7 emergency dispatch team on call in Denver. Are you the homeowner, and what is your address?",
+          "timestamp": 1773950125000,
+          "channel_metadata": null
+        },
+        {
+          "role": "user",
+          "content": "Yes, I own the home. I'm Marcus Vance at 742 Evergreen Terrace, Denver. My number is 303-555-0199.",
+          "timestamp": 1773950180000,
+          "channel_metadata": null
+        },
+        {
+          "role": "assistant",
+          "content": "Got it Marcus. I have dispatched an emergency high-priority alert to our on-call technician. Our emergency diagnostic fee is $189. A technician is on their way within 90 minutes.",
+          "timestamp": 1773950220000,
+          "channel_metadata": null
+        }
+      ],
+      "telemetry": {
+        "turn_count": 5,
+        "tools_executed": ["escalate_to_human", "create_emergency_booking"],
+        "voice_latency_ms": [],
+        "started_at": 1773950100000,
+        "last_interaction_at": 1773950220000
+      },
+      "metadata": {
+        "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X)",
+        "ip_hash": "e9c1048b62",
+        "referrer": "https://google.com/search?q=24+7+furnace+repair+denver",
+        "industry_pack_id": "hvac",
+        "environment": "production"
+      },
+      "created_at": 1773950100000,
+      "updated_at": 1773950220000
+    },
+    "sess_1773950300000_b2c3d4": {
+      "session_id": "sess_1773950300000_b2c3d4",
+      "tenant_id": "tenant_cool_breeze_02",
+      "channel": "voice",
+      "status": "completed",
+      "current_state": "CONFIRMED",
+      "context": {
+        "customer": {
+          "name": "Sarah Jenkins",
+          "phone": "+1-407-555-8321",
+          "email": "sarah.j@example.net",
+          "address": "1802 Lake Como Dr, Orlando, FL 32803",
+          "is_homeowner": true
+        },
+        "service_request": {
+          "category": "Annual Maintenance & Tune-Up",
+          "problem_description": "AC is blowing mildly cool air, wants routine pre-summer tune-up and duct cleaning quote.",
+          "urgency": "Low",
+          "equipment_type": "Central AC",
+          "is_emergency": false,
+          "photos": []
+        },
+        "scheduling": {
+          "requested_time": "Tuesday morning between 9am and 11am",
+          "confirmed_slot": "Tuesday Oct 21, 2026, 09:00 - 10:30",
+          "booking_id": "bk_cb_44012",
+          "status": "confirmed"
+        },
+        "pricing_quoted": {
+          "diagnostic_fee": 99,
+          "estimate": null,
+          "currency": "USD",
+          "fee_waived_with_repair": false
+        },
+        "qualification_answers": {
+          "homeownership": true,
+          "system_type": "Central AC",
+          "system_age": "5-10 years"
+        }
+      },
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hi there! Thanks for calling Cool Breeze Comfort Club. This is Breezy. How can I help you with your air conditioning today?",
+          "timestamp": 1773950302000,
+          "channel_metadata": { "audio_duration_seconds": 4.1 }
+        },
+        {
+          "role": "user",
+          "content": "Hi! My AC isn't cooling quite as well as it used to and I'd like to schedule a tune-up for next Tuesday morning.",
+          "timestamp": 1773950315000,
+          "channel_metadata": { "audio_duration_seconds": 5.8 }
+        },
+        {
+          "role": "assistant",
+          "content": "I would love to set that up for you! We have an opening next Tuesday between 9 and 11 AM. May I get your name and service address?",
+          "timestamp": 1773950322000,
+          "channel_metadata": { "audio_duration_seconds": 5.2 }
+        },
+        {
+          "role": "user",
+          "content": "Sure, it's Sarah Jenkins at 1802 Lake Como Drive in Orlando. Phone is 407-555-8321.",
+          "timestamp": 1773950340000,
+          "channel_metadata": { "audio_duration_seconds": 6.3 }
+        },
+        {
+          "role": "assistant",
+          "content": "Perfect, Sarah! You're confirmed for Tuesday morning at 9:00 AM with our certified technician. Our standard diagnostic visit is $99. We'll send a text confirmation to 407-555-8321.",
+          "timestamp": 1773950352000,
+          "channel_metadata": { "audio_duration_seconds": 7.4 }
+        }
+      ],
+      "telemetry": {
+        "turn_count": 5,
+        "tools_executed": ["check_availability", "create_booking"],
+        "voice_latency_ms": [310, 285, 305],
+        "started_at": 1773950300000,
+        "last_interaction_at": 1773950352000
+      },
+      "metadata": {
+        "user_agent": "TwilioVoiceGateway/v1",
+        "ip_hash": "77a839f012",
+        "referrer": "telephony:inbound_pstn",
+        "industry_pack_id": "hvac",
+        "environment": "production"
+      },
+      "created_at": 1773950300000,
+      "updated_at": 1773950352000
+    }
+  }
+}

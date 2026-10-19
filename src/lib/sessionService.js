@@ -198,6 +198,17 @@ export async function initializeSession(params) {
     channel: normalizedChannel,
     status: SESSION_STATUS.ACTIVE,
   };
+  // Backward compatibility: initialize prospects record for Pulse Admin Dashboard (/lg)
+  updates[`prospects/${sessionId}`] = {
+    session_id: sessionId,
+    tenant_id: tenantId,
+    created_at: new Date(now).toISOString(),
+    last_interaction_at: new Date(now).toISOString(),
+    context_patch: {
+      contact_info: {},
+      business_context: {},
+    },
+  };
 
   try {
     await update(ref(db), updates);
@@ -393,3 +404,231 @@ export async function terminateSession(sessionId, status = SESSION_STATUS.COMPLE
   await update(ref(db), updates);
   return updates;
 }
+
+/**
+ * Safely updates the session's structured memory in Firebase RTDB based on the LLM's JSON output.
+ * Handles problem classification, customer contact info, scheduling desires, qualification answers,
+ * and urgency level adjustments without overwriting existing validated data with nulls.
+ *
+ * @param {string} sessionId - The session identifier
+ * @param {Object} llmContextPatch - The context_patch object from LLM output
+ * @param {string} [nextState=null] - Optional next state machine state
+ * @returns {Promise<Object>} The multi-path updates applied to Firebase RTDB
+ */
+export async function patchContext(sessionId, llmContextPatch = {}, nextState = null) {
+  if (!sessionId || typeof sessionId !== "string") {
+    throw new SessionValidationError("A valid sessionId is required to patch context.");
+  }
+
+  const now = Date.now();
+  const updates = {
+    [`sessions/${sessionId}/updated_at`]: now,
+    [`sessions/${sessionId}/telemetry/last_interaction_at`]: now,
+  };
+
+  if (nextState && Object.values(SESSION_STATES).includes(nextState)) {
+    updates[`sessions/${sessionId}/current_state`] = nextState;
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const phoneRegex = /^[\d\+\-\(\)\s]{7,20}$/;
+
+  // 1. Customer Contact Memory
+  if (llmContextPatch.customer && typeof llmContextPatch.customer === "object") {
+    const cust = llmContextPatch.customer;
+    if (typeof cust.name === "string" && cust.name.trim().length > 1) {
+      updates[`sessions/${sessionId}/context/customer/name`] = cust.name.trim();
+    }
+    if (typeof cust.phone === "string" && phoneRegex.test(cust.phone.trim())) {
+      updates[`sessions/${sessionId}/context/customer/phone`] = cust.phone.trim();
+    }
+    if (typeof cust.email === "string" && emailRegex.test(cust.email.trim())) {
+      updates[`sessions/${sessionId}/context/customer/email`] = cust.email.trim().toLowerCase();
+    }
+    if (typeof cust.address === "string" && cust.address.trim().length > 3) {
+      updates[`sessions/${sessionId}/context/customer/address`] = cust.address.trim();
+    }
+    if (typeof cust.is_homeowner === "boolean") {
+      updates[`sessions/${sessionId}/context/customer/is_homeowner`] = cust.is_homeowner;
+    }
+  }
+
+  // 2. Service Request & Problem Classification
+  const srv = llmContextPatch.service_request || llmContextPatch.problem_context || {};
+  if (srv && typeof srv === "object") {
+    if (typeof srv.category === "string" && srv.category.trim()) {
+      updates[`sessions/${sessionId}/context/service_request/category`] = srv.category.trim();
+    } else if (typeof srv.problem_type === "string" && srv.problem_type.trim()) {
+      updates[`sessions/${sessionId}/context/service_request/category`] = srv.problem_type.trim();
+    }
+
+    if (typeof srv.problem_description === "string" && srv.problem_description.trim()) {
+      updates[`sessions/${sessionId}/context/service_request/problem_description`] = srv.problem_description.trim();
+    }
+
+    if (typeof srv.equipment_type === "string" && srv.equipment_type.trim()) {
+      updates[`sessions/${sessionId}/context/service_request/equipment_type`] = srv.equipment_type.trim();
+    }
+
+    if (typeof srv.urgency === "string" && ["Low", "Medium", "High", "Emergency"].includes(srv.urgency)) {
+      updates[`sessions/${sessionId}/context/service_request/urgency`] = srv.urgency;
+    }
+
+    if (srv.is_emergency === true || srv.urgency === "Emergency") {
+      updates[`sessions/${sessionId}/context/service_request/is_emergency`] = true;
+      updates[`sessions/${sessionId}/context/service_request/urgency`] = "Emergency";
+    }
+  }
+
+  // 3. Scheduling & Slot Memory
+  if (llmContextPatch.scheduling && typeof llmContextPatch.scheduling === "object") {
+    const sch = llmContextPatch.scheduling;
+    if (typeof sch.requested_time === "string" && sch.requested_time.trim()) {
+      updates[`sessions/${sessionId}/context/scheduling/requested_time`] = sch.requested_time.trim();
+    }
+    if (typeof sch.confirmed_slot === "string" && sch.confirmed_slot.trim()) {
+      updates[`sessions/${sessionId}/context/scheduling/confirmed_slot`] = sch.confirmed_slot.trim();
+    }
+    if (typeof sch.booking_id === "string" && sch.booking_id.trim()) {
+      updates[`sessions/${sessionId}/context/scheduling/booking_id`] = sch.booking_id.trim();
+    }
+    if (typeof sch.status === "string" && ["pending", "confirmed", "unavailable", "cancelled"].includes(sch.status)) {
+      updates[`sessions/${sessionId}/context/scheduling/status`] = sch.status;
+    }
+  }
+
+  // 4. Pricing Memory
+  if (llmContextPatch.pricing_quoted && typeof llmContextPatch.pricing_quoted === "object") {
+    const prc = llmContextPatch.pricing_quoted;
+    if (prc.diagnostic_fee !== undefined && prc.diagnostic_fee !== null) {
+      updates[`sessions/${sessionId}/context/pricing_quoted/diagnostic_fee`] = prc.diagnostic_fee;
+    }
+    if (prc.estimate !== undefined && prc.estimate !== null) {
+      updates[`sessions/${sessionId}/context/pricing_quoted/estimate`] = prc.estimate;
+    }
+    if (typeof prc.fee_waived_with_repair === "boolean") {
+      updates[`sessions/${sessionId}/context/pricing_quoted/fee_waived_with_repair`] = prc.fee_waived_with_repair;
+    }
+  }
+
+  // 5. Qualification Answers
+  if (llmContextPatch.qualification_answers && typeof llmContextPatch.qualification_answers === "object") {
+    for (const [qKey, qVal] of Object.entries(llmContextPatch.qualification_answers)) {
+      if (qVal !== undefined && qVal !== null) {
+        updates[`sessions/${sessionId}/context/qualification_answers/${qKey}`] = qVal;
+      }
+    }
+  }
+
+  // --- COMPATIBILITY BRIDGE: DUAL-WRITE TO LEADS & PROSPECTS FOR PULSE DASHBOARD (/lg) ---
+  if (llmContextPatch.customer && typeof llmContextPatch.customer === "object") {
+    const cust = llmContextPatch.customer;
+    if (typeof cust.name === "string" && cust.name.trim().length > 1) {
+      updates[`leads/${sessionId}/name`] = cust.name.trim();
+      updates[`prospects/${sessionId}/context_patch/contact_info/name`] = cust.name.trim();
+    }
+    if (typeof cust.phone === "string" && phoneRegex.test(cust.phone.trim())) {
+      updates[`leads/${sessionId}/phone`] = cust.phone.trim();
+      updates[`prospects/${sessionId}/context_patch/contact_info/phone`] = cust.phone.trim();
+    }
+    if (typeof cust.email === "string" && emailRegex.test(cust.email.trim())) {
+      updates[`leads/${sessionId}/email`] = cust.email.trim().toLowerCase();
+      updates[`prospects/${sessionId}/context_patch/contact_info/email`] = cust.email.trim().toLowerCase();
+    }
+    updates[`leads/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
+    updates[`prospects/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
+  }
+
+  if (srv && typeof srv === "object") {
+    if (typeof srv.problem_description === "string" && srv.problem_description.trim()) {
+      updates[`leads/${sessionId}/business_problem`] = srv.problem_description.trim();
+    }
+    if (typeof srv.urgency === "string" && srv.urgency.trim()) {
+      updates[`leads/${sessionId}/urgency_level`] = srv.urgency;
+    }
+    if (typeof srv.category === "string" && srv.category.trim()) {
+      updates[`leads/${sessionId}/service_requested`] = srv.category;
+    }
+  }
+
+  if (llmContextPatch.scheduling && typeof llmContextPatch.scheduling === "object") {
+    const sch = llmContextPatch.scheduling;
+    if (sch.confirmed_slot || sch.requested_time) {
+      updates[`leads/${sessionId}/preferred_time`] = sch.confirmed_slot || sch.requested_time;
+      updates[`leads/${sessionId}/booking_status`] = sch.status === "confirmed" ? "Meeting Booked" : "In Progress";
+    }
+  }
+
+  await update(ref(db), updates);
+  return updates;
+}
+
+/**
+ * Resolves a session by its cryptographically secure session_token.
+ * Verifies token existence and ensures it has not expired.
+ *
+ * @param {string} sessionToken - The UUID session token provided in client headers
+ * @returns {Promise<{ session: Object, sessionId: string, tenantId: string }>}
+ */
+export async function getSessionByToken(sessionToken) {
+  if (!sessionToken || typeof sessionToken !== "string" || sessionToken.trim() === "") {
+    throw new SessionValidationError("A valid 'session_token' is required.");
+  }
+
+  const tokenRef = ref(db, `session_tokens/${sessionToken.trim()}`);
+  const tokenSnapshot = await get(tokenRef);
+
+  if (!tokenSnapshot.exists()) {
+    throw new SessionValidationError("Invalid session token: token does not exist.");
+  }
+
+  const tokenData = tokenSnapshot.val();
+  if (tokenData.expires_at && tokenData.expires_at < Date.now()) {
+    throw new SessionValidationError("Session token has expired. Please bootstrap a new session.");
+  }
+
+  const session = await getSession(tokenData.session_id);
+
+  return {
+    session,
+    sessionId: tokenData.session_id,
+    tenantId: tokenData.tenant_id,
+  };
+}
+
+/**
+ * Resolves an existing session by sessionId or dynamically creates one if it doesn't exist yet.
+ * Used for legacy clients, regression test runners, and un-bootstrapped widgets.
+ *
+ * @param {string} sessionId - The session identifier
+ * @param {string} [tenantId="tenant_aicyro"] - Tenant identifier fallback
+ * @returns {Promise<{ session: Object, sessionId: string, tenantId: string }>}
+ */
+export async function getSessionOrCreate(sessionId, tenantId = "tenant_aicyro") {
+  if (!sessionId || typeof sessionId !== "string" || sessionId.trim() === "") {
+    sessionId = generateSessionId();
+  }
+
+  try {
+    const session = await getSession(sessionId.trim());
+    return {
+      session,
+      sessionId: session.session_id || sessionId,
+      tenantId: session.tenant_id || tenantId,
+    };
+  } catch (err) {
+    // Session not found, automatically initialize
+    const newSession = await initializeSession({
+      tenantId,
+      customSessionId: sessionId.trim(),
+      channel: "chat",
+    });
+    return {
+      session: newSession,
+      sessionId: sessionId.trim(),
+      tenantId,
+    };
+  }
+}
+
+

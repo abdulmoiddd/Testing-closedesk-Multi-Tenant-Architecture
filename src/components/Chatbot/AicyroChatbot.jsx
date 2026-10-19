@@ -223,6 +223,7 @@ export default function AicyroChatbot() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [firebaseDbId] = useState(() => `lead_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
   const firebaseDbIdRef = useRef(firebaseDbId);
+  const sessionTokenRef = useRef(null);
   const [agentMode, setAgentMode] = useState("text");
 
   const hasSentStartAlertRef = useRef(false);
@@ -707,21 +708,72 @@ export default function AicyroChatbot() {
   };
 
   useEffect(() => {
-    const fetchConfig = async () => {
+    const bootstrapWidget = async () => {
+      const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || "tenant_aicyro";
+      try {
+        const txId = generateCorrelationId();
+        const res = await fetchWithTrace(
+          "/api/session/bootstrap",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tenant_id: tenantId,
+              channel: "chat",
+              metadata: {
+                source_page: typeof window !== "undefined" ? window.location.href : "home",
+              },
+            }),
+          },
+          txId
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.session_token) {
+            sessionTokenRef.current = data.session_token;
+          }
+          if (data.session_id) {
+            firebaseDbIdRef.current = data.session_id;
+          }
+          if (data.client_config) {
+            const persona = data.client_config.ai_persona || {};
+            setBotConfig((prev) => ({
+              ...prev,
+              botName: persona.bot_name || data.client_config.business_name || prev.botName,
+              greetingMessage: data.welcome_message || prev.greetingMessage,
+              botAvatar: persona.bot_avatar || prev.botAvatar,
+              botVoice: persona.bot_voice || prev.botVoice,
+              voiceEnabled: persona.voice_enabled !== false,
+            }));
+            return;
+          }
+        }
+      } catch (err) {
+        uiLogger.warn("bootstrap", "bootstrap_api_fallback_to_direct_rtdb", { error: err });
+      }
+
+      // Fallback: Read directly from settings/chatbot_config if bootstrap API returned error or is unmigrated
       try {
         const snapshot = await get(ref(db, "settings/chatbot_config"));
         if (snapshot.exists()) {
           const data = snapshot.val();
           setBotConfig({
-            botName: data.botName || "Aicyro Front Desk", launcherText: data.launcherText || "Need help?",
+            botName: data.botName || "Aicyro Front Desk",
+            launcherText: data.launcherText || "Need help?",
             greetingMessage: data.greetingMessage || "Hi! I'm Aicyro's AI Assistant. How can I help you today?",
-            botAvatar: data.botAvatar || "ai_spark", customAvatarSvg: data.customAvatarSvg || "",
-            botVoice: data.botVoice || "Joanna", voiceEnabled: data.voiceEnabled !== false,
+            botAvatar: data.botAvatar || "ai_spark",
+            customAvatarSvg: data.customAvatarSvg || "",
+            botVoice: data.botVoice || "Justin",
+            voiceEnabled: data.voiceEnabled !== false,
           });
         }
-      } catch (err) { uiLogger.error("config", "load_failed", { error: err }); }
+      } catch (fallbackErr) {
+        uiLogger.error("config", "load_failed", { error: fallbackErr });
+      }
     };
-    fetchConfig();
+
+    bootstrapWidget();
   }, []);
 
   const [sessionStartTime] = useState(new Date().toISOString());
@@ -976,7 +1028,23 @@ export default function AicyroChatbot() {
       aiHistory.push({ role: "user", content: val });
 
       try {
-        const response = await fetchWithTrace("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: firebaseDbId, current_lead_data: leadData, messages: aiHistory }) }, txId);
+        const chatHeaders = { "Content-Type": "application/json" };
+        if (sessionTokenRef.current) {
+          chatHeaders["x-session-token"] = sessionTokenRef.current;
+        }
+
+        const chatPayload = {
+          session_id: firebaseDbIdRef.current || firebaseDbId,
+          session_token: sessionTokenRef.current,
+          current_lead_data: leadData,
+          messages: aiHistory,
+        };
+
+        const response = await fetchWithTrace(
+          "/api/chat",
+          { method: "POST", headers: chatHeaders, body: JSON.stringify(chatPayload) },
+          txId
+        );
 
         if (!response.ok) throw new Error(`API returned status ${response.status}`);
         const data = await response.json();

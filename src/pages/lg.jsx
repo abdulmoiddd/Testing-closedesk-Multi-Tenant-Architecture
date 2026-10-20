@@ -81,6 +81,7 @@ export default function LeadsDashboard() {
     const handleBeforeUnload = () => {
       localStorage.removeItem("currentUser");
       localStorage.removeItem("currentSuperAdmin");
+      localStorage.removeItem("currentTenant");
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {

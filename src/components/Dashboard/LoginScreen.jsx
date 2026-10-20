@@ -15,6 +15,15 @@ const generateCaptcha = () => {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
+const checkUserMatch = (user, targetUser, targetPass) => {
+  if (!user || typeof user !== "object") return false;
+  const uName = (user.name || user.username || "").trim().toLowerCase();
+  const tName = (targetUser || "").trim().toLowerCase();
+  const uPass = String(user.password || "").trim();
+  const tPass = String(targetPass || "").trim();
+  return Boolean(uName && uPass && uName === tName && uPass === tPass);
+};
+
 export default function LoginScreen({
   onLoginSuccess,
   onNavigateToSuperAdmin,
@@ -33,6 +42,14 @@ export default function LoginScreen({
   const handleLogin = async (e) => {
     e.preventDefault();
 
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanUsername || !cleanPassword) {
+      setError("Please enter both username and password.");
+      return;
+    }
+
     const txId = generateCorrelationId();
     const txLogger = baseLogger.child({
       correlation: { correlation_id: txId },
@@ -41,54 +58,129 @@ export default function LoginScreen({
     setIsLoading(true);
     setError("");
 
-    txLogger.info("auth", "login_attempt", { context: { user_id: username } });
+    txLogger.info("auth", "login_attempt", { context: { user_id: cleanUsername } });
 
     try {
-      const loginRef = ref(db, "login");
-      const snapshot = await get(loginRef);
+      let isSuccess = false;
+      let resolvedTenantId = "default";
+      let resolvedUserName = cleanUsername;
 
-      if (snapshot.exists()) {
-        const loginData = snapshot.val();
-        const matchedUser = loginData.find(
-          (user) =>
-            user && user.name === username && user.password === password,
-        );
+      // -------------------------------------------------------------
+      // 1. Try Backend API first (Enforces rate-limits & audit trails)
+      // -------------------------------------------------------------
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: cleanUsername,
+            password: cleanPassword,
+          }),
+        });
 
-        if (matchedUser) {
-          localStorage.setItem("currentUser", matchedUser.name);
-          setFailedAttempts(0); // Reset on success
-
-          txLogger.info("auth", "login_success", {
-            context: { user_id: username },
-          });
-          onLoginSuccess();
-        } else {
-          // --- BRUTE FORCE CHECK ---
-          const newAttempts = failedAttempts + 1;
-          setFailedAttempts(newAttempts);
-
-          txLogger.warn("auth", "login_failed_invalid_credentials", {
-            context: { user_id: username, attempts: newAttempts },
-          });
-
-          if (newAttempts >= 3) {
-            setCaptchaValue(generateCaptcha());
-            setShowCaptcha(true);
-            setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
-          } else {
-            setError(`Invalid username or password. (${3 - newAttempts} attempts left)`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success) {
+            isSuccess = true;
+            resolvedTenantId = data.tenant_id || "default";
           }
         }
-      } else {
-        txLogger.error("auth", "login_db_unavailable", {
-          context: { user_id: username },
+      } catch (apiErr) {
+        console.warn("Backend /api/login endpoint call failed, falling back to direct Firebase verification:", apiErr);
+      }
+
+      // -------------------------------------------------------------
+      // 2. Direct Firebase Realtime DB Verification (Fallback / Offline)
+      // -------------------------------------------------------------
+      if (!isSuccess) {
+        // A. Check root 'login' array (Default / Primary Users)
+        try {
+          const loginSnap = await get(ref(db, "login"));
+          if (loginSnap.exists()) {
+            const rawLogin = loginSnap.val();
+            const userList = Array.isArray(rawLogin) ? rawLogin : Object.values(rawLogin);
+            const matchedUser = userList.find((u) => checkUserMatch(u, cleanUsername, cleanPassword));
+            if (matchedUser) {
+              isSuccess = true;
+              resolvedUserName = matchedUser.name || matchedUser.username || cleanUsername;
+              resolvedTenantId = "default";
+            }
+          }
+        } catch (dbErr) {
+          console.warn("Root login check error:", dbErr);
+        }
+
+        // B. Check all multi-tenant partitions in 'tenants/*/users'
+        if (!isSuccess) {
+          try {
+            const tenantsSnap = await get(ref(db, "tenants"));
+            if (tenantsSnap.exists()) {
+              const tenantsVal = tenantsSnap.val();
+              for (const [tId, tData] of Object.entries(tenantsVal)) {
+                if (tData && tData.users) {
+                  const userList = Array.isArray(tData.users)
+                    ? tData.users
+                    : Object.values(tData.users);
+                  const matchedTenantUser = userList.find((u) =>
+                    checkUserMatch(u, cleanUsername, cleanPassword)
+                  );
+                  if (matchedTenantUser) {
+                    isSuccess = true;
+                    resolvedUserName =
+                      matchedTenantUser.name ||
+                      matchedTenantUser.username ||
+                      cleanUsername;
+                    resolvedTenantId = tId;
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (tenantDbErr) {
+            console.warn("Tenants users check error:", tenantDbErr);
+          }
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 3. Evaluate Authentication Result
+      // -------------------------------------------------------------
+      if (isSuccess) {
+        localStorage.setItem("currentUser", resolvedUserName);
+        localStorage.setItem("currentTenant", resolvedTenantId);
+        setFailedAttempts(0); // Reset on success
+
+        txLogger.info("auth", "login_success", {
+          context: { user_id: resolvedUserName, tenant_id: resolvedTenantId },
         });
-        setError("Error connecting to the authentication server.");
+
+        if (typeof onLoginSuccess === "function") {
+          onLoginSuccess({
+            user: resolvedUserName,
+            tenantId: resolvedTenantId,
+          });
+        }
+      } else {
+        // --- BRUTE FORCE CHECK ---
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+
+        txLogger.warn("auth", "login_failed_invalid_credentials", {
+          context: { user_id: cleanUsername, attempts: newAttempts },
+        });
+
+        if (newAttempts >= 3) {
+          setCaptchaValue(generateCaptcha());
+          setShowCaptcha(true);
+          setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
+        } else {
+          setError(`Invalid username or password. (${3 - newAttempts} attempts left)`);
+        }
       }
     } catch (err) {
       txLogger.error("auth", "login_error", {
         error: err,
-        context: { user_id: username },
+        context: { user_id: cleanUsername },
       });
       setError("A network error occurred. Please try again.");
     } finally {
@@ -138,7 +230,7 @@ export default function LoginScreen({
             Aicyro Pulse
           </h1>
           <p className="text-[var(--foreground-muted)] text-sm mt-1 font-medium">
-            {showCaptcha ? "Security Verification Required" : "Sign in to access your dashboard"}
+            {showCaptcha ? "Security Verification Required" : "Sign in to access your tenant dashboard"}
           </p>
         </div>
 
@@ -242,7 +334,7 @@ export default function LoginScreen({
 
         <div className="mt-8 pt-6 border-t border-[var(--border-color)] text-center">
           <p className="text-xs text-[var(--foreground-muted)] font-medium">
-            Authorized personnel only?{" "}
+            Platform Administrator?{" "}
             <button
               type="button"
               onClick={onNavigateToSuperAdmin}

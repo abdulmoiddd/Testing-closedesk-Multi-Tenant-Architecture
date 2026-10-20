@@ -16,6 +16,7 @@ This means you can **freely replace or discard** the current public marketing pa
 2. **The Pulse Dashboard (Tenant & Super Admin)** onto **any new web domain** (either as a centralized SaaS portal or co-hosted on the new website under `/lg`).
 
 ```text
+
 ========================================================================================================
                                      MULTI-TENANT DEPLOYMENT TOPOLOGY
 ========================================================================================================

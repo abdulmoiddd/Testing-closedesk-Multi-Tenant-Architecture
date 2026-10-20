@@ -26,6 +26,7 @@ export async function getMasterRuleBook(
   mode = "text",
   currentLeadData = null,
   retrievedKnowledge = "",
+  tenantId = "default"
 ) {
   let botConfig = {
     serviceCategory: "General", // Determines active industry flows
@@ -98,7 +99,17 @@ export async function getMasterRuleBook(
   };
 
   try {
-    const snapshot = await get(ref(db, "settings/chatbot_config"));
+    // Multi-tenant partition lookup with fallback to global settings
+    let snapshot = null;
+    if (tenantId && tenantId !== "default") {
+      try {
+        const tenantSnap = await get(ref(db, `tenants/${tenantId}/chatbot_config`));
+        if (tenantSnap.exists()) snapshot = tenantSnap;
+      } catch (_) {}
+    }
+    if (!snapshot) {
+      snapshot = await get(ref(db, "settings/chatbot_config"));
+    }
     if (snapshot.exists()) {
       const data = snapshot.val();
       botConfig = {

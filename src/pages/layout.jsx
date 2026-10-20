@@ -4,19 +4,20 @@ import AicyroChatbot from "@/components/Chatbot/AicyroChatbot";
 export default function RootLayout({ children }) {
   const router = useRouter();
 
-  // Check if the current page is the admin dashboard (/lg) or the logs page (/logs)
+  // Check if the current page is the admin dashboard (/lg), the logs page (/logs), or the embed view (/embed/*)
   const isDashboard = router.pathname === "/lg";
   const isLogsPage = router.pathname === "/logs";
+  const isEmbedPage = router.pathname.startsWith("/embed");
 
-  // Hide the chatbot if on the dashboard OR the logs page
-  const showChatbot = !isDashboard && !isLogsPage;
+  // Only show the floating chatbot on public marketing pages
+  const showChatbot = !isDashboard && !isLogsPage && !isEmbedPage;
 
   return (
     <div>
       <main>
         {children}
 
-        {/* Only render the chatbot on public/allowed pages */}
+        {/* Only render the chatbot on public marketing routes */}
         {showChatbot && <AicyroChatbot />}
       </main>
     </div>

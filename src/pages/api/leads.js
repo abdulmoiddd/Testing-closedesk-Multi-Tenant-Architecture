@@ -5,6 +5,7 @@ import { db } from "../../lib/firebase";
 import { ref, update, get } from "firebase/database";
 import { traceAiExecution } from "../../lib/aiTracer"; // 🔥 Integrates Ticket 5 Tracer for the abandoned summaries
 import { executeDbWithTrace } from "../../lib/dbTracer";
+import { resolveTenantId } from "../../lib/tenantResolver";
 
 
 async function handler(req, res, apiLogger) {
@@ -13,7 +14,12 @@ async function handler(req, res, apiLogger) {
   // ==========================================
   if (req.method === "GET") {
     try {
-      const snapshot = await get(ref(db, "leads"));
+      const tenantId = resolveTenantId(req);
+      const leadsPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads` : "leads";
+      let snapshot = await get(ref(db, leadsPath));
+      if (!snapshot.exists() && tenantId !== "default") {
+        snapshot = await get(ref(db, "leads"));
+      }
       
       apiLogger.info("lead_lifecycle", "bulk_fetch_success", { 
         context: { message: "Fetched all leads for dashboard" } 
@@ -52,7 +58,9 @@ async function handler(req, res, apiLogger) {
 
     try {
       // 1. Check existing state in the database
-      const leadRef = ref(db, `leads/${lead_id}`);
+      const tenantId = resolveTenantId(req) || data.tenant_id || "default";
+      const leadPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads/${lead_id}` : `leads/${lead_id}`;
+      const leadRef = ref(db, leadPath);
       // 🔥 Wrapped the Read operation
       const snapshot = await executeDbWithTrace(apiLogger, "read", `leads/${lead_id}`, get(leadRef));
       const exists = snapshot.exists();

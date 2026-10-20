@@ -4,6 +4,7 @@ import { db } from "../../lib/firebase";
 import { ref, set, get, update, push } from "firebase/database";
 import { getMasterRuleBook, POLICY_VERSION } from "../../lib/ruleBook";
 import { withApiLogger } from "../../lib/apiMiddleware";
+import { resolveTenantId } from "../../lib/tenantResolver";
 import { executeRagWithTrace } from "../../lib/ragTracer";
 
 import { traceAiExecution, safeParseAiResponse } from "../../lib/aiTracer";
@@ -204,7 +205,8 @@ async function handler(req, res, apiLogger) {
    
     let instructions, botConfig;
     try {
-      const ruleBook = await getMasterRuleBook("text", mergedLeadData, retrievedKnowledge);
+      const tenantId = resolveTenantId(req);
+      const ruleBook = await getMasterRuleBook("text", mergedLeadData, retrievedKnowledge, tenantId);
       instructions = ruleBook.instructions;
       botConfig = ruleBook.botConfig;
       sessionVersions.config_snapshot = generateHash(JSON.stringify(botConfig));

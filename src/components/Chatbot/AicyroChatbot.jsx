@@ -211,8 +211,17 @@ const TypewriterBubble = ({ msg, onButtonClick, scrollRef, isProcessing, onSpeak
   );
 };
 
-export default function AicyroChatbot() {
+export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
+  const tenantId = propTenantId 
+    || (typeof window !== "undefined" && (window.__CLOSEDESK_TENANT_ID__ || new URLSearchParams(window.location.search).get("tenant") || new URLSearchParams(window.location.search).get("tenant_id")))
+    || "default";
   const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: "CLOSEDESK_WIDGET_RESIZE", isExpanded: isOpen }, "*");
+    }
+  }, [isOpen]);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const [showPeek, setShowPeek] = useState(false);
   const [step, setStep] = useState(STEPS.WELCOME);
@@ -340,7 +349,7 @@ export default function AicyroChatbot() {
         "/api/analyze-image",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
           body: JSON.stringify({
             session_id: firebaseDbIdRef.current,
             image_url: downloadURL,
@@ -408,7 +417,7 @@ export default function AicyroChatbot() {
           interrupted: m.interrupted, tools: m.tools, versions: telemetryRef.current.versions,
         }
       };
-      fetchWithTrace("/api/sync-voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }, txId)
+      fetchWithTrace("/api/sync-voice", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify(payload) }, txId)
         .catch((err) => voiceLogger.error("telemetry", "sync_failed", { error: err }));
     }
     turnMetricsRef.current = null;
@@ -422,7 +431,7 @@ export default function AicyroChatbot() {
   const logVoiceError = (stage, message, rawError = null) => {
     const txId = generateCorrelationId();
     voiceLogger.error("webrtc", stage.toLowerCase(), { context: { error_message: message }, error: rawError, correlation: { correlation_id: txId } });
-    fetchWithTrace("/api/sync-voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: firebaseDbIdRef.current, action: "log_error", error_stage: stage, error_message: message, raw_error: rawError ? String(rawError) : null }) }, txId).catch(() => {});
+    fetchWithTrace("/api/sync-voice", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ session_id: firebaseDbIdRef.current, action: "log_error", error_stage: stage, error_message: message, raw_error: rawError ? String(rawError) : null }) }, txId).catch(() => {});
   };
 
   useEffect(() => {
@@ -492,7 +501,7 @@ export default function AicyroChatbot() {
 
     setVoiceState("PROCESSING");
     try {
-      const tokenResponse = await fetchWithTrace("/api/openai-token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: firebaseDbId }) }, txId);
+      const tokenResponse = await fetchWithTrace("/api/openai-token", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ session_id: firebaseDbId }) }, txId);
       const data = await tokenResponse.json();
 
       if (!tokenResponse.ok) {
@@ -596,7 +605,7 @@ export default function AicyroChatbot() {
 
             uiLogger.info("ai_tool", "tool_call_started", { context: { tool_name: event.name, tool_call_id: event.call_id }, metadata: { args: parsedArgs } });
 
-            fetchWithTrace("/api/sync-voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: firebaseDbId, tool_name: event.name, tool_args: parsedArgs }) }, toolTxId)
+            fetchWithTrace("/api/sync-voice", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ session_id: firebaseDbId, tool_name: event.name, tool_args: parsedArgs }) }, toolTxId)
               .then((res) => res.json())
               .then((result) => {
                 const duration_ms = Date.now() - toolStart;
@@ -690,7 +699,7 @@ export default function AicyroChatbot() {
     try {
       const txId = generateCorrelationId();
       const cleanText = text.replace(/[^\w\s,.!?]/gi, "");
-      const response = await fetchWithTrace("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: cleanText, voiceId: botConfig.botVoice || "Joanna" }), signal: abortControllerRef.current.signal }, txId);
+      const response = await fetchWithTrace("/api/tts", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ text: cleanText, voiceId: botConfig.botVoice || "Joanna" }), signal: abortControllerRef.current.signal }, txId);
 
       if (!response.ok) throw new Error("TTS request failed");
       const blob = await response.blob();
@@ -759,7 +768,7 @@ export default function AicyroChatbot() {
           firebaseId: firebaseDbIdRef.current, ...currentLead, is_abandoned: true, booking_status: "Abandoned Mid-Conversation",
         };
         const sanitizedPayload = Object.fromEntries(Object.entries(payload).map(([k, v]) => [k, v === undefined || v === null ? "" : v]));
-        fetchWithTrace("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sanitizedPayload), keepalive: true }, generateCorrelationId()).catch(() => {});
+        fetchWithTrace("/api/leads", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify(sanitizedPayload), keepalive: true }, generateCorrelationId()).catch(() => {});
       }
     };
     const handleVisibilityChange = () => { if (document.visibilityState === "hidden") handleUnload(); };
@@ -892,7 +901,7 @@ export default function AicyroChatbot() {
       // Attempt to hit the Make.com webhook
       const response = await fetchWithTrace(
         "/api/generate-email",
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: data.name, business_type: data.business_type, time: timeText }) },
+        { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ name: data.name, business_type: data.business_type, time: timeText }) },
         txId,
       );
       
@@ -947,7 +956,7 @@ export default function AicyroChatbot() {
       };
       const sanitizedPayload = Object.fromEntries(Object.entries(payload).map(([k, v]) => [k, v === undefined || v === null ? "" : v]));
 
-      const res = await fetchWithTrace("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sanitizedPayload), keepalive: true }, txId);
+      const res = await fetchWithTrace("/api/leads", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify(sanitizedPayload), keepalive: true }, txId);
       if (!res.ok) throw new Error(`Server status: ${res.status}`);
       
       uiLogger.info("ai_tool", "tool_call_success", { context: { tool_name: "submit_lead", tool_call_id: txId, result_status: "success" }, duration_ms: Date.now() - startTime });
@@ -976,7 +985,7 @@ export default function AicyroChatbot() {
       aiHistory.push({ role: "user", content: val });
 
       try {
-        const response = await fetchWithTrace("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: firebaseDbId, current_lead_data: leadData, messages: aiHistory }) }, txId);
+        const response = await fetchWithTrace("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ session_id: firebaseDbId, current_lead_data: leadData, messages: aiHistory }) }, txId);
 
         if (!response.ok) throw new Error(`API returned status ${response.status}`);
         const data = await response.json();

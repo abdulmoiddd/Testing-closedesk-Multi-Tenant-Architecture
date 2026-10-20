@@ -1,6 +1,7 @@
 // src/pages/api/openai-token.js
 import { getMasterRuleBook, POLICY_VERSION } from "../../lib/ruleBook";
 import { withApiLogger } from "../../lib/apiMiddleware";
+import { resolveTenantId } from "../../lib/tenantResolver";
 import { db } from "../../lib/firebase";
 import { ref, get } from "firebase/database";
 

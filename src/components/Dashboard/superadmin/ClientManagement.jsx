@@ -10,6 +10,31 @@ import { createPulseLogger } from "../../../lib/loggerPresets";
 import { recordAuditTrail } from "../../../lib/auditTracer";
 const pulseLogger = createPulseLogger("ClientManagement");
 
+const INDUSTRY_OPTIONS = [
+  { label: "HVAC (Heating & Air)", value: "HVAC", pack: "hvac_v2" },
+  { label: "Plumbing Services", value: "Plumbing", pack: "plumbing_v2" },
+  { label: "Water & Fire Restoration", value: "Restoration", pack: "restoration_v2" },
+  { label: "Roofing & Storm Repair", value: "Roofing", pack: "roofing_v2" },
+  { label: "Electrical Contracting", value: "Electrical", pack: "electrical_v2" },
+  { label: "Pest Control", value: "Pest Control", pack: "pest_v2" },
+  { label: "General Home Services", value: "General", pack: "general_v2" },
+];
+
+const INITIAL_NEW_CLIENT = {
+  businessName: "",
+  tenantId: "",
+  industry: "HVAC",
+  industryPack: "hvac_v2",
+  email: "",
+  phone: "",
+  timezone: "America/New_York",
+  website: "",
+  adminUsername: "",
+  adminPassword: "",
+  allowedOrigin: "*",
+  primaryColor: "#0284c7",
+};
+
 export default function ClientManagement() {
   const [clients, setClients] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,6 +43,13 @@ export default function ClientManagement() {
   // --- MODAL STATES ---
   const [viewingProfile, setViewingProfile] = useState(null);
   const [managingUsers, setManagingUsers] = useState(null);
+
+  // --- ADD CLIENT STATES ---
+  const [isAddingClient, setIsAddingClient] = useState(false);
+  const [newClientData, setNewClientData] = useState(INITIAL_NEW_CLIENT);
+  const [addClientError, setAddClientError] = useState("");
+  const [createdClientModal, setCreatedClientModal] = useState(null);
+  const [copySuccess, setCopySuccess] = useState("");
 
   // --- PIN VERIFICATION STATES ---
   const [pinModal, setPinModal] = useState({
@@ -36,51 +68,95 @@ export default function ClientManagement() {
   const [newPassword, setNewPassword] = useState("");
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [newUser, setNewUser] = useState({ name: "", password: "" });
-  const [revealedPasswords, setRevealedPasswords] = useState(new Set()); 
+  const [revealedPasswords, setRevealedPasswords] = useState(new Set());
+
+  // --- FETCH CLIENTS (PRIMARY + MULTI-TENANT) ---
+  const fetchClientData = async () => {
+    try {
+      const settingsRef = ref(db, "settings/business_profile");
+      const settingsSnap = await get(settingsRef);
+
+      const loginRef = ref(db, "login");
+      const loginSnap = await get(loginRef);
+
+      let profileData = {};
+      if (settingsSnap.exists()) {
+        const rawProfile = settingsSnap.val();
+        profileData = {
+          ...rawProfile.basic_info,
+          timezone: rawProfile.timezone,
+          updated_at: rawProfile.updated_at,
+        };
+      }
+
+      let usersData = [];
+      if (loginSnap.exists()) {
+        usersData = loginSnap.val().filter((u) => u !== null);
+      }
+
+      const loadedClients = [
+        {
+          id: "primary_client",
+          profile: profileData,
+          users: usersData,
+          isPrimary: true,
+        },
+      ];
+
+      // Fetch dynamic multi-tenant partitions
+      try {
+        const tenantsRef = ref(db, "tenants");
+        const tenantsSnap = await get(tenantsRef);
+        if (tenantsSnap.exists()) {
+          const tenantsVal = tenantsSnap.val();
+          for (const [tId, tData] of Object.entries(tenantsVal)) {
+            if (!tData || tId === "primary_client") continue;
+            const tProfile = tData.business_profile?.basic_info || {};
+            const tUsers = tData.users
+              ? Object.values(tData.users).filter(Boolean)
+              : [];
+            loadedClients.push({
+              id: tId,
+              profile: {
+                businessName:
+                  tProfile.businessName || tData.config?.business_name || tId,
+                email: tProfile.email || "",
+                phone: tProfile.phone || "",
+                website: tProfile.website || "",
+                industry:
+                  tProfile.industry || tData.config?.industry_pack || "General",
+                timezone:
+                  tData.business_profile?.timezone ||
+                  tData.config?.timezone ||
+                  "America/New_York",
+                updated_at:
+                  tData.business_profile?.updated_at ||
+                  tData.created_at ||
+                  new Date().toISOString(),
+              },
+              users: tUsers,
+              config: tData.config || {},
+              isMultiTenant: true,
+            });
+          }
+        }
+      } catch (tenantErr) {
+        console.warn("Could not fetch multi-tenant list:", tenantErr);
+      }
+
+      setClients(loadedClients);
+    } catch (error) {
+      console.error("Error fetching client data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchClientData = async () => {
-      try {
-        const settingsRef = ref(db, "settings/business_profile");
-        const settingsSnap = await get(settingsRef);
-
-        const loginRef = ref(db, "login");
-        const loginSnap = await get(loginRef);
-
-        let profileData = {};
-        if (settingsSnap.exists()) {
-          const rawProfile = settingsSnap.val();
-          profileData = {
-            ...rawProfile.basic_info,
-            timezone: rawProfile.timezone,
-            updated_at: rawProfile.updated_at,
-          };
-        }
-
-        let usersData = [];
-        if (loginSnap.exists()) {
-          usersData = loginSnap.val().filter((u) => u !== null);
-        }
-
-        const loadedClients = [
-          {
-            id: "primary_client",
-            profile: profileData,
-            users: usersData,
-          },
-        ];
-
-        setClients(loadedClients);
-      } catch (error) {
-        console.error("Error fetching client data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchClientData();
   }, []);
 
+  // --- PIN AUTH ---
   const requestPinAuth = (actionPayload) => {
     setPinModal({ isOpen: true, action: actionPayload, error: "" });
     setPinInput("");
@@ -99,13 +175,13 @@ export default function ClientManagement() {
         if (admin && admin.pin === pinToVerify) {
           executeSecuredAction(pinModal.action);
           setPinModal({ isOpen: false, action: null, error: "" });
-          setPinInput(""); 
+          setPinInput("");
         } else {
           setPinModal((prev) => ({
             ...prev,
             error: "Invalid PIN. Access denied.",
           }));
-          setPinInput(""); 
+          setPinInput("");
         }
       }
     } catch (error) {
@@ -123,7 +199,6 @@ export default function ClientManagement() {
   const handlePinChange = (e) => {
     const val = e.target.value.replace(/\D/g, "").slice(0, 4);
     setPinInput(val);
-
     if (val.length === 4) {
       verifyPin(val);
     }
@@ -157,11 +232,20 @@ export default function ClientManagement() {
     }
   };
 
-  const saveUsersToFirebase = async (updatedUsersArray) => {
+  // --- USER PERSISTENCE (SCOPED PER CLIENT) ---
+  const saveUsersToFirebase = async (client, updatedUsersArray) => {
     try {
       setActionLoading(true);
-      const firebaseFormattedArray = [null, ...updatedUsersArray];
-      await set(ref(db, "login"), firebaseFormattedArray);
+      if (!client || client.id === "primary_client") {
+        const firebaseFormattedArray = [null, ...updatedUsersArray];
+        await set(ref(db, "login"), firebaseFormattedArray);
+      } else {
+        const usersObj = {};
+        updatedUsersArray.forEach((u, i) => {
+          usersObj[i + 1] = u;
+        });
+        await set(ref(db, `tenants/${client.id}/users`), usersObj);
+      }
     } catch (error) {
       console.error("Error saving users:", error);
       alert("Failed to save changes to the database.");
@@ -173,16 +257,17 @@ export default function ClientManagement() {
   const handleSavePassword = async () => {
     if (!newPassword.trim()) return;
     const updatedClients = [...clients];
-    const targetUsers = updatedClients[editingUser.clientIndex].users;
+    const targetClient = updatedClients[editingUser.clientIndex];
+    const targetUsers = targetClient.users;
     targetUsers[editingUser.userIndex].password = newPassword;
-    await saveUsersToFirebase(targetUsers);
-    
-    // 🚨 TICKET 14: Log User Role / Password Changes
+
+    await saveUsersToFirebase(targetClient, targetUsers);
+
     recordAuditTrail(pulseLogger, "user_role_changed", {
       who: localStorage.getItem("currentSuperAdmin") || "superadmin",
-      target: `client_${editingUser.clientIndex}_user_${editingUser.userIndex}`,
+      target: `client_${targetClient.id}_user_${editingUser.userIndex}`,
       status: "success",
-      reason: "Password updated"
+      reason: "Password updated",
     });
 
     setClients(updatedClients);
@@ -193,17 +278,18 @@ export default function ClientManagement() {
   const handleAddUser = async (clientIndex) => {
     if (!newUser.name.trim() || !newUser.password.trim()) return;
     const updatedClients = [...clients];
-    const targetUsers = updatedClients[clientIndex].users;
-    targetUsers.push(newUser);
-    await saveUsersToFirebase(targetUsers);
+    const targetClient = updatedClients[clientIndex];
+    const targetUsers = targetClient.users;
+    targetUsers.push({ ...newUser, role: "admin" });
 
-    // 🚨 TICKET 14: Log Client Updated (User Addition)
+    await saveUsersToFirebase(targetClient, targetUsers);
+
     recordAuditTrail(pulseLogger, "client_updated", {
       who: localStorage.getItem("currentSuperAdmin") || "superadmin",
-      target: `client_${clientIndex}`,
+      target: `client_${targetClient.id}`,
       newState: newUser,
       status: "success",
-      reason: "New user allocated"
+      reason: "New user allocated",
     });
 
     setClients(updatedClients);
@@ -214,20 +300,18 @@ export default function ClientManagement() {
   const handleDeleteUser = async (clientIndex, userIndex) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     const updatedClients = [...clients];
-    const targetUsers = updatedClients[clientIndex].users;
-    
-    // 🚨 TICKET 14: Store what is being deleted first so it can be logged!
+    const targetClient = updatedClients[clientIndex];
+    const targetUsers = targetClient.users;
     const userBeingDeleted = targetUsers[userIndex];
-    
-    targetUsers.splice(userIndex, 1);
-    await saveUsersToFirebase(targetUsers);
 
-    // 🚨 TICKET 14: Log Data Deletion
-    recordAuditTrail(pulseLogger, "data_deleted", {
+    targetUsers.splice(userIndex, 1);
+    await saveUsersToFirebase(targetClient, targetUsers);
+
+    recordAuditTrail(pulseLogger, "user_deleted", {
       who: localStorage.getItem("currentSuperAdmin") || "superadmin",
-      target: `client_${clientIndex}_user_${userIndex}`,
-      previousState: userBeingDeleted,
-      status: "success"
+      target: `client_${targetClient.id}`,
+      user: userBeingDeleted?.name,
+      status: "success",
     });
 
     setClients(updatedClients);
@@ -236,40 +320,251 @@ export default function ClientManagement() {
   const handleSaveProfile = async () => {
     setActionLoading(true);
     try {
-      const updates = {
-        "settings/business_profile/basic_info/address": editedProfileData.address,
-        "settings/business_profile/basic_info/avgJobValue": editedProfileData.avgJobValue,
-        "settings/business_profile/basic_info/businessName": editedProfileData.businessName,
-        "settings/business_profile/basic_info/email": editedProfileData.email,
-        "settings/business_profile/basic_info/industry": editedProfileData.industry,
-        "settings/business_profile/basic_info/phone": editedProfileData.phone,
-        "settings/business_profile/basic_info/website": editedProfileData.website,
-        "settings/business_profile/timezone": editedProfileData.timezone,
-        "settings/business_profile/updated_at": new Date().toISOString(),
-      };
+      const nowIso = new Date().toISOString();
+      const targetClient = viewingProfile;
 
-      await update(ref(db), updates);
+      if (!targetClient || targetClient.id === "primary_client") {
+        const updates = {
+          "settings/business_profile/basic_info/address":
+            editedProfileData.address || "",
+          "settings/business_profile/basic_info/avgJobValue":
+            editedProfileData.avgJobValue || "",
+          "settings/business_profile/basic_info/businessName":
+            editedProfileData.businessName || "",
+          "settings/business_profile/basic_info/email":
+            editedProfileData.email || "",
+          "settings/business_profile/basic_info/industry":
+            editedProfileData.industry || "",
+          "settings/business_profile/basic_info/phone":
+            editedProfileData.phone || "",
+          "settings/business_profile/basic_info/website":
+            editedProfileData.website || "",
+          "settings/business_profile/timezone":
+            editedProfileData.timezone || "America/New_York",
+          "settings/business_profile/updated_at": nowIso,
+        };
+        await update(ref(db), updates);
+      } else {
+        const tenantUpdates = {
+          [`tenants/${targetClient.id}/business_profile/basic_info`]: {
+            businessName: editedProfileData.businessName || "",
+            email: editedProfileData.email || "",
+            phone: editedProfileData.phone || "",
+            website: editedProfileData.website || "",
+            industry: editedProfileData.industry || "",
+            address: editedProfileData.address || "",
+          },
+          [`tenants/${targetClient.id}/business_profile/timezone`]:
+            editedProfileData.timezone || "America/New_York",
+          [`tenants/${targetClient.id}/business_profile/updated_at`]: nowIso,
+          [`tenants/${targetClient.id}/config/business_name`]:
+            editedProfileData.businessName || "",
+        };
+        await update(ref(db), tenantUpdates);
+      }
 
-      // 🚨 TICKET 14: Log configuration/profile changes
       recordAuditTrail(pulseLogger, "configuration_changed", {
         who: localStorage.getItem("currentSuperAdmin") || "superadmin",
-        target: "settings/business_profile",
-        previousState: clients[0].profile,
-        newState: editedProfileData
+        target: `tenants/${targetClient.id}/business_profile`,
+        previousState: targetClient.profile,
+        newState: editedProfileData,
       });
 
-      const updatedClients = [...clients];
-      updatedClients[0].profile = {
-        ...editedProfileData,
-        updated_at: updates["settings/business_profile/updated_at"],
-      };
+      const updatedClients = clients.map((c) =>
+        c.id === targetClient.id
+          ? {
+              ...c,
+              profile: {
+                ...editedProfileData,
+                updated_at: nowIso,
+              },
+            }
+          : c
+      );
 
       setClients(updatedClients);
-      setViewingProfile(updatedClients[0]);
+      setViewingProfile({
+        ...targetClient,
+        profile: {
+          ...editedProfileData,
+          updated_at: nowIso,
+        },
+      });
       setIsEditingProfile(false);
     } catch (error) {
       console.error("Error saving profile:", error);
       alert("Failed to save profile changes.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // --- AUTO-SLUGIFY TENANT ID ON NAME CHANGE ---
+  const handleBusinessNameChange = (name) => {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+    setNewClientData((prev) => ({
+      ...prev,
+      businessName: name,
+      tenantId: prev.tenantId && prev.tenantId !== slug ? prev.tenantId : slug,
+    }));
+  };
+
+  const handleIndustryChange = (industry) => {
+    const match = INDUSTRY_OPTIONS.find((opt) => opt.value === industry);
+    setNewClientData((prev) => ({
+      ...prev,
+      industry,
+      industryPack: match ? match.pack : "general_v2",
+    }));
+  };
+
+  // --- CREATE NEW CLIENT HANDLER ---
+  const handleCreateNewClient = async (e) => {
+    e.preventDefault();
+    setAddClientError("");
+
+    const {
+      businessName,
+      tenantId,
+      industry,
+      industryPack,
+      email,
+      phone,
+      timezone,
+      website,
+      adminUsername,
+      adminPassword,
+      allowedOrigin,
+      primaryColor,
+    } = newClientData;
+
+    // Validations
+    if (!businessName.trim()) {
+      setAddClientError("Business Name is required.");
+      return;
+    }
+    if (!tenantId.trim()) {
+      setAddClientError("Tenant ID / Identifier is required.");
+      return;
+    }
+    const cleanTenantId = tenantId.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    if (cleanTenantId !== tenantId) {
+      setAddClientError("Tenant ID can only contain lowercase letters, numbers, hyphens, and underscores.");
+      return;
+    }
+    if (clients.some((c) => c.id === cleanTenantId)) {
+      setAddClientError(`Tenant ID '${cleanTenantId}' already exists. Please choose a unique identifier.`);
+      return;
+    }
+    if (!adminUsername.trim() || !adminPassword.trim()) {
+      setAddClientError("Initial Admin Username and Password are required.");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const originHost =
+        typeof window !== "undefined" ? window.location.origin : "https://app.closedesk.ai";
+
+      const tenantPayload = {
+        id: cleanTenantId,
+        enabled: true,
+        created_at: nowIso,
+        business_profile: {
+          basic_info: {
+            businessName: businessName.trim(),
+            email: email.trim(),
+            phone: phone.trim(),
+            website: website.trim(),
+            industry: industry,
+          },
+          timezone: timezone || "America/New_York",
+          updated_at: nowIso,
+        },
+        config: {
+          business_name: businessName.trim(),
+          industry_pack: industryPack,
+          timezone: timezone || "America/New_York",
+          allowed_origins: [allowedOrigin.trim() || "*"],
+        },
+        chatbot_config: {
+          bot_name: `${businessName.trim()} Specialist`,
+          voiceEnabled: true,
+          voice: "alloy",
+          serviceCategory: industry,
+        },
+        appearance: {
+          primaryColor: primaryColor || "#0284c7",
+          hue: "blue",
+        },
+        users: {
+          "1": {
+            name: adminUsername.trim(),
+            username: adminUsername.trim(),
+            password: adminPassword.trim(),
+            role: "admin",
+            created_at: nowIso,
+          },
+        },
+      };
+
+      // Write tenant record directly into Firebase RTDB
+      await set(ref(db, `tenants/${cleanTenantId}`), tenantPayload);
+
+      // Record SOC2-style Audit Trail
+      recordAuditTrail(pulseLogger, "client_created", {
+        who: localStorage.getItem("currentSuperAdmin") || "superadmin",
+        target: `tenants/${cleanTenantId}`,
+        tenant_id: cleanTenantId,
+        industry_pack: industryPack,
+        status: "success",
+      });
+
+      // Update client state locally
+      const createdClientObj = {
+        id: cleanTenantId,
+        profile: {
+          businessName: businessName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          website: website.trim(),
+          industry: industry,
+          timezone: timezone,
+          updated_at: nowIso,
+        },
+        users: [
+          {
+            name: adminUsername.trim(),
+            password: adminPassword.trim(),
+            role: "admin",
+          },
+        ],
+        config: tenantPayload.config,
+        isMultiTenant: true,
+      };
+
+      setClients((prev) => [...prev, createdClientObj]);
+
+      // Open Success & Embed Snippet Modal
+      setCreatedClientModal({
+        tenantId: cleanTenantId,
+        businessName: businessName.trim(),
+        adminUsername: adminUsername.trim(),
+        adminPassword: adminPassword.trim(),
+        embedSnippet: `<script src="${originHost}/widget.js" data-tenant="${cleanTenantId}" defer></script>`,
+      });
+
+      // Reset Form
+      setNewClientData(INITIAL_NEW_CLIENT);
+      setIsAddingClient(false);
+    } catch (error) {
+      console.error("Failed to create client:", error);
+      setAddClientError("Failed to save new client to Firebase database. Check network or console.");
     } finally {
       setActionLoading(false);
     }
@@ -284,18 +579,26 @@ export default function ClientManagement() {
     setManagingUsers(null);
     setEditingUser(null);
     setIsAddingUser(false);
-    setRevealedPasswords(new Set()); 
+    setRevealedPasswords(new Set());
+  };
+
+  const copyToClipboard = (text, label) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopySuccess(label);
+      setTimeout(() => setCopySuccess(""), 3000);
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center min-h-[400px]">
+      <div className="w-full h-96 flex flex-col items-center justify-center gap-4">
         <svg
-          className="w-10 h-10 animate-spin text-[var(--primary)] mb-4"
+          className="animate-spin h-8 w-8 text-[var(--primary)]"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
         >
           <path
             d="M21 12a9 9 0 1 1-6.219-8.56"
@@ -304,7 +607,7 @@ export default function ClientManagement() {
           />
         </svg>
         <p className="text-[var(--foreground-muted)] font-bold">
-          Syncing with database...
+          Syncing client directory with database...
         </p>
       </div>
     );
@@ -312,34 +615,37 @@ export default function ClientManagement() {
 
   return (
     <div className="w-full relative">
-      <div className="flex items-center justify-between mb-8">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-black text-[var(--foreground)]">
             Client Directory
           </h2>
           <p className="text-[var(--foreground-muted)] font-medium text-sm mt-1">
-            Manage tenant profiles, user allocations, and authentication
-            credentials.
+            Manage multi-tenant client profiles, staff access, and embed snippets.
           </p>
         </div>
-        <button className="px-4 py-2 bg-[var(--primary)] text-white text-sm font-bold rounded-xl shadow-[0_4px_15px_var(--lead-glow)] hover:opacity-90 transition-all flex items-center gap-2">
+        <button
+          onClick={() => {
+            setAddClientError("");
+            setIsAddingClient(true);
+          }}
+          className="px-5 py-2.5 bg-[var(--primary)] text-white text-sm font-bold rounded-xl shadow-[0_4px_15px_var(--lead-glow)] hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+        >
           <svg
             className="w-4 h-4"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="2.5"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 4v16m8-8H4"
-            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
           Add New Client
         </button>
       </div>
 
+      {/* CLIENT GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {clients.map((client, cIdx) => (
           <div
@@ -348,33 +654,31 @@ export default function ClientManagement() {
           >
             <div className="flex justify-between items-start mb-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center font-black text-xl border border-[var(--primary)]/20">
+                <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center font-black text-xl border border-[var(--primary)]/20 uppercase">
                   {client.profile.businessName
                     ? client.profile.businessName.charAt(0)
-                    : "A"}
+                    : "C"}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-[var(--foreground)]">
                     {client.profile.businessName || "Unnamed Business"}
                   </h3>
                   <div className="flex items-center gap-2 text-[var(--foreground-muted)] text-xs font-medium mt-1">
-                    <span className="flex items-center gap-1">
-                      <svg
-                        className="w-3 h-3 text-[var(--logo-mongo-green)]"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                      >
-                        <circle cx="12" cy="12" r="8" />
-                      </svg>
+                    <span className="flex items-center gap-1 font-semibold text-emerald-500">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                       Active
                     </span>
                     <span>•</span>
-                    <span>{client.profile.industry || "N/A"}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--background)] border border-[var(--border-color)] font-mono text-[10px]">
+                      {client.id}
+                    </span>
+                    <span>•</span>
+                    <span>{client.profile.industry || "General"}</span>
                   </div>
                 </div>
               </div>
               <span className="px-3 py-1 bg-[var(--background)] border border-[var(--border-color)] rounded-lg text-xs font-bold text-[var(--foreground)]">
-                {client.users.length} Users
+                {client.users.length} {client.users.length === 1 ? "User" : "Users"}
               </span>
             </div>
 
@@ -415,6 +719,333 @@ export default function ClientManagement() {
         ))}
       </div>
 
+      {/* ======================================================== */}
+      {/* 🚀 MODAL 1: ADD NEW CLIENT (MULTI-TENANT WIZARD)         */}
+      {/* ======================================================== */}
+      {isAddingClient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !actionLoading && setIsAddingClient(false)}
+          ></div>
+          <div className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 max-w-2xl w-full relative z-50 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar flex flex-col">
+            <div className="flex justify-between items-center mb-6 shrink-0 border-b border-[var(--border-color)] pb-4">
+              <div>
+                <h3 className="text-xl font-black text-[var(--foreground)]">
+                  Provision New Tenant
+                </h3>
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  Create an isolated client partition with customized rules & staff login.
+                </p>
+              </div>
+              <button
+                disabled={actionLoading}
+                onClick={() => setIsAddingClient(false)}
+                className="p-2 text-[var(--foreground-muted)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--background)] transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {addClientError && (
+              <div className="p-3 mb-6 bg-red-500/10 border border-red-500/30 rounded-xl text-red-500 text-xs font-bold">
+                ⚠️ {addClientError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateNewClient} className="space-y-6">
+              {/* SECTION: BASIC INFO */}
+              <div>
+                <h4 className="text-xs font-black uppercase text-[var(--primary)] tracking-wider mb-3">
+                  1. Company & Tenant Identity
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Business Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Apex Emergency Plumbing"
+                      value={newClientData.businessName}
+                      onChange={(e) => handleBusinessNameChange(e.target.value)}
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Tenant Identifier (Slug) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. apex_plumbing"
+                      value={newClientData.tenantId}
+                      onChange={(e) =>
+                        setNewClientData({
+                          ...newClientData,
+                          tenantId: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""),
+                        })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-mono text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                    <span className="text-[10px] text-[var(--foreground-muted)] mt-1 block">
+                      Used in &lt;script data-tenant="{newClientData.tenantId || "slug"}"&gt;
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: INDUSTRY & RULES */}
+              <div>
+                <h4 className="text-xs font-black uppercase text-[var(--primary)] tracking-wider mb-3">
+                  2. Industry Intelligence Pack
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Service Industry *
+                    </label>
+                    <select
+                      value={newClientData.industry}
+                      onChange={(e) => handleIndustryChange(e.target.value)}
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    >
+                      {INDUSTRY_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Assigned Pack Version
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={newClientData.industryPack}
+                      className="w-full bg-[var(--background)]/50 border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-mono text-[var(--foreground-muted)] cursor-not-allowed outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: CONTACT & LOCATION */}
+              <div>
+                <h4 className="text-xs font-black uppercase text-[var(--primary)] tracking-wider mb-3">
+                  3. Operational Contact & Timezone
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Dispatch Email
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="dispatch@client.com"
+                      value={newClientData.email}
+                      onChange={(e) =>
+                        setNewClientData({ ...newClientData, email: e.target.value })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Emergency Phone
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="(555) 000-0000"
+                      value={newClientData.phone}
+                      onChange={(e) =>
+                        setNewClientData({ ...newClientData, phone: e.target.value })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Timezone
+                    </label>
+                    <select
+                      value={newClientData.timezone}
+                      onChange={(e) =>
+                        setNewClientData({ ...newClientData, timezone: e.target.value })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    >
+                      <option value="America/New_York">Eastern (US)</option>
+                      <option value="America/Chicago">Central (US)</option>
+                      <option value="America/Denver">Mountain (US)</option>
+                      <option value="America/Los_Angeles">Pacific (US)</option>
+                      <option value="UTC">UTC Universal</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: ADMIN CREDENTIALS */}
+              <div>
+                <h4 className="text-xs font-black uppercase text-[var(--primary)] tracking-wider mb-3">
+                  4. Initial Tenant Admin Credentials
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Admin Username *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. apex_admin"
+                      value={newClientData.adminUsername}
+                      onChange={(e) =>
+                        setNewClientData({ ...newClientData, adminUsername: e.target.value })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[var(--foreground-muted)] mb-1 block">
+                      Admin Password *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="••••••••••••"
+                      value={newClientData.adminPassword}
+                      onChange={(e) =>
+                        setNewClientData({ ...newClientData, adminPassword: e.target.value })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SUBMIT BUTTONS */}
+              <div className="flex gap-3 pt-4 border-t border-[var(--border-color)]">
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="flex-1 py-3 bg-[var(--primary)] text-white text-sm font-bold rounded-xl shadow-[0_4px_15px_var(--lead-glow)] hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  {actionLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M4 12a8 8 0 018-8" className="opacity-75" />
+                      </svg>
+                      Provisioning Tenant in Database...
+                    </>
+                  ) : (
+                    "Create Client Tenant"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={actionLoading}
+                  onClick={() => setIsAddingClient(false)}
+                  className="px-6 py-3 border border-[var(--border-color)] text-[var(--foreground)] text-sm font-bold rounded-xl hover:bg-[var(--background)] transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 🎉 MODAL 2: CREATED TENANT SUCCESS & EMBED SNIPPET       */}
+      {/* ======================================================== */}
+      {createdClientModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/75 backdrop-blur-md"
+            onClick={() => setCreatedClientModal(null)}
+          ></div>
+          <div className="bg-[var(--card-bg)] border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-xl w-full relative z-50 shadow-2xl flex flex-col">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-[var(--foreground)]">
+                  Tenant Successfully Created!
+                </h3>
+                <p className="text-xs text-[var(--foreground-muted)]">
+                  {createdClientModal.businessName} is ready to deploy.
+                </p>
+              </div>
+            </div>
+
+            {/* EMBED CODE BOX */}
+            <div className="mt-4 mb-4">
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
+                  Website Embed Snippet
+                </label>
+                <button
+                  onClick={() =>
+                    copyToClipboard(createdClientModal.embedSnippet, "embed")
+                  }
+                  className="text-xs font-bold text-[var(--primary)] hover:underline flex items-center gap-1"
+                >
+                  {copySuccess === "embed" ? "✓ Copied!" : "Copy Code"}
+                </button>
+              </div>
+              <div className="p-3 bg-[var(--background)] rounded-xl border border-[var(--border-color)] font-mono text-xs text-[var(--foreground)] break-all select-all">
+                {createdClientModal.embedSnippet}
+              </div>
+              <p className="text-[11px] text-[var(--foreground-muted)] mt-1.5">
+                Paste this 1-line script tag before the closing &lt;/body&gt; tag on the client's website (WordPress, Webflow, Shopify, or HTML).
+              </p>
+            </div>
+
+            {/* CREDENTIALS BOX */}
+            <div className="p-4 bg-[var(--background)] rounded-xl border border-[var(--border-color)] mb-6">
+              <p className="text-xs font-bold text-[var(--foreground)] mb-2 uppercase tracking-wider">
+                Client Dashboard Login (/lg)
+              </p>
+              <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                <div>
+                  <span className="text-[var(--foreground-muted)] block text-[10px] uppercase font-bold">Username</span>
+                  <span className="font-bold text-[var(--foreground)]">{createdClientModal.adminUsername}</span>
+                </div>
+                <div>
+                  <span className="text-[var(--foreground-muted)] block text-[10px] uppercase font-bold">Password</span>
+                  <span className="font-bold text-[var(--foreground)]">{createdClientModal.adminPassword}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setCreatedClientModal(null)}
+              className="w-full py-3 bg-[var(--primary)] text-white text-sm font-bold rounded-xl shadow-[0_4px_15px_var(--lead-glow)] hover:opacity-90 transition-all"
+            >
+              Done & Return to Directory
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 👁️ MODAL 3: VIEW / EDIT BUSINESS PROFILE                 */}
+      {/* ======================================================== */}
       {viewingProfile && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <div
@@ -427,8 +1058,8 @@ export default function ClientManagement() {
                 <h3 className="text-xl font-black text-[var(--foreground)]">
                   Business Profile
                 </h3>
-                <p className="text-xs text-[var(--foreground-muted)] mt-1">
-                  Tenant core configuration
+                <p className="text-xs text-[var(--foreground-muted)] mt-1 font-mono">
+                  Tenant: {viewingProfile.id}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -455,10 +1086,10 @@ export default function ClientManagement() {
                 )}
                 <button
                   onClick={closeProfileModal}
-                  className="text-[var(--foreground-muted)] hover:text-[var(--logo-politico-red)] transition-colors"
+                  className="text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors p-1"
                 >
                   <svg
-                    className="w-6 h-6"
+                    className="w-5 h-5"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -474,365 +1105,368 @@ export default function ClientManagement() {
               </div>
             </div>
 
-            {isEditingProfile ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.keys(editedProfileData).map((key) => {
-                  if (key === "updated_at") return null;
-                  return (
-                    <div key={key} className="flex flex-col">
-                      <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1">
-                        {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
-                      </label>
-                      <input
-                        type="text"
-                        value={editedProfileData[key] || ""}
-                        onChange={(e) =>
-                          setEditedProfileData({
-                            ...editedProfileData,
-                            [key]: e.target.value,
-                          })
-                        }
-                        className="w-full bg-[var(--background)] border border-[var(--border-color)] text-[var(--foreground)] text-sm px-3 py-2 rounded-xl focus:outline-none focus:border-[var(--primary)] transition-colors"
-                      />
-                    </div>
-                  );
-                })}
-                <div className="col-span-1 md:col-span-2 flex gap-3 mt-4">
+            <div className="space-y-6">
+              {/* Profile Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
+                    Business Name
+                  </label>
+                  {isEditingProfile ? (
+                    <input
+                      type="text"
+                      value={editedProfileData.businessName || ""}
+                      onChange={(e) =>
+                        setEditedProfileData({
+                          ...editedProfileData,
+                          businessName: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  ) : (
+                    <p className="text-sm font-bold text-[var(--foreground)]">
+                      {viewingProfile.profile.businessName || "—"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
+                    Industry
+                  </label>
+                  {isEditingProfile ? (
+                    <input
+                      type="text"
+                      value={editedProfileData.industry || ""}
+                      onChange={(e) =>
+                        setEditedProfileData({
+                          ...editedProfileData,
+                          industry: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  ) : (
+                    <p className="text-sm font-bold text-[var(--foreground)]">
+                      {viewingProfile.profile.industry || "—"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
+                    Email
+                  </label>
+                  {isEditingProfile ? (
+                    <input
+                      type="email"
+                      value={editedProfileData.email || ""}
+                      onChange={(e) =>
+                        setEditedProfileData({
+                          ...editedProfileData,
+                          email: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  ) : (
+                    <p className="text-sm font-bold text-[var(--foreground)]">
+                      {viewingProfile.profile.email || "—"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
+                    Phone
+                  </label>
+                  {isEditingProfile ? (
+                    <input
+                      type="text"
+                      value={editedProfileData.phone || ""}
+                      onChange={(e) =>
+                        setEditedProfileData({
+                          ...editedProfileData,
+                          phone: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  ) : (
+                    <p className="text-sm font-bold text-[var(--foreground)]">
+                      {viewingProfile.profile.phone || "—"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
+                    Website
+                  </label>
+                  {isEditingProfile ? (
+                    <input
+                      type="text"
+                      value={editedProfileData.website || ""}
+                      onChange={(e) =>
+                        setEditedProfileData({
+                          ...editedProfileData,
+                          website: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  ) : (
+                    <p className="text-sm font-bold text-[var(--foreground)]">
+                      {viewingProfile.profile.website || "—"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
+                    Timezone
+                  </label>
+                  {isEditingProfile ? (
+                    <input
+                      type="text"
+                      value={editedProfileData.timezone || ""}
+                      onChange={(e) =>
+                        setEditedProfileData({
+                          ...editedProfileData,
+                          timezone: e.target.value,
+                        })
+                      }
+                      className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm font-semibold text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  ) : (
+                    <p className="text-sm font-bold text-[var(--foreground)]">
+                      {viewingProfile.profile.timezone || "—"}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Embed snippet view inside profile */}
+              <div className="p-4 bg-[var(--background)] rounded-xl border border-[var(--border-color)]">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[10px] uppercase font-bold text-[var(--primary)] tracking-wider">
+                    Client Embed Script
+                  </span>
                   <button
-                    onClick={handleSaveProfile}
-                    disabled={actionLoading}
-                    className="flex-1 bg-[var(--primary)] text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                    onClick={() =>
+                      copyToClipboard(
+                        `<script src="${typeof window !== "undefined" ? window.location.origin : ""}/widget.js" data-tenant="${viewingProfile.id}" defer></script>`,
+                        "profile_embed"
+                      )
+                    }
+                    className="text-xs font-bold text-[var(--primary)] hover:underline"
                   >
-                    {actionLoading ? "Saving..." : "Save Changes"}
+                    {copySuccess === "profile_embed" ? "✓ Copied" : "Copy"}
                   </button>
+                </div>
+                <div className="font-mono text-xs text-[var(--foreground-muted)] break-all select-all">
+                  &lt;script src="{typeof window !== "undefined" ? window.location.origin : ""}/widget.js" data-tenant="{viewingProfile.id}" defer&gt;&lt;/script&gt;
+                </div>
+              </div>
+
+              {isEditingProfile && (
+                <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
                   <button
                     onClick={() => setIsEditingProfile(false)}
-                    disabled={actionLoading}
-                    className="px-6 bg-[var(--background)] border border-[var(--border-color)] text-[var(--foreground)] font-bold py-3 rounded-xl hover:text-[var(--logo-politico-red)] transition-colors"
+                    className="px-4 py-2 rounded-xl border border-[var(--border-color)] text-[var(--foreground)] text-sm font-bold hover:bg-[var(--background)] transition-all"
                   >
                     Cancel
                   </button>
+                  <button
+                    disabled={actionLoading}
+                    onClick={handleSaveProfile}
+                    className="px-5 py-2 rounded-xl bg-[var(--primary)] text-white text-sm font-bold shadow-[0_4px_15px_var(--lead-glow)] hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-2"
+                  >
+                    {actionLoading ? "Saving..." : "Save Changes"}
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-6">
-                {Object.entries(viewingProfile.profile).map(([key, value]) => {
-                  if (typeof value === "object") return null;
-                  return (
-                    <div
-                      key={key}
-                      className="flex flex-col border-b border-[var(--border-color)] pb-3"
-                    >
-                      <span className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1">
-                        {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
-                      </span>
-                      <span className="text-sm font-semibold text-[var(--foreground)] break-all">
-                        {value || "—"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
 
+      {/* ======================================================== */}
+      {/* 👥 MODAL 4: MANAGE TENANT USERS                           */}
+      {/* ======================================================== */}
       {managingUsers && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={closeUsersModal}
           ></div>
-          <div className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-3xl p-6 sm:p-8 max-w-2xl w-full relative z-50 shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-3xl p-8 max-w-2xl w-full relative z-50 shadow-2xl max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col">
             <div className="flex justify-between items-center mb-6 shrink-0 border-b border-[var(--border-color)] pb-4">
               <div>
                 <h3 className="text-xl font-black text-[var(--foreground)]">
-                  User Management
+                  Manage Users
                 </h3>
-                <p className="text-[var(--foreground-muted)] text-xs font-medium mt-1">
-                  Tenant: {managingUsers.client.profile.businessName}
+                <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                  Tenant: {managingUsers.client.profile.businessName || managingUsers.client.id}
                 </p>
               </div>
               <button
-                disabled={actionLoading}
                 onClick={closeUsersModal}
-                className="p-2 rounded-lg bg-[var(--background)] text-[var(--foreground-muted)] hover:text-[var(--logo-politico-red)] transition-colors disabled:opacity-50"
+                className="text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors p-1"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div className="flex-grow overflow-y-auto pr-2 custom-scrollbar space-y-3">
+            <div className="space-y-4">
               {managingUsers.client.users.map((user, uIdx) => (
                 <div
                   key={uIdx}
-                  className="flex items-center justify-between p-4 bg-[var(--background)] border border-[var(--border-color)] rounded-2xl"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-[var(--background)] rounded-xl border border-[var(--border-color)] gap-3"
                 >
                   <div>
-                    <p className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider">
-                      Username
-                    </p>
-                    <p className="text-sm font-bold text-[var(--foreground)]">
-                      {user.name}
-                    </p>
-                  </div>
-
-                  {editingUser?.userIndex === uIdx ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="New Password"
-                        className="bg-[var(--card-bg)] border border-[var(--primary)] text-[var(--foreground)] text-sm px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 w-32 sm:w-40"
-                        autoFocus
-                      />
+                    <h5 className="font-bold text-sm text-[var(--foreground)] flex items-center gap-2">
+                      {user.name || user.username || "User"}
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--primary)]/10 text-[var(--primary)] font-bold">
+                        {user.role || "Admin"}
+                      </span>
+                    </h5>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-mono text-[var(--foreground-muted)]">
+                        Password:
+                      </span>
+                      <span className="text-xs font-mono text-[var(--foreground)] font-bold">
+                        {revealedPasswords.has(uIdx) ? user.password : "••••••••"}
+                      </span>
                       <button
-                        disabled={actionLoading}
-                        onClick={handleSavePassword}
-                        className="p-1.5 bg-[var(--logo-mongo-green)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M5 13l4 4L19 7"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        disabled={actionLoading}
-                        onClick={() => setEditingUser(null)}
-                        className="p-1.5 bg-[var(--background)] text-[var(--foreground-muted)] hover:text-[var(--logo-politico-red)] rounded-lg border border-[var(--border-color)] disabled:opacity-50"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <div className="px-3 py-1.5 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg text-xs font-mono text-[var(--foreground-muted)] min-w-[80px] text-center">
-                        {revealedPasswords.has(uIdx) ? (
-                          <span className="text-[var(--foreground)] font-bold">
-                            {user.password}
-                          </span>
-                        ) : (
-                          "••••••••"
-                        )}
-                      </div>
-
-                      <button
-                        disabled={actionLoading}
-                        onClick={() => {
-                          if (revealedPasswords.has(uIdx)) {
-                            setRevealedPasswords((prev) => {
-                              const newSet = new Set(prev);
-                              newSet.delete(uIdx);
-                              return newSet;
-                            });
-                          } else {
-                            requestPinAuth({
-                              type: "REVEAL_PASSWORD",
-                              userIndex: uIdx,
-                            });
-                          }
-                        }}
-                        className={`p-1.5 rounded-lg transition-colors border ${revealedPasswords.has(uIdx) ? "bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border-[var(--accent-blue)]/20" : "bg-[var(--card-bg)] text-[var(--foreground-muted)] border-[var(--border-color)] hover:text-[var(--foreground)]"}`}
-                        title={
-                          revealedPasswords.has(uIdx)
-                            ? "Hide Password"
-                            : "View Password (Requires PIN)"
-                        }
-                      >
-                        {revealedPasswords.has(uIdx) ? (
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                          </svg>
-                        )}
-                      </button>
-
-                      <button
-                        disabled={actionLoading}
                         onClick={() =>
                           requestPinAuth({
-                            type: "EDIT_PASSWORD",
-                            payload: {
-                              clientIndex: managingUsers.cIdx,
-                              userIndex: uIdx,
-                              ...user,
-                            },
+                            type: "REVEAL_PASSWORD",
+                            userIndex: uIdx,
                           })
                         }
-                        className="p-1.5 text-[var(--foreground-muted)] hover:text-[var(--accent-blue)] bg-[var(--card-bg)] border border-[var(--border-color)] hover:border-[var(--accent-blue)]/50 rounded-lg transition-colors disabled:opacity-50"
-                        title="Edit Password (Requires PIN)"
+                        className="text-[11px] font-bold text-[var(--primary)] hover:underline ml-1"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                          />
-                        </svg>
-                      </button>
-
-                      <button
-                        disabled={actionLoading}
-                        onClick={() =>
-                          handleDeleteUser(managingUsers.cIdx, uIdx)
-                        }
-                        className="p-1.5 text-[var(--foreground-muted)] hover:text-[var(--logo-politico-red)] bg-[var(--card-bg)] border border-[var(--border-color)] hover:border-[var(--logo-politico-red)]/50 rounded-lg transition-colors disabled:opacity-50"
-                        title="Delete User"
-                      >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
+                        {revealedPasswords.has(uIdx) ? "" : "Reveal"}
                       </button>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <button
+                      onClick={() =>
+                        requestPinAuth({
+                          type: "EDIT_PASSWORD",
+                          payload: {
+                            clientIndex: managingUsers.cIdx,
+                            userIndex: uIdx,
+                            name: user.name || user.username,
+                            password: user.password,
+                          },
+                        })
+                      }
+                      className="px-3 py-1.5 bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 text-xs font-bold rounded-lg hover:bg-[var(--primary)] hover:text-white transition-all"
+                    >
+                      Reset Password
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUser(managingUsers.cIdx, uIdx)}
+                      className="px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-bold rounded-lg hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
 
-              {isAddingUser ? (
-                <div className="p-4 bg-[var(--primary)]/5 border border-[var(--primary)]/20 rounded-2xl flex flex-col sm:flex-row items-end gap-3 mt-4">
-                  <div className="flex-1 w-full">
-                    <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
-                      Username
-                    </label>
+              {/* Password Edit Box */}
+              {editingUser && (
+                <div className="p-4 bg-[var(--card-bg)] border border-[var(--primary)] rounded-xl mt-4">
+                  <h6 className="text-xs font-bold text-[var(--primary)] uppercase mb-2">
+                    Reset Password for {editingUser.name}
+                  </h6>
+                  <div className="flex gap-2">
                     <input
-                      type="text"
-                      value={newUser.name}
-                      onChange={(e) =>
-                        setNewUser({ ...newUser, name: e.target.value })
-                      }
-                      className="w-full bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--foreground)] text-sm px-3 py-2 rounded-xl focus:outline-none focus:border-[var(--primary)]"
-                      placeholder="Enter username"
+                      type="password"
+                      placeholder="Enter new password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="flex-1 bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
                     />
-                  </div>
-                  <div className="flex-1 w-full">
-                    <label className="text-[10px] uppercase font-bold text-[var(--foreground-muted)] tracking-wider mb-1 block">
-                      Password
-                    </label>
-                    <input
-                      type="text"
-                      value={newUser.password}
-                      onChange={(e) =>
-                        setNewUser({ ...newUser, password: e.target.value })
-                      }
-                      className="w-full bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--foreground)] text-sm px-3 py-2 rounded-xl focus:outline-none focus:border-[var(--primary)]"
-                      placeholder="Enter password"
-                    />
-                  </div>
-                  <div className="flex gap-2 pb-0.5 w-full sm:w-auto mt-2 sm:mt-0">
                     <button
-                      disabled={actionLoading}
-                      onClick={() => handleAddUser(managingUsers.cIdx)}
-                      className="flex-1 sm:flex-none px-4 py-2 bg-[var(--primary)] text-white text-sm font-bold rounded-xl hover:opacity-90 disabled:opacity-50"
+                      disabled={actionLoading || !newPassword.trim()}
+                      onClick={handleSavePassword}
+                      className="px-4 py-2 bg-[var(--primary)] text-white text-xs font-bold rounded-xl hover:opacity-90 disabled:opacity-50"
                     >
                       Save
                     </button>
                     <button
-                      disabled={actionLoading}
-                      onClick={() => setIsAddingUser(false)}
-                      className="flex-1 sm:flex-none px-3 py-2 bg-[var(--background)] border border-[var(--border-color)] text-[var(--foreground-muted)] text-sm font-bold rounded-xl hover:text-[var(--logo-politico-red)] disabled:opacity-50"
+                      onClick={() => {
+                        setEditingUser(null);
+                        setNewPassword("");
+                      }}
+                      className="px-3 py-2 border border-[var(--border-color)] text-[var(--foreground-muted)] text-xs font-bold rounded-xl"
                     >
                       Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Add User Box */}
+              {isAddingUser ? (
+                <div className="p-4 bg-[var(--background)] border border-[var(--primary)]/30 rounded-xl mt-4 space-y-3">
+                  <h6 className="text-xs font-bold text-[var(--primary)] uppercase">
+                    Allocate New Staff Account
+                  </h6>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Username"
+                      value={newUser.name}
+                      onChange={(e) =>
+                        setNewUser({ ...newUser, name: e.target.value })
+                      }
+                      className="w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={newUser.password}
+                      onChange={(e) =>
+                        setNewUser({ ...newUser, password: e.target.value })
+                      }
+                      className="w-full bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-sm text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <button
+                      onClick={() => setIsAddingUser(false)}
+                      className="px-4 py-2 border border-[var(--border-color)] text-xs font-bold rounded-xl text-[var(--foreground-muted)]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={actionLoading || !newUser.name.trim() || !newUser.password.trim()}
+                      onClick={() => handleAddUser(managingUsers.cIdx)}
+                      className="px-5 py-2 bg-[var(--primary)] text-white text-xs font-bold rounded-xl hover:opacity-90 disabled:opacity-50"
+                    >
+                      Add User
                     </button>
                   </div>
                 </div>
               ) : (
                 <button
                   onClick={() => setIsAddingUser(true)}
-                  className="w-full py-4 mt-4 border-2 border-dashed border-[var(--border-color)] rounded-2xl text-[var(--foreground-muted)] font-bold text-sm hover:border-[var(--primary)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/5 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3.5 border-2 border-dashed border-[var(--border-color)] rounded-2xl text-[var(--foreground-muted)] font-bold text-sm hover:border-[var(--primary)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/5 transition-all flex items-center justify-center gap-2 mt-4"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 4v16m8-8H4"
-                    />
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
-                  Allocate New User
+                  Allocate New Staff Account
                 </button>
               )}
             </div>
@@ -840,6 +1474,9 @@ export default function ClientManagement() {
         </div>
       )}
 
+      {/* ======================================================== */}
+      {/* 🔒 MODAL 5: PIN SECURITY AUTHORIZATION                   */}
+      {/* ======================================================== */}
       {pinModal.isOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
@@ -869,8 +1506,7 @@ export default function ClientManagement() {
                 Security Authorization
               </h3>
               <p className="text-[var(--foreground-muted)] text-xs mt-2 mb-6">
-                Please enter your Super Admin PIN to authorize this sensitive
-                action.
+                Please enter your Super Admin PIN to authorize this sensitive action.
               </p>
 
               <form onSubmit={handlePinSubmit} className="w-full">
@@ -892,7 +1528,7 @@ export default function ClientManagement() {
 
                 {actionLoading && (
                   <p className="text-[var(--primary)] text-xs font-bold mb-4 animate-pulse">
-                    Verifying...
+                    Verifying PIN...
                   </p>
                 )}
 

@@ -223,6 +223,30 @@ async function seedMultiTenantData() {
   };
 
   // --------------------------------------------------------------------------
+  // 0. PLATFORM ADMIN & SUPERADMIN SECURITY
+  // --------------------------------------------------------------------------
+  updates["superadmins/action_pin"] = "1234";
+  updates["platform_admin/superadmins/action_pin"] = "1234";
+  updates["superadmins/accounts/admin"] = {
+    email: "superadmin@closedesk.io",
+    name: "Super Admin",
+    role: "platform_owner",
+    created_at: now,
+    appearance: {
+      applyScope: "dashboard",
+      hue: "default",
+      mode: "light",
+      shade: 500,
+    },
+  };
+  updates["platform_admin/superadmins/accounts/admin"] = {
+    email: "superadmin@closedesk.io",
+    name: "Super Admin",
+    role: "platform_owner",
+    created_at: now,
+  };
+
+  // --------------------------------------------------------------------------
   // 2. TENANTS (/tenants)
   // --------------------------------------------------------------------------
 
@@ -235,6 +259,94 @@ async function seedMultiTenantData() {
     industry_pack_id: "saas",
     created_at: now,
     updated_at: now,
+
+    location: {
+      address: "Rawalpindi, Pakistan",
+      city: "Rawalpindi",
+      region: "Punjab",
+      country: "PK",
+      postal_code: "46000",
+      coordinates: {
+        lat: 33.5973,
+        lng: 73.0479,
+      },
+      timezone: "Asia/Karachi",
+      service_area: [
+        "Rawalpindi",
+        "Islamabad",
+        "Punjab",
+        "Global Online / Remote",
+      ],
+    },
+
+    users: {
+      root: {
+        user_id: "root",
+        username: "root",
+        name: "Root Administrator",
+        password: "root",
+        role: "tenant_admin",
+        email: "info@aicyro.com",
+        phone: "03472539535",
+        status: "active",
+        created_at: now,
+        appearance: {
+          applyScope: "dashboard",
+          hue: "default",
+          mode: "light",
+          shade: 500,
+        },
+        notifications: {
+          adminEmail: "moid@aicyro.com",
+          adminPhone: "",
+          afterHoursAlerts: true,
+          dailySummary: true,
+          emailAlerts: true,
+          leadReceivers: "moid@aicyro.com",
+          smsAlerts: false,
+          urgentAlerts: true,
+          urgentOnly: true,
+          weeklySummary: true,
+        },
+      },
+      admin: {
+        user_id: "admin",
+        username: "admin",
+        name: "Moid (Admin)",
+        password: "root",
+        role: "tenant_admin",
+        email: "moid@aicyro.com",
+        phone: "03472539535",
+        status: "active",
+        created_at: now,
+        appearance: {
+          applyScope: "dashboard",
+          hue: "indigo",
+          mode: "light",
+          shade: 500,
+        },
+      },
+      saad: {
+        user_id: "saad",
+        username: "saad",
+        name: "Saad",
+        password: "saad",
+        role: "agent",
+        email: "saad@aicyro.com",
+        status: "active",
+        created_at: now,
+      },
+      team: {
+        user_id: "team",
+        username: "team",
+        name: "Operations Team",
+        password: "root",
+        role: "staff",
+        email: "team@aicyro.com",
+        status: "active",
+        created_at: now,
+      },
+    },
 
     client_config: {
       business_name: "Aicyro",
@@ -321,6 +433,43 @@ async function seedMultiTenantData() {
     created_at: now,
     updated_at: now,
 
+    location: {
+      address: "100 Industrial Pkwy, Dallas, TX 75201",
+      city: "Dallas",
+      region: "TX",
+      country: "US",
+      postal_code: "75201",
+      coordinates: {
+        lat: 32.7767,
+        lng: -96.797,
+      },
+      timezone: "America/Chicago",
+      service_area: ["Dallas", "Fort Worth", "Plano", "Arlington"],
+    },
+
+    users: {
+      dispatch: {
+        user_id: "dispatch",
+        username: "dispatch",
+        name: "Apex Dispatcher",
+        password: "apex",
+        role: "tenant_admin",
+        email: "dispatch@apexairsolutions.com",
+        status: "active",
+        created_at: now,
+      },
+      tech1: {
+        user_id: "tech1",
+        username: "tech1",
+        name: "Lead Technician",
+        password: "apex",
+        role: "technician",
+        email: "tech1@apexairsolutions.com",
+        status: "active",
+        created_at: now,
+      },
+    },
+
     client_config: {
       business_name: "Apex Air Solutions",
       phone: "(555) 234-5678",
@@ -371,6 +520,43 @@ async function seedMultiTenantData() {
     industry_pack_id: "hvac",
     created_at: now,
     updated_at: now,
+
+    location: {
+      address: "450 Main St, Austin, TX 78701",
+      city: "Austin",
+      region: "TX",
+      country: "US",
+      postal_code: "78701",
+      coordinates: {
+        lat: 30.2672,
+        lng: -97.7431,
+      },
+      timezone: "America/Chicago",
+      service_area: ["Austin", "Round Rock", "Cedar Park"],
+    },
+
+    users: {
+      office: {
+        user_id: "office",
+        username: "office",
+        name: "Cool Breeze Manager",
+        password: "breeze",
+        role: "tenant_admin",
+        email: "office@coolbreezeaustin.com",
+        status: "active",
+        created_at: now,
+      },
+      agent1: {
+        user_id: "agent1",
+        username: "agent1",
+        name: "Support Specialist",
+        password: "breeze",
+        role: "agent",
+        email: "agent1@coolbreezeaustin.com",
+        status: "active",
+        created_at: now,
+      },
+    },
 
     client_config: {
       business_name: "Cool Breeze Heating & Air",

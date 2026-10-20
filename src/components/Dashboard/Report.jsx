@@ -33,12 +33,15 @@ export default function Report({ onLogout }) {
   };
 
   useEffect(() => {
-    const leadsRef = ref(db, "leads");
-    const analyticsRef = ref(db, "analytics/summary");
-    const profileRef = ref(db, "settings/business_profile/basic_info");
+    const currentTenantId = typeof window !== "undefined"
+      ? (localStorage.getItem("currentTenantId") || "tenant_aicyro")
+      : "tenant_aicyro";
 
-    const unsubscribeLeads = onValue(leadsRef, (snapshot) => {
-      const data = snapshot.val();
+    const leadsRef = ref(db, `tenants/${currentTenantId}/leads`);
+    const analyticsRef = ref(db, `tenants/${currentTenantId}/analytics/summary`);
+    const profileRef = ref(db, `tenants/${currentTenantId}/client_config`);
+
+    const processLeads = (data) => {
       if (data) {
         const liveData = Object.keys(data).map((key) => {
           const item = data[key];
@@ -61,10 +64,34 @@ export default function Report({ onLogout }) {
         setLeads([]);
       }
       setIsLoading(false);
+    };
+
+    const unsubscribeLeads = onValue(leadsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (!data && currentTenantId === "tenant_aicyro") {
+        onValue(ref(db, "leads"), (rootSnap) => {
+          processLeads(rootSnap.val());
+        }, { onlyOnce: true });
+      } else {
+        processLeads(data);
+      }
     });
 
     const unsubscribeAnalytics = onValue(analyticsRef, (snapshot) => {
-      const data = snapshot.val();
+      let data = snapshot.val();
+      if (!data && currentTenantId === "tenant_aicyro") {
+        onValue(ref(db, "analytics/summary"), (rootSnap) => {
+          const rData = rootSnap.val();
+          if (rData) {
+            setAnalytics({
+              visitors: rData.total_website_visitors || 0,
+              opens: rData.total_chatbot_opens || 0,
+              convos: rData.total_conversations_started || 0,
+            });
+          }
+        }, { onlyOnce: true });
+        return;
+      }
       if (data) {
         setAnalytics({
           visitors: data.total_website_visitors || 0,
@@ -75,9 +102,16 @@ export default function Report({ onLogout }) {
     });
 
     const unsubscribeProfile = onValue(profileRef, (snapshot) => {
-      const data = snapshot.val();
+      let data = snapshot.val();
       if (data && data.avgJobValue) {
         setAvgJobValue(Number(data.avgJobValue) || 1200);
+      } else if (currentTenantId === "tenant_aicyro") {
+        onValue(ref(db, "settings/business_profile/basic_info"), (rootSnap) => {
+          const rData = rootSnap.val();
+          if (rData && rData.avgJobValue) {
+            setAvgJobValue(Number(rData.avgJobValue) || 1200);
+          }
+        }, { onlyOnce: true });
       }
     });
 

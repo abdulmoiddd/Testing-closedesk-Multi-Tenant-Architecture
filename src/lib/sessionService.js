@@ -192,14 +192,11 @@ export async function initializeSession(params) {
   // 3. Atomic Multi-Path Persistence in Firebase RTDB
   const updates = {};
   updates[`sessions/${sessionId}`] = newSessionRecord;
-  // Multi-tenant fast lookup index
-  updates[`tenants/${tenantId}/sessions/${sessionId}`] = {
-    created_at: now,
-    channel: normalizedChannel,
-    status: SESSION_STATUS.ACTIVE,
-  };
-  // Backward compatibility: initialize prospects record for Pulse Admin Dashboard (/lg)
-  updates[`prospects/${sessionId}`] = {
+  // Multi-tenant pure silo: full session record under tenant
+  updates[`tenants/${tenantId}/sessions/${sessionId}`] = newSessionRecord;
+
+  // Backward compatibility: initialize prospects record for Pulse Admin Dashboard (/lg) and tenant silo
+  const prospectRecord = {
     session_id: sessionId,
     tenant_id: tenantId,
     created_at: new Date(now).toISOString(),
@@ -209,6 +206,8 @@ export async function initializeSession(params) {
       business_context: {},
     },
   };
+  updates[`prospects/${sessionId}`] = prospectRecord;
+  updates[`tenants/${tenantId}/prospects/${sessionId}`] = prospectRecord;
 
   try {
     await update(ref(db), updates);
@@ -520,42 +519,58 @@ export async function patchContext(sessionId, llmContextPatch = {}, nextState = 
     }
   }
 
-  // --- COMPATIBILITY BRIDGE: DUAL-WRITE TO LEADS & PROSPECTS FOR PULSE DASHBOARD (/lg) ---
+  // --- COMPATIBILITY BRIDGE: DUAL-WRITE TO LEADS & PROSPECTS FOR PULSE DASHBOARD (/lg) & TENANT SILO ---
+  const tenantId = llmContextPatch.tenant_id || "tenant_aicyro";
+
   if (llmContextPatch.customer && typeof llmContextPatch.customer === "object") {
     const cust = llmContextPatch.customer;
     if (typeof cust.name === "string" && cust.name.trim().length > 1) {
       updates[`leads/${sessionId}/name`] = cust.name.trim();
+      updates[`tenants/${tenantId}/leads/${sessionId}/name`] = cust.name.trim();
       updates[`prospects/${sessionId}/context_patch/contact_info/name`] = cust.name.trim();
+      updates[`tenants/${tenantId}/prospects/${sessionId}/context_patch/contact_info/name`] = cust.name.trim();
     }
     if (typeof cust.phone === "string" && phoneRegex.test(cust.phone.trim())) {
       updates[`leads/${sessionId}/phone`] = cust.phone.trim();
+      updates[`tenants/${tenantId}/leads/${sessionId}/phone`] = cust.phone.trim();
       updates[`prospects/${sessionId}/context_patch/contact_info/phone`] = cust.phone.trim();
+      updates[`tenants/${tenantId}/prospects/${sessionId}/context_patch/contact_info/phone`] = cust.phone.trim();
     }
     if (typeof cust.email === "string" && emailRegex.test(cust.email.trim())) {
       updates[`leads/${sessionId}/email`] = cust.email.trim().toLowerCase();
+      updates[`tenants/${tenantId}/leads/${sessionId}/email`] = cust.email.trim().toLowerCase();
       updates[`prospects/${sessionId}/context_patch/contact_info/email`] = cust.email.trim().toLowerCase();
+      updates[`tenants/${tenantId}/prospects/${sessionId}/context_patch/contact_info/email`] = cust.email.trim().toLowerCase();
     }
     updates[`leads/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
+    updates[`tenants/${tenantId}/leads/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
     updates[`prospects/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
+    updates[`tenants/${tenantId}/prospects/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
   }
 
   if (srv && typeof srv === "object") {
     if (typeof srv.problem_description === "string" && srv.problem_description.trim()) {
       updates[`leads/${sessionId}/business_problem`] = srv.problem_description.trim();
+      updates[`tenants/${tenantId}/leads/${sessionId}/business_problem`] = srv.problem_description.trim();
     }
     if (typeof srv.urgency === "string" && srv.urgency.trim()) {
       updates[`leads/${sessionId}/urgency_level`] = srv.urgency;
+      updates[`tenants/${tenantId}/leads/${sessionId}/urgency_level`] = srv.urgency;
     }
     if (typeof srv.category === "string" && srv.category.trim()) {
       updates[`leads/${sessionId}/service_requested`] = srv.category;
+      updates[`tenants/${tenantId}/leads/${sessionId}/service_requested`] = srv.category;
     }
   }
 
   if (llmContextPatch.scheduling && typeof llmContextPatch.scheduling === "object") {
     const sch = llmContextPatch.scheduling;
     if (sch.confirmed_slot || sch.requested_time) {
+      const statusStr = sch.status === "confirmed" ? "Meeting Booked" : "In Progress";
       updates[`leads/${sessionId}/preferred_time`] = sch.confirmed_slot || sch.requested_time;
-      updates[`leads/${sessionId}/booking_status`] = sch.status === "confirmed" ? "Meeting Booked" : "In Progress";
+      updates[`leads/${sessionId}/booking_status`] = statusStr;
+      updates[`tenants/${tenantId}/leads/${sessionId}/preferred_time`] = sch.confirmed_slot || sch.requested_time;
+      updates[`tenants/${tenantId}/leads/${sessionId}/booking_status`] = statusStr;
     }
   }
 
@@ -575,8 +590,10 @@ export async function getSessionByToken(sessionToken) {
     throw new SessionValidationError("A valid 'session_token' is required.");
   }
 
-  const tokenRef = ref(db, `session_tokens/${sessionToken.trim()}`);
-  const tokenSnapshot = await get(tokenRef);
+  let tokenSnapshot = await get(ref(db, `session_tokens/${sessionToken.trim()}`));
+  if (!tokenSnapshot.exists()) {
+    tokenSnapshot = await get(ref(db, `session_token_index/${sessionToken.trim()}`));
+  }
 
   if (!tokenSnapshot.exists()) {
     throw new SessionValidationError("Invalid session token: token does not exist.");

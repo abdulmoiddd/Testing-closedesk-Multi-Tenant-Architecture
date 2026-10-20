@@ -28,19 +28,31 @@ export default function NotificationSettings() {
   };
 
   useEffect(() => {
-    const prefsRef = ref(db, "users/root/notifications");
-    const unsubPrefs = onValue(prefsRef, (snapshot) => {
-      if (snapshot.exists()) setPreferences(snapshot.val());
+    // 1. Listen to tenant silo preferences first, fallback to root
+    const tenantPrefsRef = ref(db, "tenants/tenant_aicyro/users/root/notifications");
+    const unsubTenant = onValue(tenantPrefsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setPreferences(snapshot.val());
+      } else {
+        const legacyRef = ref(db, "users/root/notifications");
+        onValue(legacyRef, (legSnap) => {
+          if (legSnap.exists()) setPreferences(legSnap.val());
+        }, { onlyOnce: true });
+      }
     });
-    return () => unsubPrefs();
+    return () => unsubTenant();
   }, []);
 
   const handleSavePreferences = async () => {
     setIsSavingPrefs(true);
     pulseLogger.info("settings_update", "notification_preferences_updated");
     try {
-      await update(ref(db, "users/root/notifications"), preferences);
-      showToast("Alert preferences saved successfully!");
+      const updates = {
+        "users/root/notifications": preferences,
+        "tenants/tenant_aicyro/users/root/notifications": preferences,
+      };
+      await update(ref(db), updates);
+      showToast("Alert preferences saved successfully across tenant systems!");
     } catch (error) {
       pulseLogger.error("settings_update", "notification_preferences_failed", { error });
       showToast("Failed to save alert preferences.", "error");
@@ -53,10 +65,10 @@ export default function NotificationSettings() {
     setIsSendingTest(true);
     pulseLogger.info("settings_update", "test_email_triggered");
     try {
-      const alertsRef = ref(db, "email_alerts");
-      await push(alertsRef, {
+      const testPayload = {
         status: "pending",
         event_type: "end",
+        tenant_id: "tenant_aicyro",
         title: "Aicyro Pulse - Test Routing Alert",
         message: "This is a test alert to verify your routing configuration is working correctly.",
         lead_data: {
@@ -64,10 +76,18 @@ export default function NotificationSettings() {
           email: "noreply@aicyro.com",
           phone: "N/A",
           urgency_level: "Low",
-          conversation_summary: "System generated test email to verify routing preferences."
+          conversation_summary: "System generated test email to verify routing preferences.",
+          tenant_id: "tenant_aicyro",
         },
-        timestamp: Date.now()
-      });
+        timestamp: Date.now(),
+      };
+
+      // Dual-write: root email alerts and tenant silo email alerts
+      await Promise.all([
+        push(ref(db, "email_alerts"), testPayload),
+        push(ref(db, "tenants/tenant_aicyro/email_alerts"), testPayload),
+      ]);
+
       showToast("Test email triggered! Check your inbox.");
     } catch (error) {
       pulseLogger.error("settings_update", "test_email_failed", { error });

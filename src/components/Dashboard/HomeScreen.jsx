@@ -26,37 +26,34 @@ export default function HomeScreen({ onLogout }) {
   const [timeFrame, setTimeFrame] = useState("All");
   const [avgJobValue, setAvgJobValue] = useState(1200);
 
+  const currentTenantId = typeof window !== "undefined"
+    ? (localStorage.getItem("currentTenantId") || "tenant_aicyro")
+    : "tenant_aicyro";
+
   // --- FIREBASE REALTIME DATABASE LISTENERS ---
   useEffect(() => {
-    // 1. Listen for Actual Leads (Single Source of Truth across all pages)
-    const leadsRef = ref(db, "leads");
+    // 1. Listen for Actual Leads (Dynamically bound to Active Tenant with fallback)
+    const tenantLeadsRef = ref(db, `tenants/${currentTenantId}/leads`);
     const unsubscribeLeads = onValue(
-      leadsRef,
+      tenantLeadsRef,
       (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const leadsArray = Object.keys(data)
-            .map((key) => {
-              const l = data[key];
-              // Standardize formatting to match the Terminal
-              let formattedScore = "Low";
-              if (l.lead_score) {
-                formattedScore = l.lead_score.charAt(0).toUpperCase() + l.lead_score.slice(1).toLowerCase();
-              }
-              return {
-                ...l,
-                id: l.firebaseId || key,
-                name: l.name || "Anonymous",
-                timestamp: l.last_interaction_at || l.conversation_started_at || null,
-                lead_score: formattedScore,
-                booking_status: l.booking_status || "Captured",
-                email: l.email || "",
-                phone: l.phone || "",
-              };
-            })
-            .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+        let data = snapshot.val();
+        if (!data && currentTenantId === "tenant_aicyro") {
+          // Fallback to legacy root leads if tenant leads node empty
+          onValue(ref(db, "leads"), (rootSnap) => {
+            const rootData = rootSnap.val();
+            if (rootData) {
+              processLeadsData(rootData);
+            } else {
+              setLeads([]);
+            }
+            setIsLoading(false);
+          }, { onlyOnce: true });
+          return;
+        }
 
-          setLeads(leadsArray);
+        if (data) {
+          processLeadsData(data);
         } else {
           setLeads([]);
         }
@@ -68,10 +65,45 @@ export default function HomeScreen({ onLogout }) {
       }
     );
 
-    // 2. Listen for Analytics Summary (Visitors & Opens)
-    const analyticsRef = ref(db, "analytics/summary");
+    const processLeadsData = (data) => {
+      const leadsArray = Object.keys(data)
+        .map((key) => {
+          const l = data[key];
+          let formattedScore = "Low";
+          if (l.lead_score) {
+            formattedScore = l.lead_score.charAt(0).toUpperCase() + l.lead_score.slice(1).toLowerCase();
+          }
+          return {
+            ...l,
+            id: l.firebaseId || key,
+            name: l.name || "Anonymous",
+            timestamp: l.last_interaction_at || l.conversation_started_at || null,
+            lead_score: formattedScore,
+            booking_status: l.booking_status || "Captured",
+            email: l.email || "",
+            phone: l.phone || "",
+          };
+        })
+        .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+      setLeads(leadsArray);
+    };
+
+    // 2. Listen for Analytics Summary (Visitors & Opens for Active Tenant)
+    const analyticsRef = ref(db, `tenants/${currentTenantId}/analytics/summary`);
     const unsubscribeAnalytics = onValue(analyticsRef, (snapshot) => {
-      const data = snapshot.val();
+      let data = snapshot.val();
+      if (!data && currentTenantId === "tenant_aicyro") {
+        onValue(ref(db, "analytics/summary"), (rootSnap) => {
+          const rData = rootSnap.val();
+          if (rData) {
+            setTotalWebsiteVisitors(rData.total_website_visitors || 0);
+            setTotalChatbotOpens(rData.total_chatbot_opens || 0);
+            setTotalConversationsStarted(rData.total_conversations_started || 0);
+          }
+        }, { onlyOnce: true });
+        return;
+      }
       if (data) {
         setTotalWebsiteVisitors(data.total_website_visitors || 0);
         setTotalChatbotOpens(data.total_chatbot_opens || 0);
@@ -80,25 +112,47 @@ export default function HomeScreen({ onLogout }) {
     });
 
     // 3. Listen for Chatbot Config Data
-    const configRef = ref(db, "settings/chatbot_config");
+    const configRef = ref(db, `tenants/${currentTenantId}/chatbot_config`);
     const unsubscribeConfig = onValue(configRef, (snapshot) => {
-      const data = snapshot.val();
+      let data = snapshot.val();
+      if (!data && currentTenantId === "tenant_aicyro") {
+        onValue(ref(db, "settings/chatbot_config"), (rootSnap) => {
+          const rData = rootSnap.val();
+          if (rData) {
+            setBotConfig({
+              botName: rData.botName || "AI Assistant",
+              botIdentity: rData.botIdentity || "AI Front Desk",
+              escalationRule: rData.escalationRule || "email_admin",
+              bookingRule: rData.bookingRule || "Strict Funnel",
+            });
+          }
+        }, { onlyOnce: true });
+        return;
+      }
       if (data) {
         setBotConfig({
-          botName: data.botName || "Raja G.",
-          botIdentity: data.botIdentity || "The Booker for Aicyro",
+          botName: data.botName || "AI Assistant",
+          botIdentity: data.botIdentity || "AI Front Desk",
           escalationRule: data.escalationRule || "email_admin",
           bookingRule: data.bookingRule || "Strict Funnel",
         });
       }
     });
 
-    // 4. Listen for Business Profile Data
-    const profileRef = ref(db, "settings/business_profile/basic_info");
+    // 4. Listen for Business Profile Data (Pricing & Average Job Value)
+    const profileRef = ref(db, `tenants/${currentTenantId}/client_config`);
     const unsubscribeProfile = onValue(profileRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data && data.avgJobValue) {
-        setAvgJobValue(Number(data.avgJobValue) || 1200);
+      let data = snapshot.val();
+      if (data && data.pricing?.avg_job_value) {
+        setAvgJobValue(Number(data.pricing.avg_job_value) || 1200);
+      } else {
+        // Fallback to legacy path
+        onValue(ref(db, "settings/business_profile/basic_info"), (rootSnap) => {
+          const rData = rootSnap.val();
+          if (rData && rData.avgJobValue) {
+            setAvgJobValue(Number(rData.avgJobValue) || 1200);
+          }
+        }, { onlyOnce: true });
       }
     });
 

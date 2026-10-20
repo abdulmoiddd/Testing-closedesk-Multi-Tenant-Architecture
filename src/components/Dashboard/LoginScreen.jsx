@@ -44,46 +44,94 @@ export default function LoginScreen({
     txLogger.info("auth", "login_attempt", { context: { user_id: username } });
 
     try {
-      const loginRef = ref(db, "login");
-      const snapshot = await get(loginRef);
+      let matchedUser = null;
+      let matchedTenantId = null;
+      let matchedTenant = null;
 
-      if (snapshot.exists()) {
-        const loginData = snapshot.val();
-        const matchedUser = loginData.find(
-          (user) =>
-            user && user.name === username && user.password === password,
-        );
+      // 1. Check all tenants in Firebase RTDB (/tenants)
+      try {
+        const tenantsRef = ref(db, "tenants");
+        const tenantsSnap = await get(tenantsRef);
 
-        if (matchedUser) {
-          localStorage.setItem("currentUser", matchedUser.name);
-          setFailedAttempts(0); // Reset on success
+        if (tenantsSnap.exists()) {
+          const tenantsObj = tenantsSnap.val();
+          for (const [tId, tenant] of Object.entries(tenantsObj)) {
+            if (tenant && tenant.users) {
+              const usersObj = tenant.users;
+              const found = Object.values(usersObj).find(
+                (u) =>
+                  u &&
+                  (u.username === username || u.name === username || u.email === username) &&
+                  u.password === password
+              );
 
-          txLogger.info("auth", "login_success", {
-            context: { user_id: username },
-          });
-          onLoginSuccess();
-        } else {
-          // --- BRUTE FORCE CHECK ---
-          const newAttempts = failedAttempts + 1;
-          setFailedAttempts(newAttempts);
-
-          txLogger.warn("auth", "login_failed_invalid_credentials", {
-            context: { user_id: username, attempts: newAttempts },
-          });
-
-          if (newAttempts >= 3) {
-            setCaptchaValue(generateCaptcha());
-            setShowCaptcha(true);
-            setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
-          } else {
-            setError(`Invalid username or password. (${3 - newAttempts} attempts left)`);
+              if (found) {
+                matchedUser = found;
+                matchedTenantId = tId;
+                matchedTenant = tenant;
+                break;
+              }
+            }
           }
         }
-      } else {
-        txLogger.error("auth", "login_db_unavailable", {
-          context: { user_id: username },
+      } catch (e) {
+        console.warn("Tenant users lookup error, falling back", e);
+      }
+
+      // 2. Fallback to Legacy /login array
+      if (!matchedUser) {
+        const loginRef = ref(db, "login");
+        const snapshot = await get(loginRef);
+
+        if (snapshot.exists()) {
+          const loginData = snapshot.val();
+          const list = Array.isArray(loginData) ? loginData : Object.values(loginData);
+          const found = list.find(
+            (user) =>
+              user && user.name === username && user.password === password,
+          );
+          if (found) {
+            matchedUser = found;
+            matchedTenantId = "tenant_aicyro";
+            matchedTenant = { name: "Aicyro" };
+          }
+        }
+      }
+
+      if (matchedUser && matchedTenantId) {
+        const resolvedName = matchedUser.name || matchedUser.username || username;
+        const tenantName = matchedTenant?.name || matchedTenant?.client_config?.business_name || "Aicyro";
+
+        localStorage.setItem("currentUser", resolvedName);
+        localStorage.setItem("currentTenantId", matchedTenantId);
+        localStorage.setItem("currentTenantName", tenantName);
+        localStorage.setItem("currentUserRole", matchedUser.role || "tenant_admin");
+
+        setFailedAttempts(0); // Reset on success
+
+        txLogger.info("auth", "login_success", {
+          context: { user_id: username, tenant_id: matchedTenantId },
         });
-        setError("Error connecting to the authentication server.");
+
+        if (onLoginSuccess) {
+          onLoginSuccess(matchedTenantId, matchedUser);
+        }
+      } else {
+        // --- BRUTE FORCE CHECK ---
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+
+        txLogger.warn("auth", "login_failed_invalid_credentials", {
+          context: { user_id: username, attempts: newAttempts },
+        });
+
+        if (newAttempts >= 3) {
+          setCaptchaValue(generateCaptcha());
+          setShowCaptcha(true);
+          setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
+        } else {
+          setError(`Invalid username or password. (${3 - newAttempts} attempts left)`);
+        }
       }
     } catch (err) {
       txLogger.error("auth", "login_error", {

@@ -105,15 +105,52 @@ export default function BusinessProfile({ onNavigate }) {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const snapshot = await get(ref(db, "settings/business_profile"));
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          if (data.basic_info)
-            setFormData((prev) => ({ ...prev, ...data.basic_info }));
-          if (data.operating_hours) setSchedule(data.operating_hours);
+        let profileData = null;
 
-          if (data.timezone) {
-            setTimezone(data.timezone);
+        // 1. Try reading from Tenant Silo
+        const tenantProfileSnap = await get(ref(db, "tenants/tenant_aicyro/settings/business_profile"));
+        if (tenantProfileSnap.exists()) {
+          profileData = tenantProfileSnap.val();
+        } else {
+          // Check tenant client_config & location directly
+          const [cfgSnap, locSnap] = await Promise.all([
+            get(ref(db, "tenants/tenant_aicyro/client_config")),
+            get(ref(db, "tenants/tenant_aicyro/location")),
+          ]);
+          if (cfgSnap.exists()) {
+            const cfg = cfgSnap.val();
+            const loc = locSnap.exists() ? locSnap.val() : {};
+            profileData = {
+              basic_info: {
+                businessName: cfg.business_name || "",
+                industry: cfg.industry || "",
+                website: cfg.website || "",
+                phone: cfg.phone || "",
+                email: cfg.email || "",
+                avgJobValue: cfg.pricing?.avg_job_value || "",
+                address: loc.address || cfg.address || "",
+              },
+              operating_hours: cfg.operating_hours || DEFAULT_SCHEDULE,
+              timezone: loc.timezone || cfg.timezone || "",
+            };
+          }
+        }
+
+        // 2. Fallback to Legacy root settings/business_profile
+        if (!profileData) {
+          const snapshot = await get(ref(db, "settings/business_profile"));
+          if (snapshot.exists()) {
+            profileData = snapshot.val();
+          }
+        }
+
+        if (profileData) {
+          if (profileData.basic_info)
+            setFormData((prev) => ({ ...prev, ...profileData.basic_info }));
+          if (profileData.operating_hours) setSchedule(profileData.operating_hours);
+
+          if (profileData.timezone) {
+            setTimezone(profileData.timezone);
           } else {
             setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
           }
@@ -184,13 +221,34 @@ export default function BusinessProfile({ onNavigate }) {
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
-      await set(ref(db, "settings/business_profile"), {
+      const nowIso = new Date().toISOString();
+      const legacyPayload = {
         basic_info: formData,
         operating_hours: schedule,
         timezone: timezone,
-        updated_at: new Date().toISOString(),
-      });
-      showToast("Business profile updated successfully!", "success");
+        updated_at: nowIso,
+      };
+
+      // 1. Dual-Write to Legacy Root Settings
+      await set(ref(db, "settings/business_profile"), legacyPayload);
+
+      // 2. Dual-Write to Tenant Silo (/tenants/tenant_aicyro)
+      const tenantUpdates = {
+        "tenants/tenant_aicyro/settings/business_profile": legacyPayload,
+        "tenants/tenant_aicyro/client_config/business_name": formData.businessName || "Aicyro",
+        "tenants/tenant_aicyro/client_config/industry": formData.industry || "SaaS",
+        "tenants/tenant_aicyro/client_config/phone": formData.phone || "",
+        "tenants/tenant_aicyro/client_config/email": formData.email || "",
+        "tenants/tenant_aicyro/client_config/website": formData.website || "",
+        "tenants/tenant_aicyro/client_config/operating_hours": schedule,
+        "tenants/tenant_aicyro/client_config/pricing/avg_job_value": formData.avgJobValue || "200",
+        "tenants/tenant_aicyro/location/address": formData.address || "",
+        "tenants/tenant_aicyro/location/timezone": timezone || "Asia/Karachi",
+      };
+
+      await update(ref(db), tenantUpdates);
+
+      showToast("Business profile updated successfully across tenant systems!", "success");
     } catch (error) {
       showToast("Failed to save changes.", "error");
     } finally {

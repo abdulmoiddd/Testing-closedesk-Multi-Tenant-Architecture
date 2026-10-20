@@ -266,12 +266,22 @@ async function executeCreateServiceRequest(args, context) {
   // 4. Atomic Multi-Path Persistence
   const updates = {};
   updates[`leads/${leadId}`] = leadPayload;
+  updates[`tenants/${tenant.tenant_id}/leads/${leadId}`] = leadPayload;
+
   updates[`sessions/${sessionId}/context/service_request/category`] = category;
   updates[`sessions/${sessionId}/context/service_request/problem_description`] = problemDescription;
   updates[`sessions/${sessionId}/context/service_request/urgency`] = urgency;
   updates[`sessions/${sessionId}/context/customer/name`] = name || null;
   updates[`sessions/${sessionId}/context/customer/phone`] = phone || null;
   updates[`sessions/${sessionId}/context/customer/email`] = email || null;
+
+  // Mirror to tenant session silo
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/service_request/category`] = category;
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/service_request/problem_description`] = problemDescription;
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/service_request/urgency`] = urgency;
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/customer/name`] = name || null;
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/customer/phone`] = phone || null;
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/customer/email`] = email || null;
 
   // Mirror to prospects for WebRTC/telemetry dashboards
   updates[`prospects/${sessionId}/context_patch/contact_info`] = {
@@ -280,6 +290,16 @@ async function executeCreateServiceRequest(args, context) {
     email,
   };
   updates[`prospects/${sessionId}/context_patch/business_context`] = {
+    problem: problemDescription,
+    category,
+    urgency,
+  };
+  updates[`tenants/${tenant.tenant_id}/prospects/${sessionId}/context_patch/contact_info`] = {
+    name,
+    phone,
+    email,
+  };
+  updates[`tenants/${tenant.tenant_id}/prospects/${sessionId}/context_patch/business_context`] = {
     problem: problemDescription,
     category,
     urgency,
@@ -358,9 +378,24 @@ async function executeCreateBooking(args, context) {
   updates[`leads/${sessionId}/service_requested`] = serviceType;
   updates[`leads/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
 
+  // Tenant Silo Dual-Write
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/booking_status`] = "Meeting Booked";
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/preferred_date`] = date;
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/preferred_time`] = time;
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/display_time`] = displayTime;
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/name`] = name;
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/email`] = email;
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/phone`] = phone;
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/service_requested`] = serviceType;
+  updates[`tenants/${tenant.tenant_id}/leads/${sessionId}/last_interaction_at`] = new Date(now).toISOString();
+
   updates[`sessions/${sessionId}/context/scheduling/status`] = "confirmed";
   updates[`sessions/${sessionId}/context/scheduling/confirmed_slot`] = displayTime;
   updates[`sessions/${sessionId}/context/scheduling/booking_id`] = bookingId;
+
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/scheduling/status`] = "confirmed";
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/scheduling/confirmed_slot`] = displayTime;
+  updates[`tenants/${tenant.tenant_id}/sessions/${sessionId}/context/scheduling/booking_id`] = bookingId;
 
   await update(ref(db), updates);
 

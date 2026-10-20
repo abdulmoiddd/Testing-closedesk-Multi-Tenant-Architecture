@@ -144,12 +144,17 @@ async function handler(req, res, apiLogger) {
     const tokenUpdates = {};
     tokenUpdates[`sessions/${sessionRecord.session_id}/session_token`] = sessionToken;
     tokenUpdates[`sessions/${sessionRecord.session_id}/token_expires_at`] = tokenExpiresAt;
-    tokenUpdates[`session_tokens/${sessionToken}`] = {
+    tokenUpdates[`tenants/${tenant.tenant_id}/sessions/${sessionRecord.session_id}/session_token`] = sessionToken;
+    tokenUpdates[`tenants/${tenant.tenant_id}/sessions/${sessionRecord.session_id}/token_expires_at`] = tokenExpiresAt;
+
+    const tokenIndexPayload = {
       session_id: sessionRecord.session_id,
       tenant_id: tenant.tenant_id,
       created_at: Date.now(),
       expires_at: tokenExpiresAt,
     };
+    tokenUpdates[`session_tokens/${sessionToken}`] = tokenIndexPayload;
+    tokenUpdates[`session_token_index/${sessionToken}`] = tokenIndexPayload;
 
     await update(ref(db), tokenUpdates);
 

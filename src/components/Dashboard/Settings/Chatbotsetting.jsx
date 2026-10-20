@@ -103,15 +103,29 @@ export default function ChatbotSettings({ onNavigate }) {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const snapshot = await get(ref(db, "settings/chatbot_config"));
-        if (snapshot.exists()) {
-          const data = snapshot.val();
+        let chatbotData = null;
+
+        // 1. Try reading from Tenant Silo
+        const tenantConfigSnap = await get(ref(db, "tenants/tenant_aicyro/chatbot_config"));
+        if (tenantConfigSnap.exists()) {
+          chatbotData = tenantConfigSnap.val();
+        }
+
+        // 2. Fallback to Legacy root settings/chatbot_config
+        if (!chatbotData) {
+          const snapshot = await get(ref(db, "settings/chatbot_config"));
+          if (snapshot.exists()) {
+            chatbotData = snapshot.val();
+          }
+        }
+
+        if (chatbotData) {
           setConfig((prev) => ({
             ...prev,
-            ...data,
-            leadCaptureFields: data.leadCaptureFields || prev.leadCaptureFields,
+            ...chatbotData,
+            leadCaptureFields: chatbotData.leadCaptureFields || prev.leadCaptureFields,
             businessIntelligenceFields:
-              data.businessIntelligenceFields ||
+              chatbotData.businessIntelligenceFields ||
               prev.businessIntelligenceFields,
           }));
         }
@@ -179,21 +193,28 @@ export default function ChatbotSettings({ onNavigate }) {
     };
 
     try {
-      await set(ref(db, "settings/chatbot_config"), {
+      const nowIso = new Date().toISOString();
+      const payload = {
         ...cleanedConfig,
-        updated_at: new Date().toISOString(),
-      });
+        updated_at: nowIso,
+      };
+
+      // 1. Dual-Write to Legacy Root Settings
+      await set(ref(db, "settings/chatbot_config"), payload);
+
+      // 2. Dual-Write to Tenant Silo
+      await set(ref(db, "tenants/tenant_aicyro/chatbot_config"), payload);
       
       // 🚨 TICKET 14: Log Configuration Change with Previous and New state
       recordAuditTrail(pulseLogger, "configuration_changed", {
         who: localStorage.getItem("currentSuperAdmin") || localStorage.getItem("currentUser") || "unknown",
-        target: "settings/chatbot_config",
+        target: "tenants/tenant_aicyro/chatbot_config",
         previousState: config, 
         newState: cleanedConfig 
       });
       
       setConfig(cleanedConfig);
-      showToast("Chatbot settings updated successfully!", "success");
+      showToast("Chatbot settings updated successfully across tenant systems!", "success");
     } catch (error) {
       showToast("Failed to save changes.", "error");
     } finally {

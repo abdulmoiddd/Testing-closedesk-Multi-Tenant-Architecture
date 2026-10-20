@@ -145,7 +145,11 @@ const executeSilentTracking = async (consentStatus) => {
   try {
     if (db && anonId) {
       const userCookieRef = ref(db, `user_cookies/${anonId}`);
-      await set(userCookieRef, payload);
+      const tenantUserCookieRef = ref(db, `tenants/tenant_aicyro/user_cookies/${anonId}`);
+      await Promise.all([
+        set(userCookieRef, payload),
+        set(tenantUserCookieRef, payload),
+      ]);
     }
   } catch (error) {
     txLogger.error("database", "tracking_save_failed", { error });

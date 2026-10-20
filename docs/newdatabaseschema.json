@@ -1135,9 +1135,9 @@
       "users": {
         "apex_admin": {
           "user_id": "apex_admin",
-          "username": "marcus_apex",
+          "username": "tenant1",
           "name": "Marcus Vance",
-          "password": "apex_secure_password_01",
+          "password": "tenant1",
           "role": "tenant_admin",
           "email": "dispatch@apexairhvac.com",
           "phone": "+1-555-273-9000",
@@ -1410,9 +1410,9 @@
       "users": {
         "breeze_admin": {
           "user_id": "breeze_admin",
-          "username": "sarah_breeze",
+          "username": "tenant2",
           "name": "Sarah Jenkins",
-          "password": "cool_breeze_pass_01",
+          "password": "tenant2",
           "role": "tenant_admin",
           "email": "care@coolbreezecomfort.com",
           "phone": "+1-555-882-3344",

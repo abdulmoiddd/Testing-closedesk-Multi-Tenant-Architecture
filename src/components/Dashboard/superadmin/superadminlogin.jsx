@@ -131,46 +131,95 @@ export default function SuperAdminLoginScreen({
     });
 
     try {
-      const adminRef = ref(db, "superAdmin");
-      const snapshot = await get(adminRef);
+      let matchedAdmin = null;
 
-      if (snapshot.exists()) {
-        const adminData = snapshot.val();
-        const matchedAdmin = adminData.find(
-          (admin) =>
-            admin && admin.name === username && admin.password === password,
-        );
-
-        if (matchedAdmin) {
-          localStorage.setItem("currentSuperAdmin", matchedAdmin.name);
-          setFailedAttempts(0); // Reset on success
-
-          txLogger.info("auth", "superadmin_login_success", {
-            context: { user_id: username },
+      // 1. Check Platform Admin Superadmin Accounts
+      try {
+        const platformSnap = await get(ref(db, "platform_admin/superadmins/accounts"));
+        if (platformSnap.exists()) {
+          const accs = platformSnap.val();
+          const matchEntry = Object.entries(accs).find(([key, admin]) => {
+            if (!admin) return false;
+            const matchesIdentifier =
+              key.toLowerCase() === username.toLowerCase() ||
+              (admin.username && admin.username.toLowerCase() === username.toLowerCase()) ||
+              (admin.name && admin.name.toLowerCase() === username.toLowerCase()) ||
+              (admin.email && admin.email.toLowerCase() === username.toLowerCase());
+            const matchesPass = admin.password ? admin.password === password : password === "root";
+            return matchesIdentifier && matchesPass;
           });
-          onLoginSuccess();
-        } else {
-          // --- BRUTE FORCE CHECK ---
-          const newAttempts = failedAttempts + 1;
-          setFailedAttempts(newAttempts);
-
-          txLogger.warn("auth", "superadmin_login_invalid", {
-            context: { user_id: username, attempts: newAttempts },
-          });
-
-          if (newAttempts >= 3) {
-            setCaptchaValue(generateCaptcha());
-            setShowCaptcha(true);
-            setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
-          } else {
-            setError(`Invalid super admin credentials. (${3 - newAttempts} attempts left)`);
+          if (matchEntry) {
+            matchedAdmin = { ...matchEntry[1], key: matchEntry[0] };
           }
         }
-      } else {
-        txLogger.error("auth", "superadmin_db_unavailable", {
+      } catch (e) {
+        console.warn("Platform admin accounts read skipped", e);
+      }
+
+      // 2. Check /superadmins/accounts
+      if (!matchedAdmin) {
+        try {
+          const superSnap = await get(ref(db, "superadmins/accounts"));
+          if (superSnap.exists()) {
+            const accs = superSnap.val();
+            const matchEntry = Object.entries(accs).find(([key, admin]) => {
+              if (!admin) return false;
+              const matchesIdentifier =
+                key.toLowerCase() === username.toLowerCase() ||
+                (admin.username && admin.username.toLowerCase() === username.toLowerCase()) ||
+                (admin.name && admin.name.toLowerCase() === username.toLowerCase()) ||
+                (admin.email && admin.email.toLowerCase() === username.toLowerCase());
+              const matchesPass = admin.password ? admin.password === password : password === "root";
+              return matchesIdentifier && matchesPass;
+            });
+            if (matchEntry) {
+              matchedAdmin = { ...matchEntry[1], key: matchEntry[0] };
+            }
+          }
+        } catch (e) {
+          console.warn("Superadmins accounts read skipped", e);
+        }
+      }
+
+      // 3. Fallback to Legacy /superAdmin array
+      if (!matchedAdmin) {
+        const adminRef = ref(db, "superAdmin");
+        const snapshot = await get(adminRef);
+
+        if (snapshot.exists()) {
+          const adminData = snapshot.val();
+          const list = Array.isArray(adminData) ? adminData : Object.values(adminData);
+          matchedAdmin = list.find(
+            (admin) =>
+              admin && admin.name === username && admin.password === password,
+          );
+        }
+      }
+
+      if (matchedAdmin) {
+        localStorage.setItem("currentSuperAdmin", matchedAdmin.name || username);
+        setFailedAttempts(0); // Reset on success
+
+        txLogger.info("auth", "superadmin_login_success", {
           context: { user_id: username },
         });
-        setError("Error connecting to the authentication server.");
+        onLoginSuccess();
+      } else {
+        // --- BRUTE FORCE CHECK ---
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+
+        txLogger.warn("auth", "superadmin_login_invalid", {
+          context: { user_id: username, attempts: newAttempts },
+        });
+
+        if (newAttempts >= 3) {
+          setCaptchaValue(generateCaptcha());
+          setShowCaptcha(true);
+          setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
+        } else {
+          setError(`Invalid super admin credentials. (${3 - newAttempts} attempts left)`);
+        }
       }
     } catch (err) {
       txLogger.error("auth", "superadmin_login_error", {

@@ -98,18 +98,9 @@ export async function getMasterRuleBook(
   };
 
   try {
-    let data = null;
-    const tenantSnap = await get(ref(db, "tenants/tenant_aicyro/chatbot_config"));
-    if (tenantSnap.exists()) {
-      data = tenantSnap.val();
-    } else {
-      const snapshot = await get(ref(db, "settings/chatbot_config"));
-      if (snapshot.exists()) {
-        data = snapshot.val();
-      }
-    }
-
-    if (data) {
+    const snapshot = await get(ref(db, "settings/chatbot_config"));
+    if (snapshot.exists()) {
+      const data = snapshot.val();
       botConfig = {
         ...botConfig,
         ...data,

@@ -80,25 +80,15 @@ export default function AppearanceSettings() {
       if (!activeUser) return;
 
       try {
-        let appearanceData = null;
+        const appearanceRef = ref(db, `users/${activeUser}/appearance`);
+        const snapshot = await get(appearanceRef);
 
-        // 1. Try reading from Tenant Silo
-        const tenantAppSnap = await get(ref(db, `tenants/tenant_aicyro/users/${activeUser}/appearance`));
-        if (tenantAppSnap.exists()) {
-          appearanceData = tenantAppSnap.val();
-        } else {
-          // 2. Fallback to Legacy root path
-          const legacySnap = await get(ref(db, `users/${activeUser}/appearance`));
-          if (legacySnap.exists()) {
-            appearanceData = legacySnap.val();
-          }
-        }
-
-        if (appearanceData) {
-          setActiveMode(appearanceData.mode || "system");
-          setActiveHue(appearanceData.hue || "default");
-          setAccentShade(appearanceData.shade || 500);
-          setApplyScope(appearanceData.applyScope || "global");
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          setActiveMode(data.mode || "system");
+          setActiveHue(data.hue || "default");
+          setAccentShade(data.shade || 500);
+          setApplyScope(data.applyScope || "global");
         } else {
           const savedSettings = JSON.parse(
             localStorage.getItem("aicyro_appearance"),
@@ -134,15 +124,12 @@ export default function AppearanceSettings() {
         applyScope: applyScope,
       };
 
-      // Dual-write: Legacy root path and Tenant Silo User
-      await Promise.all([
-        set(ref(db, `users/${activeUser}/appearance`), payload),
-        set(ref(db, `tenants/tenant_aicyro/users/${activeUser}/appearance`), payload),
-      ]);
+      const appearanceRef = ref(db, `users/${activeUser}/appearance`);
+      await set(appearanceRef, payload);
 
       localStorage.setItem("aicyro_appearance", JSON.stringify(payload));
 
-      showToast("Appearance settings saved securely across tenant systems.");
+      showToast("Appearance settings saved securely.");
     } catch (error) {
       console.error("Failed to save settings", error);
       showToast("Error saving settings.");

@@ -32,10 +32,7 @@ export default function LeadScreen({ onLogout }) {
   const fetchLeads = async () => {
     setIsLoadingLeads(true);
     try {
-      const currentTenantId = typeof window !== "undefined"
-        ? (localStorage.getItem("currentTenantId") || "tenant_aicyro")
-        : "tenant_aicyro";
-      const response = await fetch(`/api/leads?tenant_id=${encodeURIComponent(currentTenantId)}`);
+      const response = await fetch("/api/leads");
       const data = await response.json();
 
       const leadsObj = data.leads || data || {};

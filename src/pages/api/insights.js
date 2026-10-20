@@ -1,4 +1,3 @@
-// src/pages/api/insights.js
 import OpenAI from "openai";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
@@ -16,32 +15,15 @@ async function handler(req, res, apiLogger) {
       .json({ error: "OpenAI API key is missing from .env" });
   }
 
-  const { tenant_id = "tenant_aicyro" } = req.body || {};
-  const sanitizedTenantId = (tenant_id && typeof tenant_id === "string")
-    ? tenant_id.trim()
-    : "tenant_aicyro";
-
   try {
-    // 1. Fetch recent conversations from Tenant Silo first, fallback to legacy root leads
-    let leads = {};
-    const tenantLeadsRef = ref(db, `tenants/${sanitizedTenantId}/leads`);
-    const tenantSnap = await get(tenantLeadsRef);
-
-    if (tenantSnap.exists()) {
-      leads = tenantSnap.val();
-    }
-
-    if (Object.keys(leads).length === 0) {
-      const rootLeadsRef = ref(db, "leads");
-      const rootSnap = await get(rootLeadsRef);
-      if (rootSnap.exists()) {
-        leads = rootSnap.val();
-      }
-    }
+    // 1. Fetch recent conversations from Firebase to analyze
+    const leadsRef = ref(db, "leads");
+    const snapshot = await get(leadsRef);
 
     let conversationData = "";
 
-    if (Object.keys(leads).length > 0) {
+    if (snapshot.exists()) {
+      const leads = snapshot.val();
       // Extract the last 50 leads to prevent token overflow
       const entries = Object.values(leads).slice(-50);
 
@@ -49,7 +31,7 @@ async function handler(req, res, apiLogger) {
         .map(
           (lead) => `
         ---
-        Date: ${lead.timestamp || lead.created_at || "Unknown"}
+        Date: ${lead.timestamp || "Unknown"}
         Service Requested: ${lead.service_requested || "Unknown"}
         Urgency: ${lead.urgency_level || "Unknown"}
         Intent: ${lead.visitor_intent || "Unknown"}
@@ -62,7 +44,7 @@ async function handler(req, res, apiLogger) {
     } else {
       return res
         .status(200)
-        .json({ detailed_bullets: ["No conversation data found yet for this tenant."] });
+        .json({ detailed_bullets: ["No conversation data found yet."] });
     }
 
     const openai = new OpenAI({ apiKey });
@@ -118,11 +100,10 @@ async function handler(req, res, apiLogger) {
     const aiInsights = JSON.parse(completion.choices[0].message.content);
 
     // 3. Return the generated insights to the frontend
-    return res.status(200).json({ ...aiInsights, tenant_id: sanitizedTenantId });
+    return res.status(200).json(aiInsights);
   } catch (error) {
     apiLogger.error("Error generating insights:", error);
     return res.status(500).json({ error: "Failed to process insights." });
   }
 }
-
 export default withApiLogger(handler, "Insights-API");

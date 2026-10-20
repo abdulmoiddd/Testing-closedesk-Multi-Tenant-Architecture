@@ -71,7 +71,6 @@ export default function LeadsDashboard() {
   const [currentView, setCurrentView] = useState("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarBrandName, setSidebarBrandName] = useState("Aicyro Pulse");
-  const [currentTenantId, setCurrentTenantId] = useState("tenant_aicyro");
   const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
   const [isInsightExpanded, setIsInsightExpanded] = useState(false);
 
@@ -82,9 +81,6 @@ export default function LeadsDashboard() {
     const handleBeforeUnload = () => {
       localStorage.removeItem("currentUser");
       localStorage.removeItem("currentSuperAdmin");
-      localStorage.removeItem("currentTenantId");
-      localStorage.removeItem("currentTenantName");
-      localStorage.removeItem("currentUserRole");
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
@@ -92,32 +88,23 @@ export default function LeadsDashboard() {
     };
   }, []);
 
-  // --- FETCH BUSINESS NAME FROM FIREBASE (DYNAMICALLY BOUND TO CURRENT TENANT) ---
+  // --- FETCH BUSINESS NAME FROM FIREBASE ---
   useEffect(() => {
     if (isAuthenticated) {
-      const activeTenant = currentTenantId || localStorage.getItem("currentTenantId") || "tenant_aicyro";
       const brandRef = ref(
         db,
-        `tenants/${activeTenant}/client_config/business_name`,
+        "settings/business_profile/basic_info/businessName",
       );
       const unsubscribe = onValue(brandRef, (snapshot) => {
         if (snapshot.exists() && snapshot.val().trim() !== "") {
           setSidebarBrandName(snapshot.val());
         } else {
-          // Fallback to legacy path
-          const legacyRef = ref(db, "settings/business_profile/basic_info/businessName");
-          onValue(legacyRef, (legSnap) => {
-            if (legSnap.exists() && legSnap.val().trim() !== "") {
-              setSidebarBrandName(legSnap.val());
-            } else {
-              setSidebarBrandName("Aicyro Pulse");
-            }
-          }, { onlyOnce: true });
+          setSidebarBrandName("Aicyro Pulse");
         }
       });
       return () => unsubscribe();
     }
-  }, [isAuthenticated, currentTenantId]);
+  }, [isAuthenticated]);
 
   // --- GLOBAL THEME INITIALIZATION ---
   useEffect(() => {
@@ -244,9 +231,6 @@ export default function LeadsDashboard() {
     setLoginView("user");
     localStorage.removeItem("currentUser");
     localStorage.removeItem("currentSuperAdmin");
-    localStorage.removeItem("currentTenantId");
-    localStorage.removeItem("currentTenantName");
-    localStorage.removeItem("currentUserRole");
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.style.removeProperty("--primary");
     document.documentElement.style.removeProperty("--secondary");
@@ -269,11 +253,7 @@ export default function LeadsDashboard() {
     }
     return (
       <LoginScreen
-        onLoginSuccess={(tenantId) => {
-          const resolvedTenant = tenantId || localStorage.getItem("currentTenantId") || "tenant_aicyro";
-          setCurrentTenantId(resolvedTenant);
-          setIsAuthenticated(true);
-        }}
+        onLoginSuccess={() => setIsAuthenticated(true)}
         onNavigateToSuperAdmin={() => setLoginView("superadmin")}
       />
     );

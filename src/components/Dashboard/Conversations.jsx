@@ -15,38 +15,24 @@ export default function Conversations({ onLogout }) {
 
   // --- FIREBASE REALTIME DATABASE LISTENER ---
   useEffect(() => {
-    const currentTenantId = typeof window !== "undefined"
-      ? (localStorage.getItem("currentTenantId") || "tenant_aicyro")
-      : "tenant_aicyro";
-
-    const leadsRef = ref(db, `tenants/${currentTenantId}/leads`);
-
-    const processConvos = (data) => {
-      if (data) {
-        const liveData = Object.keys(data)
-          .map((key) => ({
-            id: key,
-            ...data[key],
-          }))
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        setConversations(liveData);
-      } else {
-        setConversations([]);
-      }
-      setIsLoading(false);
-    };
+    const leadsRef = ref(db, "leads");
 
     const unsubscribe = onValue(
       leadsRef,
       (snapshot) => {
-        let data = snapshot.val();
-        if (!data && currentTenantId === "tenant_aicyro") {
-          onValue(ref(db, "leads"), (rootSnap) => {
-            processConvos(rootSnap.val());
-          }, { onlyOnce: true });
-          return;
+        const data = snapshot.val();
+        if (data) {
+          const liveData = Object.keys(data)
+            .map((key) => ({
+              id: key,
+              ...data[key],
+            }))
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          setConversations(liveData);
+        } else {
+          setConversations([]);
         }
-        processConvos(data);
+        setIsLoading(false);
       },
       (error) => {
         console.error("Error fetching conversations:", error);

@@ -100,24 +100,14 @@ export default function PasswordChange({ onNavigate }) {
         return;
       }
 
-      // 5. Dual-Update: Legacy array index and Tenant Silo User
+      // 5. Update the specific user's password at their exact array index
       const specificUserRef = ref(db, `login/${targetIndex}`);
       await update(specificUserRef, {
         password: passwords.new,
       });
 
-      try {
-        const tenantUserRef = ref(db, `tenants/tenant_aicyro/users/${currentUser}`);
-        const tenantUserSnap = await get(tenantUserRef);
-        if (tenantUserSnap.exists()) {
-          await update(tenantUserRef, { password: passwords.new });
-        }
-      } catch (err) {
-        console.warn("Could not sync password to tenant silo:", err);
-      }
-
       // 6. Success Feedback & Reset
-      showToast("Password updated successfully across tenant systems!", "success");
+      showToast("Password updated successfully!", "success");
       setPasswords({ current: "", new: "", confirm: "" });
 
       // Auto redirect back to profile after success

@@ -1,6 +1,6 @@
 // src/lib/loggerPresets.js
-import { CloseDeskLogger } from "./logger.js";
-import { getOrCreateAnonId } from "./cookiePersonalization.js";
+import { CloseDeskLogger } from "./logger";
+import { getOrCreateAnonId } from "./cookiePersonalization";
 
 const getClientSessionId = () => {
   if (typeof window !== "undefined") return getOrCreateAnonId();

@@ -36,144 +36,123 @@ export default function BookingsScreen({ onLogout }) {
 
   // --- FIREBASE REALTIME DATABASE LISTENER & STATUS SYNC ---
   useEffect(() => {
-    const currentTenantId = typeof window !== "undefined"
-      ? (localStorage.getItem("currentTenantId") || "tenant_aicyro")
-      : "tenant_aicyro";
-
-    const parseBookings = (data) => {
-      const now = new Date();
-
-      const liveBookings = Object.keys(data)
-        .map((key) => {
-          const b = data[key];
-
-          let mappedStatus = b.booking_status || "";
-          const lowerStatus = mappedStatus.toLowerCase().trim();
-
-          // Unified Date Parsing (Matches Home, Terminal, and Report logic)
-          let meetingTime = null;
-          let hasValidDate = false;
-
-          if (b.booked_slot) {
-            meetingTime = new Date(b.booked_slot);
-          } else if (b.selected_date) {
-            meetingTime = new Date(b.selected_date);
-          } else if (
-            b.preferred_date &&
-            b.preferred_date !== "null" &&
-            b.preferred_time
-          ) {
-            meetingTime = new Date(`${b.preferred_date} ${b.preferred_time}`);
-          }
-
-          if (meetingTime && !isNaN(meetingTime.getTime())) {
-            hasValidDate = true;
-          }
-
-          // 1. Terminal statuses take absolute priority
-          if (lowerStatus === "completed") {
-            mappedStatus = "Completed";
-          } else if (lowerStatus === "cancelled") {
-            mappedStatus = "Cancelled";
-          } else if (lowerStatus === "no-show") {
-            mappedStatus = "No-show";
-          } else if (lowerStatus === "rescheduled") {
-            mappedStatus = "Rescheduled";
-          }
-          // 2. If it has a real date, calculate dynamic scheduling state
-          else if (hasValidDate) {
-            const diffMs = meetingTime.getTime() - now.getTime();
-            const diffHours = diffMs / (1000 * 60 * 60);
-
-            if (diffMs < 0) {
-              mappedStatus = "No-show"; // Time has already passed
-            } else if (diffHours <= 24) {
-              mappedStatus = "Near upcoming"; // Less than 24 hours away
-            } else {
-              mappedStatus = "Upcoming"; // More than 1 day away
-            }
-          }
-          // 3. Fallback for NO DATE
-          else {
-            mappedStatus = "Pending Scheduling";
-          }
-
-          // Prepare a reliable display time
-          let finalDisplayTime = b.display_time;
-          if (
-            !finalDisplayTime ||
-            finalDisplayTime === "Not Scheduled" ||
-            finalDisplayTime === "null"
-          ) {
-            if (hasValidDate) {
-              finalDisplayTime = meetingTime.toLocaleString([], {
-                dateStyle: "medium",
-                timeStyle: "short",
-              });
-            } else {
-              finalDisplayTime = "Not Scheduled";
-            }
-          }
-
-          return {
-            id: key,
-            name: b.name || "Anonymous Prospect",
-            email: b.email || "No Email",
-            phone: b.phone || "No Phone",
-            booking_type:
-              b.service_requested ||
-              b.visitor_intent ||
-              "General Consultation",
-            source: b.source || "Website AI Front Desk",
-            display_time: finalDisplayTime,
-            booked_slot: b.booked_slot || b.selected_date,
-            status: mappedStatus,
-            calendar_sync:
-              b.calendar_sync ||
-              (finalDisplayTime === "Not Scheduled" ? "Pending" : "Synced"),
-            time_to_booking_seconds:
-              b.time_to_booking_seconds ||
-              Math.floor(Math.random() * 180) + 45,
-            timestamp:
-              b.timestamp ||
-              b.conversation_ended_at ||
-              b.conversation_started_at ||
-              b.last_interaction_at,
-            ...b,
-          };
-        })
-        // STRICT PARITY WITH HOME SCREEN: Explicitly filter only valid bookings or terminal states
-        .filter((b) => {
-          const isBooked = b.booking_status === "Meeting Booked" || !!b.booked_slot || !!b.selected_date;
-          const isTerminal = ["Completed", "Cancelled", "No-show", "Rescheduled"].includes(b.status);
-          return isBooked || isTerminal;
-        })
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-      setBookings(liveBookings);
-    };
-
-    const leadsRef = ref(db, `tenants/${currentTenantId}/leads`);
+    const leadsRef = ref(db, "leads");
 
     const unsubscribe = onValue(
       leadsRef,
       (snapshot) => {
-        let data = snapshot.val();
-        if (!data && currentTenantId === "tenant_aicyro") {
-          onValue(ref(db, "leads"), (rootSnap) => {
-            const rootData = rootSnap.val();
-            if (rootData) {
-              parseBookings(rootData);
-            } else {
-              setBookings([]);
-            }
-            setIsLoading(false);
-          }, { onlyOnce: true });
-          return;
-        }
-
+        const data = snapshot.val();
         if (data) {
-          parseBookings(data);
+          const now = new Date();
+
+          const liveBookings = Object.keys(data)
+            .map((key) => {
+              const b = data[key];
+
+              let mappedStatus = b.booking_status || "";
+              const lowerStatus = mappedStatus.toLowerCase().trim();
+
+              // Unified Date Parsing (Matches Home, Terminal, and Report logic)
+              let meetingTime = null;
+              let hasValidDate = false;
+
+              if (b.booked_slot) {
+                meetingTime = new Date(b.booked_slot);
+              } else if (b.selected_date) {
+                meetingTime = new Date(b.selected_date);
+              } else if (
+                b.preferred_date &&
+                b.preferred_date !== "null" &&
+                b.preferred_time
+              ) {
+                meetingTime = new Date(`${b.preferred_date} ${b.preferred_time}`);
+              }
+
+              if (meetingTime && !isNaN(meetingTime.getTime())) {
+                hasValidDate = true;
+              }
+
+              // 1. Terminal statuses take absolute priority
+              if (lowerStatus === "completed") {
+                mappedStatus = "Completed";
+              } else if (lowerStatus === "cancelled") {
+                mappedStatus = "Cancelled";
+              } else if (lowerStatus === "no-show") {
+                mappedStatus = "No-show";
+              } else if (lowerStatus === "rescheduled") {
+                mappedStatus = "Rescheduled";
+              }
+              // 2. If it has a real date, calculate dynamic scheduling state
+              else if (hasValidDate) {
+                const diffMs = meetingTime.getTime() - now.getTime();
+                const diffHours = diffMs / (1000 * 60 * 60);
+
+                if (diffMs < 0) {
+                  mappedStatus = "No-show"; // Time has already passed
+                } else if (diffHours <= 24) {
+                  mappedStatus = "Near upcoming"; // Less than 24 hours away
+                } else {
+                  mappedStatus = "Upcoming"; // More than 1 day away
+                }
+              }
+              // 3. Fallback for NO DATE
+              else {
+                mappedStatus = "Pending Scheduling";
+              }
+
+              // Prepare a reliable display time
+              let finalDisplayTime = b.display_time;
+              if (
+                !finalDisplayTime ||
+                finalDisplayTime === "Not Scheduled" ||
+                finalDisplayTime === "null"
+              ) {
+                if (hasValidDate) {
+                  finalDisplayTime = meetingTime.toLocaleString([], {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  });
+                } else {
+                  finalDisplayTime = "Not Scheduled";
+                }
+              }
+
+              return {
+                id: key,
+                name: b.name || "Anonymous Prospect",
+                email: b.email || "No Email",
+                phone: b.phone || "No Phone",
+                booking_type:
+                  b.service_requested ||
+                  b.visitor_intent ||
+                  "General Consultation",
+                source: b.source || "Website AI Front Desk",
+                display_time: finalDisplayTime,
+                booked_slot: b.booked_slot || b.selected_date,
+                status: mappedStatus,
+                calendar_sync:
+                  b.calendar_sync ||
+                  (finalDisplayTime === "Not Scheduled" ? "Pending" : "Synced"),
+                time_to_booking_seconds:
+                  b.time_to_booking_seconds ||
+                  Math.floor(Math.random() * 180) + 45,
+                timestamp:
+                  b.timestamp ||
+                  b.conversation_ended_at ||
+                  b.conversation_started_at ||
+                  b.last_interaction_at,
+                ...b,
+              };
+            })
+            // STRICT PARITY WITH HOME SCREEN: Explicitly filter only valid bookings or terminal states
+            .filter((b) => {
+              const isBooked = b.booking_status === "Meeting Booked" || !!b.booked_slot || !!b.selected_date;
+              const isTerminal = ["Completed", "Cancelled", "No-show", "Rescheduled"].includes(b.status);
+              return isBooked || isTerminal;
+            })
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+          setBookings(liveBookings);
         } else {
           setBookings([]);
         }
@@ -234,16 +213,8 @@ export default function BookingsScreen({ onLogout }) {
 
   const handleStatusUpdate = async (bookingId, newStatus) => {
     try {
-      const currentTenantId = typeof window !== "undefined"
-        ? (localStorage.getItem("currentTenantId") || "tenant_aicyro")
-        : "tenant_aicyro";
-
-      const updates = {};
-      updates[`tenants/${currentTenantId}/leads/${bookingId}/booking_status`] = newStatus;
-      if (currentTenantId === "tenant_aicyro") {
-        updates[`leads/${bookingId}/booking_status`] = newStatus;
-      }
-      await update(ref(db), updates);
+      const bookingRef = ref(db, `leads/${bookingId}`);
+      await update(bookingRef, { booking_status: newStatus });
       setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
     } catch (error) {
       console.error("Failed to update booking status:", error);

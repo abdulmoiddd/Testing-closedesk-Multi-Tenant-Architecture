@@ -1,9 +1,36 @@
 // src/pages/api/analytics.js
-import { ref, runTransaction, push, update, set } from "firebase/database";
+import { ref, runTransaction, push, update, set, get } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
+import { resolveTenantId } from "../../lib/tenantResolver";
 
 async function handler(req, res, apiLogger) {
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET: Fetch analytics summary (Scoped by tenant or platform)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (req.method === "GET") {
+    try {
+      const tenantId = resolveTenantId(req);
+      const isTenant = tenantId && tenantId !== "default";
+      const summaryPath = isTenant
+        ? `tenants/${tenantId}/analytics/summary`
+        : "analytics/summary";
+
+      let snapshot = await get(ref(db, summaryPath));
+      if (!snapshot.exists() && isTenant) {
+        snapshot = await get(ref(db, "analytics/summary"));
+      }
+
+      return res.status(200).json(snapshot.exists() ? snapshot.val() : {});
+    } catch (err) {
+      apiLogger.error("Failed to fetch analytics summary:", err);
+      return res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // POST: Record Tracking Event (Multi-Tenant Scoped)
+  // ──────────────────────────────────────────────────────────────────────────
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -16,9 +43,15 @@ async function handler(req, res, apiLogger) {
       details = "",
       deviceName = "Unknown Device",
       username = "Visitor",
-    } = req.body;
+      hostUrl = "",
+      referrer = "Direct",
+    } = req.body || {};
 
-    // 1. Map incoming events to Global Summary field names
+    // 1. Resolve Tenant Context
+    const tenantId = resolveTenantId(req) || req.body?.tenant_id || "default";
+    const isTenantScoped = tenantId && tenantId !== "default";
+
+    // 2. Map incoming event types
     let summaryField = "";
     let visitorCounterField = "";
 
@@ -35,65 +68,115 @@ async function handler(req, res, apiLogger) {
       return res.status(400).json({ error: "Invalid tracking event type" });
     }
 
-    // Generate explicit time and date fields
     const now = new Date();
     const timestamp = now.toISOString();
-    const date = now.toISOString().split("T")[0]; // e.g., "2026-09-03"
-    const time = now.toTimeString().split(" ")[0]; // e.g., "13:07:51"
+    const date = now.toISOString().split("T")[0];
+    const time = now.toTimeString().split(" ")[0];
 
     // ──────────────────────────────────────────────────────────────────────────
-    // A. Increment Global Platform Summary Counters
+    // A. Update Tenant-Scoped Partition (If Multi-Tenant)
+    // ──────────────────────────────────────────────────────────────────────────
+    if (isTenantScoped) {
+      // 1. Tenant Summary Counter
+      const tenantSummaryRef = ref(
+        db,
+        `tenants/${tenantId}/analytics/summary/${summaryField}`
+      );
+      await runTransaction(tenantSummaryRef, (currentVal) => {
+        return (currentVal || 0) + 1;
+      });
+
+      // 2. Tenant Visitor Chronological Event
+      const tenantVisitorEventsRef = ref(
+        db,
+        `tenants/${tenantId}/analytics/visitors/${anonId}/events`
+      );
+      const tenantEventRef = push(tenantVisitorEventsRef);
+      await set(tenantEventRef, {
+        event_id: tenantEventRef.key,
+        event_type,
+        pagePath,
+        hostUrl,
+        referrer,
+        details,
+        timestamp,
+        date,
+        time,
+        tenant_id: tenantId,
+      });
+
+      // 3. Tenant Visitor Individual Counter
+      const tenantVisitorCounterRef = ref(
+        db,
+        `tenants/${tenantId}/analytics/visitors/${anonId}/summary/${visitorCounterField}`
+      );
+      await runTransaction(tenantVisitorCounterRef, (currentVal) => {
+        return (currentVal || 0) + 1;
+      });
+
+      // 4. Tenant Visitor Profile Metadata
+      const tenantVisitorMetaRef = ref(
+        db,
+        `tenants/${tenantId}/analytics/visitors/${anonId}/profile`
+      );
+      await update(tenantVisitorMetaRef, {
+        anonId,
+        username,
+        deviceName,
+        hostUrl,
+        lastActiveAt: timestamp,
+        lastVisitedPage: pagePath,
+        tenant_id: tenantId,
+      });
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // B. Update Global Platform Summary (Shared Cross-Tenant Metrics)
     // ──────────────────────────────────────────────────────────────────────────
     const globalSummaryRef = ref(db, `analytics/summary/${summaryField}`);
     await runTransaction(globalSummaryRef, (currentValue) => {
       return (currentValue || 0) + 1;
     });
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // B. Log Individual Chronological Event for this specific visitor
-    // ──────────────────────────────────────────────────────────────────────────
-    const visitorEventsRef = ref(db, `analytics/visitors/${anonId}/events`);
-
-    // Generate the unique ID first before saving
-    const newEventRef = push(visitorEventsRef);
-
-    // Save the entity with the explicit ID, Date, and Time
-    await set(newEventRef, {
-      event_id: newEventRef.key, // Unique ID inside the entity
+    const globalVisitorEventsRef = ref(db, `analytics/visitors/${anonId}/events`);
+    const newGlobalEventRef = push(globalVisitorEventsRef);
+    await set(newGlobalEventRef, {
+      event_id: newGlobalEventRef.key,
       event_type,
       pagePath,
+      hostUrl,
+      referrer,
       details,
       timestamp,
       date,
       time,
+      tenant_id: tenantId,
     });
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // C. Update Individual Visitor Profile & Summary Counters
-    // ──────────────────────────────────────────────────────────────────────────
-    const visitorSummaryRef = ref(
+    const globalVisitorSummaryRef = ref(
       db,
-      `analytics/visitors/${anonId}/summary/${visitorCounterField}`,
+      `analytics/visitors/${anonId}/summary/${visitorCounterField}`
     );
-    await runTransaction(visitorSummaryRef, (currentVal) => {
+    await runTransaction(globalVisitorSummaryRef, (currentVal) => {
       return (currentVal || 0) + 1;
     });
 
-    // Update profile metadata (Last active time, device name, username)
-    const visitorMetaRef = ref(db, `analytics/visitors/${anonId}/profile`);
-    await update(visitorMetaRef, {
+    const globalVisitorMetaRef = ref(db, `analytics/visitors/${anonId}/profile`);
+    await update(globalVisitorMetaRef, {
       anonId,
       username,
       deviceName,
+      hostUrl,
       lastActiveAt: timestamp,
       lastVisitedPage: pagePath,
+      tenant_id: tenantId,
     });
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, tenant_id: tenantId });
   } catch (error) {
     apiLogger.error("Firebase Analytics Write Error:", error);
     return res.status(500).json({ error: "Internal tracking server error" });
   }
 }
 
-export default withApiLogger(handler, "Analyics-API");
+export default withApiLogger(handler, "Analytics-API");

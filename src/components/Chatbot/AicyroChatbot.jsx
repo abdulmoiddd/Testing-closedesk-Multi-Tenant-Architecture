@@ -479,6 +479,10 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
   const handleInputInteraction = () => { if (isListening && recognitionRef.current) { recognitionRef.current.stop(); setIsListening(false); } };
 
   const handleStartVoiceCall = async () => {
+    if (!hasTrackedConvo) {
+      trackConversationStarted("Voice session initiated", tenantId);
+      setHasTrackedConvo(true);
+    }
     if (!botConfig.voiceEnabled) return;
     const txId = generateCorrelationId();
     const callLogger = voiceLogger.child({ correlation: { correlation_id: txId } });
@@ -872,7 +876,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     });
   }
 
-  function openChat() { setShowPeek(false); setIsOpen(true); uiLogger.info("chatbot_ui", "widget_opened", { context: { message: "User manually opened chatbot UI" } }); if (!hasTrackedOpen) trackChatOpened(); }
+  function openChat() { setShowPeek(false); setIsOpen(true); uiLogger.info("chatbot_ui", "widget_opened", { context: { message: "User manually opened chatbot UI" } }); if (!hasTrackedOpen) trackChatOpened(tenantId); }
 
   function handleCloseChat() { uiLogger.info("user_action", "widget_closed"); stopSpeech(); if (voiceState !== "IDLE" && voiceState !== "ERROR") handleEndVoiceCall(); submitLead({ ...leadDataRef.current, conversation_ended_at: new Date().toISOString() }); setMessages((prev) => prev.map((m) => ({ ...m, instant: true, spoken: true }))); setIsOpen(false); }
 
@@ -972,7 +976,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     if (isListening && recognitionRef.current) { recognitionRef.current.stop(); setIsListening(false); }
 
     addUserMessage(val);
-    if (!hasTrackedConvo) { trackConversationStarted(val); setHasTrackedConvo(true); uiLogger.info("user_action", "chat_started", { context: { message: "First message sent by user" } }); }
+    if (!hasTrackedConvo) { trackConversationStarted(val, tenantId); setHasTrackedConvo(true); uiLogger.info("user_action", "chat_started", { context: { message: "First message sent by user" } }); }
 
     if (!hasSentStartAlertRef.current) { hasSentStartAlertRef.current = true; queueEmailAlert("New Text Chat Started", `A visitor just started a chat: "${val}"`, leadData, "start"); }
 

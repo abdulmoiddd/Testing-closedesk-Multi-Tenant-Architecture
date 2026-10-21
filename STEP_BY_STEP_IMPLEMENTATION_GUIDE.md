@@ -2,8 +2,8 @@
 
 **Document:** Complete Hands-On Integration Guide for New Users & Beginners  
 **Product:** CloseDesk by Aicyro  
-**Version:** 2.0 (Production Multi-Tenant Edition)  
-**Goal:** Deploy the **CloseDesk Multimodal Chatbot Widget** and **Pulse Operations Dashboard** on any new website in less than 30 minutes, without writing complex backend code.
+**Version:** 2.1 (Production Multi-Tenant & Automated Telemetry Release)  
+**Goal:** Deploy the **CloseDesk Multimodal Chatbot Widget** and **Pulse Operations Dashboard** on any new website in less than 30 minutes, without writing backend code.
 
 ---
 
@@ -20,20 +20,21 @@ Before running any code, understand the 3 simple pieces of the CloseDesk platfor
   |                                                                                                    |
   |  +----------------------------------+       +-------------------------------+      +------------+  |
   |  |  Client's Existing Website       |       |  api.youragency.com           |      |  OpenAI    |  |
-  |  |                                  |       |                               |----->|  Realtime  |  |
-  |  |  [ Floating CloseDesk Widget ]   |------>|  * /api/openai-token          |      |  GPT-4o    |  |
-  |  |   - Voice AI (Talk with mic)     |       |  * /api/chat                  |      +------------+  |
-  |  |   - Text Chat                    |       |  * /api/analyze-image         |             |        |
-  |  |   - Upload broken equipment photo|       |                               |      +------------+  |
-  |  +----------------------------------+       |  * Pulse Dashboard (/lg)      |<---->|  Firebase  |  |
-  |                                             |    (Triage leads & calendar)  |      |  Database  |  |
+  |  |  (e.g. brightstarhvac.com)       |       |                               |----->|  Realtime  |  |
+  |  |                                  |       |  * /api/openai-token          |      |  GPT-4o    |  |
+  |  |  [ Floating CloseDesk Widget ]   |------>|  * /api/chat                  |      +------------+  |
+  |  |   - Voice AI (Talk with mic)     |       |  * /api/analyze-image         |             |        |
+  |  |   - Text Chat                    |       |  * /api/analytics             |      +------------+  |
+  |  |   - Broken equipment inspection  |       |                               |      |  Firebase  |  |
+  |  |   - Auto Host Website Tracking   |       |  * Pulse Dashboard (/lg)      |<---->|  Database  |  |
+  |  +----------------------------------+       |    (Triage leads & calendar)  |      |  Storage   |  |
   |                                             +-------------------------------+      +------------+  |
   +----------------------------------------------------------------------------------------------------+
 ```
 
 1. **The Client's Website (Front-End):** Any website (WordPress, Shopify, Webflow, custom React). It simply loads the floating CloseDesk widget with one line of HTML code.
-2. **CloseDesk Backend & Dashboard (`CloseDesk-Aicyro-GIT`):** A single Next.js project that you deploy to Vercel in 3 clicks. It manages the AI, processes speech and images, and provides the **Pulse Dashboard** at `/lg` for the contractor.
-3. **Cloud Providers:** Free Firebase Realtime Database (to store leads and transcripts) and OpenAI (for GPT-4o voice and intelligence).
+2. **CloseDesk Backend & Dashboard (`CloseDesk-Aicyro-GIT`):** A single Next.js project that you deploy to Vercel in 3 clicks. It manages the AI, processes speech and images, tracks website analytics, and provides the **Pulse Dashboard** at `/lg` for the contractor.
+3. **Cloud Providers:** Free Firebase Realtime Database (to store leads, visitor tracking, and transcripts) and OpenAI (for GPT-4o voice and intelligence).
 
 ---
 
@@ -117,34 +118,45 @@ Before embedding the chatbot on a client's website, register the client in your 
 
 ```text
 +----------------------------------------------------------------------------------------------------+
-|                                    PROVISIONING A CLIENT IN /lg                                    |
+|                               PROVISIONING A CLIENT IN /lg SUPERADMIN                              |
 |                                                                                                    |
-|   1. Open /lg                  2. Click "SuperAdmin"        3. Click "New Client"                  |
-|      Login as SuperAdmin       Enter PIN / Passkey             Name: "Apex Plumbing"               |
-|                                                                Tenant ID: "apex_plumbing"          |
-|                                                                Industry Pack: "plumbing_v2"        |
-|                                                                Domain: "https://apexplumbing.com"  |
+|   1. Open /lg                  2. Click "SuperAdmin"        3. Click "Add New Client"              |
+|      Login as SuperAdmin       Enter PIN / Passkey             Fill in Client Wizard:              |
+|                                                                * Name: "Apex Emergency Plumbing"   |
+|                                                                * Slug: "apex_emergency_plumbing"   |
+|                                                                * Pack: "Plumbing (plumbing_v2)"    |
+|                                                                * Admin User: "apex_admin"          |
+|                                                                * Admin Pass: "Apex2026!"           |
 |                                                                                                    |
-|                                4. Save & Copy Widget Code Snippet!                                 |
+|                                4. Instant Embed Modal pops up with 1-click script copy!            |
 +----------------------------------------------------------------------------------------------------+
 ```
 
+### Step-by-Step Client Setup:
 1. Navigate to your live dashboard: `https://YOUR_DOMAIN.vercel.app/lg`.
-2. Toggle to the **Super Admin Portal** view.
-3. In the **Client Management** tab, click **+ Add New Client**:
-   * **Company Name:** `Apex Emergency Plumbing`
-   * **Tenant ID:** `apex_plumbing` *(Must be lowercase, no spaces)*
-   * **Industry Pack:** Select `Plumbing`
-   * **Allowed Domain:** `https://apexplumbing.com`
-   * **Admin Username:** `apex_admin`
-   * **Admin Password:** Create a password for the client (e.g. `Apex2026!`)
-4. Click **Create Tenant**. CloseDesk automatically configures their database partition in Firebase at `/tenants/apex_plumbing/`.
+2. Click **Super Admin Login** at the bottom of the card.
+3. In the **Client Management** tab ([`ClientManagement.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/superadmin/ClientManagement.jsx)), click **+ Add New Client**.
+4. Fill in the interactive wizard:
+   * **Business Name:** `Apex Emergency Plumbing` *(The system auto-suggests the slug `apex_emergency_plumbing`)*
+   * **Tenant Identifier (Slug):** `apex_plumbing` *(Lowercase alphanumeric, hyphens, and underscores)*
+   * **Service Industry:** Select from dropdown (e.g. `Plumbing Services`). CloseDesk automatically assigns the `plumbing_v2` intelligence pack.
+   * **Dispatch Email & Emergency Phone:** Enter the on-call technician details.
+   * **Timezone:** Select client timezone (e.g. `Eastern (US)`).
+   * **Initial Tenant Admin Credentials:**
+     * **Admin Username:** `apex_admin`
+     * **Admin Password:** `Apex2026!`
+5. Click **Create Client Tenant**.
+6. **Instant Embed Snippet Modal:**  
+   A modal pops up confirming creation and provides your ready-to-copy HTML `<script>` tag with a **"Copy Code"** button.
 
 ---
 
 ## 5. Phase 4: Embedding the Widget on the New Website
 
 You can now add the CloseDesk AI Front-Desk to **any website**. Pick your platform below:
+
+> [!TIP]
+> **Automatic Website Tracking Included:** The snippet below automatically tracks website visits (`page_view`), visitor devices, and referring domains without requiring Google Analytics or custom tracking scripts.
 
 ### Option 4A: Plain HTML / Static Website
 Add this snippet directly before the closing `</body>` tag of your HTML file:
@@ -256,7 +268,7 @@ If you are building a custom React or Next.js website and want to render the wid
 
 ---
 
-## 6. Phase 5: Giving Your Client Access to Their Pulse Dashboard
+## 6. Phase 5: Client Login & Using the Pulse Dashboard
 
 Now hand off the operational dashboard to the business owner or dispatcher:
 
@@ -265,42 +277,55 @@ Now hand off the operational dashboard to the business owner or dispatcher:
 |                                    CLIENT DISPATCHER DAILY WORKFLOW                                |
 |                                                                                                    |
 |  1. Dispatcher opens: https://YOUR_DOMAIN.vercel.app/lg                                            |
-|  2. Logs in with:                                                                                  |
+|  2. Logs in on standard login screen:                                                              |
 |     * Username: apex_admin                                                                         |
-|     * Password: [Their Secret Password]                                                            |
+|     * Password: Apex2026!                                                                          |
 |                                                                                                    |
 |  3. What they see:                                                                                 |
 |     ┌────────────────────────┐  ┌────────────────────────┐  ┌─────────────────────────────────┐   |
-|     │ Terminal Screen        │  │ Booking Screen         │  │ Conversations Screen            │   |
-|     │ Red emergency alerts   │  │ Confirmed calendar     │  │ Full text & voice call replays  │   |
-|     │ One-click phone callback│ │ dispatch appointments  │  │ Photos of broken equipment      │   |
+|     │ Home KPI Cockpit       │  │ Terminal Triage Screen │  │ Conversations Screen            │   |
+|     │ Live visitors & opens  │  │ Red emergency alerts   │  │ Full text & voice call replays  │   |
+|     │ Conversion rate metrics│  │ One-click phone callback│ │ Photos of broken equipment      │   |
 |     └────────────────────────┘  └────────────────────────┘  └─────────────────────────────────┘   |
 +----------------------------------------------------------------------------------------------------+
 ```
 
+### Seamless Multi-Tenant Login:
+* The client goes to `https://YOUR_DOMAIN.vercel.app/lg`.
+* They enter their username (`apex_admin`) and password (`Apex2026!`) on the **standard login screen**.
+* CloseDesk's multi-tenant authentication engine ([`LoginScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/LoginScreen.jsx) & [`login.js`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/pages/api/login.js)) automatically recognizes their tenant (`apex_plumbing`), binds their session, and customizes the dashboard with their company name and theme colors.
+
 ### What the Client Can Do in `/lg`:
-1. **Live Lead Triage ([TerminalScreen.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/TerminalScreen.jsx)):**  
-   Whenever a visitor speaks to the bot or requests an emergency service, it appears on the contractor's screen with a sound ping and a flashing red **EMERGENCY** badge. The dispatcher clicks **Call Customer** to instantly dial them.
-2. **Review Voice Recordings ([Conversations.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Conversations.jsx)):**  
-   The contractor can review full text transcripts and listen to the customer's voice audio, as well as view inspection photos uploaded by the homeowner.
-3. **Customize Their AI Front-Desk ([Settings/](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/)):**  
-   The contractor can:
-   * Set business hours and emergency on-call numbers ([BusinessProfile.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/BusinessProfile.jsx)).
-   * Choose their AI voice persona (Alloy, Echo, Shimmer, Coral, Ash) and test it live ([Chatbotsetting.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/Chatbotsetting.jsx)).
-   * Adjust the brand accent color ([apearance.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/apearance.jsx)).
+1. **Home KPI Cockpit ([`HomeScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/HomeScreen.jsx)):**  
+   Shows real-time analytics from **their website**:
+   * **Total Website Visitors:** Automatically tracked from their external site.
+   * **Chatbot Opens:** Counts every time a visitor expands the widget.
+   * **Conversations Started:** Tracks every dialogue and WebRTC voice call.
+   * **Estimated Closed Pipeline & Conversion Rate.**
+2. **Live Lead Triage ([`TerminalScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/TerminalScreen.jsx)):**  
+   Whenever a visitor speaks to the bot or requests an emergency service, it appears on the contractor's screen with an audible sound chime and a flashing red **EMERGENCY** badge. The dispatcher clicks **Call Customer** to instantly dial them.
+3. **Review Voice Recordings & Photos ([`Conversations.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Conversations.jsx)):**  
+   The contractor can review full text transcripts, listen to voice audio, and view defect photos uploaded by the homeowner.
+4. **Visitor Hardware & Map ([`CookieDataDisplay.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/CookieDataDisplay.jsx)):**  
+   View visitor device types (iOS, Android, PC), IP geolocation markers, and cluster maps scoped exclusively to their website traffic.
+5. **Customize Their AI Front-Desk ([`Settings/`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/)):**  
+   * Set business hours and emergency on-call numbers ([`BusinessProfile.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/BusinessProfile.jsx)).
+   * Choose their AI voice persona (Alloy, Echo, Shimmer, Coral, Ash) and test it live ([`Chatbotsetting.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/Chatbotsetting.jsx)).
+   * Adjust the brand accent color ([`apearance.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/apearance.jsx)).
 
 ---
 
 ## 7. Phase 6: End-to-End Flight Check (Verification Test)
 
-Follow these 4 steps to verify that your new deployment works perfectly:
+Follow these 5 steps to verify that your new deployment works end-to-end:
 
 | Step | Action | Expected Result |
 | :--- | :--- | :--- |
-| **Test 1: Widget Visibility** | Open the client's website in Google Chrome. | The circular AI Front-Desk launcher bubble appears in the bottom-right corner. |
-| **Test 2: Realtime Voice Call** | Click the launcher, click the **Microphone** icon, allow mic access, and say: *"I have an emergency water leak under my kitchen sink."* | The bot speaks back within 1 second: *"Please turn off the main water shutoff valve immediately. Let me get an emergency plumber to you. What is your phone number?"* |
-| **Test 3: Lead Capture** | Provide a test phone number: *"555-019-2834"*. | The bot confirms the callback request and closes the qualification loop. |
-| **Test 4: Verify Pulse Dashboard** | Open `/lg` in another tab, log in as `apex_admin`, and look at the **Terminal Screen**. | The lead appears at the top of the queue with an audible chime, priority labeled `EMERGENCY`, and phone `555-019-2834`. |
+| **Test 1: Website Visit Tracking** | Open the client's external website in an incognito window. | The widget launcher bubble appears in the bottom right corner. In `/lg`, **Total Website Visitors** increments by +1. |
+| **Test 2: Chatbot Open Tracking** | Click the launcher icon to expand the chatbot. | In `/lg` Home Screen, **Chatbot Opens** increments by +1. |
+| **Test 3: Realtime Voice Call** | Click the **Microphone** icon, allow mic access, and say: *"I have an emergency water leak under my kitchen sink."* | In `/lg`, **Conversations Started** increments by +1. The bot speaks back within 1 second with voice assistance: *"Please turn off the main water shutoff valve immediately. What is your phone number?"* |
+| **Test 4: Lead Qualification** | Speak or type a test phone number: *"555-019-2834"*. | The bot confirms the callback request and closes the qualification loop. |
+| **Test 5: Live Dispatch Alert** | In `/lg`, switch to the **Terminal Screen**. | An emergency audio chime sounds, and the lead appears at the top of the queue with priority `EMERGENCY` and phone `555-019-2834`. |
 
 ---
 

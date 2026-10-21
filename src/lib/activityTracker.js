@@ -14,32 +14,61 @@ function getReadableDeviceName() {
   return "Desktop PC";
 }
 
+function resolveClientTenantId(explicitTenantId) {
+  if (explicitTenantId && typeof explicitTenantId === "string" && explicitTenantId.trim()) {
+    return explicitTenantId.trim();
+  }
+  if (typeof window !== "undefined") {
+    if (window.__CLOSEDESK_TENANT_ID__) return window.__CLOSEDESK_TENANT_ID__;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryTenant = urlParams.get("tenant") || urlParams.get("tenant_id");
+      if (queryTenant) return queryTenant;
+      const storedTenant = localStorage.getItem("currentTenant");
+      if (storedTenant && storedTenant !== "default") return storedTenant;
+    } catch (_) {}
+  }
+  return "default";
+}
+
 async function sendAnalyticsEvent(eventType, payload = {}) {
   if (typeof window === "undefined") return;
 
   const currentPath = window.location.pathname;
 
-  // 🛑 MASTER GUARD: Completely disable all tracking on the /lg page or any /lg/* sub-pages
-  if (currentPath === "/lg" || currentPath.startsWith("/lg/")) {
+  // 🛑 MASTER GUARD: Completely disable tracking on admin /lg and observability /logs pages
+  if (
+    currentPath === "/lg" ||
+    currentPath.startsWith("/lg/") ||
+    currentPath === "/logs" ||
+    currentPath.startsWith("/logs/")
+  ) {
     return;
   }
 
   const anonId = getOrCreateAnonId() || "unknown";
   const storedUsername = localStorage.getItem("aicyro_username");
   const username = storedUsername || `Visitor_${anonId.substring(0, 8)}`;
+  const tenantId = resolveClientTenantId(payload.tenant_id);
 
   try {
     await fetch("/api/analytics", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-tenant-id": tenantId,
+      },
       body: JSON.stringify({
         event_type: eventType,
+        tenant_id: tenantId,
         anonId,
         deviceName: getReadableDeviceName(),
         username,
-        pagePath: currentPath,
+        pagePath: payload.pagePath || currentPath,
+        referrer: typeof document !== "undefined" ? document.referrer || "Direct" : "Direct",
         ...payload,
       }),
+      keepalive: true,
     });
   } catch (err) {
     console.warn("Analytics log error:", err);
@@ -47,10 +76,10 @@ async function sendAnalyticsEvent(eventType, payload = {}) {
 }
 
 /**
- * 1. Track Website Visit (With Exclusion Guard & 3-Second Deduplication Lock)
+ * 1. Track Website Visit (With Exclusion Guard, Multi-Tenant Support & 3-Second Deduplication Lock)
  */
-export function trackVisit(pagePath = "/") {
-  // 🛑 Skip tracking immediately if navigating to /lg
+export function trackVisit(pagePath = "/", txId = null, tenantId = null) {
+  // 🛑 Skip tracking immediately if navigating to admin views
   if (pagePath === "/lg" || pagePath.startsWith("/lg/")) {
     return;
   }
@@ -63,23 +92,29 @@ export function trackVisit(pagePath = "/") {
   lastTrackedPage = pagePath;
   lastTrackedTime = now;
 
-  sendAnalyticsEvent("page_view", { pagePath });
-}
-
-/**
- * 2. Track Chatbot Opened
- */
-export function trackChatOpened() {
-  sendAnalyticsEvent("chatbot_opened", {
-    details: "Expanded AI Front Desk Widget",
+  sendAnalyticsEvent("page_view", {
+    pagePath,
+    correlation_id: txId,
+    tenant_id: tenantId,
   });
 }
 
 /**
- * 3. Track Conversation Started
+ * 2. Track Chatbot Opened (Multi-Tenant Scoped)
  */
-export function trackConversationStarted(messageSnippet = "") {
+export function trackChatOpened(tenantId = null) {
+  sendAnalyticsEvent("chatbot_opened", {
+    details: "Expanded AI Front Desk Widget",
+    tenant_id: tenantId,
+  });
+}
+
+/**
+ * 3. Track Conversation Started (Multi-Tenant Scoped)
+ */
+export function trackConversationStarted(messageSnippet = "", tenantId = null) {
   sendAnalyticsEvent("conversation_started", {
     details: messageSnippet.substring(0, 100),
+    tenant_id: tenantId,
   });
 }

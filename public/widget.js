@@ -3,9 +3,9 @@
  * Allows embedding the CloseDesk Multimodal AI Front-Desk on ANY website.
  *
  * Features:
+ * - Exact Cookie & Location Policy Screen-Lock Banner & Background Blur Overlay
  * - Automatic Host Website Visit Tracking (page_view) scoped to tenant_id
- * - Universal Cookie Consent Banner & Visitor Telemetry for Pulse Dashboard (/lg)
- * - Real-Time Geolocation & IP Resolution for Google Radar Map Pins
+ * - Real-Time Geolocation & IP Resolution for Google Radar Map Pins (/lg)
  * - Shared Visitor UUID across host page and chatbot iframe
  * - Full-Duplex WebRTC Voice & Multimodal Camera inspection
  * - Responsive auto-sizing (Pill launcher -> full-screen modal)
@@ -71,18 +71,18 @@
   // 4. Device Identification
   function getReadableDeviceName() {
     const ua = navigator.userAgent || "";
-    let os = "Desktop PC";
+    let os = "Unknown OS";
     let type = "Desktop";
 
     if (/Windows/i.test(ua)) os = "Windows PC";
     else if (/Macintosh|Mac OS X/i.test(ua)) os = "Macintosh";
     else if (/Android/i.test(ua)) {
-      os = "Android Mobile";
+      os = "Android";
       type = "Mobile";
     } else if (/iPhone|iPad|iPod/i.test(ua)) {
       os = "iOS Device";
       type = "Mobile";
-    } else if (/Linux/i.test(ua)) os = "Linux PC";
+    } else if (/Linux/i.test(ua)) os = "Linux";
 
     if (/Tablet|iPad/i.test(ua)) type = "Tablet";
 
@@ -147,7 +147,7 @@
             lng: null,
           });
         },
-        { timeout: 6000, enableHighAccuracy: true, maximumAge: 60000 }
+        { timeout: 8000 }
       );
     });
   }
@@ -166,7 +166,7 @@
           lat: null,
           lng: null,
         });
-      }, 3500);
+      }, 4000);
 
       fetch("https://ipinfo.io/json", {
         signal: controller ? controller.signal : undefined,
@@ -194,7 +194,6 @@
           });
         })
         .catch(function () {
-          // Fallback to secondary IP geolocation if ipinfo is blocked or failed
           fetch("https://freeipapi.com/api/json", {
             signal: controller ? controller.signal : undefined,
           })
@@ -230,7 +229,6 @@
 
   function sendCookieConsentPayload(consentStatus, locationData, ipData) {
     try {
-      // Prioritize precise GPS coordinates; if unavailable, fallback to IP coordinates
       const effectiveLat =
         locationData && locationData.lat != null
           ? Number(locationData.lat)
@@ -278,7 +276,6 @@
       };
 
       const endpoint = baseUrl + "/api/cookie-consent";
-      console.log("[CloseDesk] Persisting cookie telemetry to:", endpoint, payload);
 
       fetch(endpoint, {
         method: "POST",
@@ -289,33 +286,21 @@
         body: JSON.stringify(payload),
         keepalive: true,
         mode: "cors",
-      })
-        .then(function (res) {
-          if (!res.ok) {
-            console.warn("[CloseDesk] Cookie save response status:", res.status);
-          } else {
-            console.log("[CloseDesk] Cookie consent telemetry successfully saved in database.");
+      }).catch(function () {
+        try {
+          if (navigator.sendBeacon) {
+            const blob = new Blob([JSON.stringify(payload)], {
+              type: "application/json",
+            });
+            navigator.sendBeacon(endpoint, blob);
           }
-        })
-        .catch(function (err) {
-          console.error("[CloseDesk] Failed to send cookie consent fetch:", err);
-          // Fallback to sendBeacon if fetch threw a network error
-          try {
-            if (navigator.sendBeacon) {
-              const blob = new Blob([JSON.stringify(payload)], {
-                type: "application/json",
-              });
-              navigator.sendBeacon(endpoint, blob);
-            }
-          } catch (_) {}
-        });
-    } catch (err) {
-      console.error("[CloseDesk] Error constructing cookie telemetry payload:", err);
-    }
+        } catch (_) {}
+      });
+    } catch (_) {}
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 7. Cookie Consent Banner UI & Lifecycle
+  // 7. Cookie Consent Banner UI (Exact Replica of CookieConsentBanner.jsx)
   // ──────────────────────────────────────────────────────────────────────────
 
   const CONSENT_STORAGE_KEY = "closedesk_cookie_consent";
@@ -334,73 +319,150 @@
     try {
       const data = { status: status, timestamp: Date.now() };
       localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(data));
-      document.cookie = `closedesk_cookie_consent=${encodeURIComponent(
-        status
-      )}; max-age=31536000; path=/; SameSite=Lax`;
+      if (status === "accepted") {
+        document.cookie = `closedesk_cookie_consent=${encodeURIComponent(
+          status
+        )}; max-age=31536000; path=/; SameSite=Lax`;
+      } else {
+        document.cookie = "closedesk_cookie_consent=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+      }
     } catch (_) {}
   }
 
   function injectBannerStyles() {
-    if (document.getElementById("closedesk-cookie-styles")) return;
+    if (document.getElementById("closedesk-cookie-exact-styles")) return;
     const style = document.createElement("style");
-    style.id = "closedesk-cookie-styles";
+    style.id = "closedesk-cookie-exact-styles";
     style.textContent = `
+      @keyframes cdSlideInTopLeft {
+        from {
+          opacity: 0;
+          transform: translate3d(-15px, -15px, 0);
+        }
+        to {
+          opacity: 1;
+          transform: translate3d(0, 0, 0);
+        }
+      }
+
+      #closedesk-cookie-overlay {
+        position: fixed !important;
+        inset: 0 !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 2147483645 !important;
+        background: rgba(0, 0, 0, 0.6) !important;
+        backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+
       #closedesk-cookie-banner {
-        position: fixed;
-        bottom: 24px;
-        left: 24px;
-        width: 380px;
-        max-width: calc(100vw - 32px);
-        z-index: 2147483646;
-        background: rgba(13, 17, 23, 0.96) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.14) !important;
-        border-radius: 20px !important;
-        box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+        position: fixed !important;
+        top: 16px !important;
+        left: 16px !important;
+        right: 16px !important;
+        z-index: 2147483646 !important;
+        background: #030712 !important;
+        color: #ffffff !important;
+        border: 1px solid #1f2937 !important;
+        border-radius: 16px !important;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
         padding: 20px !important;
-        color: #f1f5f9 !important;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-        font-size: 14px !important;
-        line-height: 1.5 !important;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
         box-sizing: border-box !important;
-        opacity: 0;
-        transform: translateY(16px) scale(0.96);
-        transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        animation: cdSlideInTopLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
         pointer-events: auto !important;
       }
+
+      @media (min-width: 768px) {
+        #closedesk-cookie-banner {
+          right: auto !important;
+          width: 340px !important;
+        }
+      }
+
       #closedesk-cookie-banner * {
         box-sizing: border-box !important;
       }
-      #closedesk-cookie-banner.closedesk-visible {
-        opacity: 1 !important;
-        transform: translateY(0) scale(1) !important;
+
+      #closedesk-cookie-banner .cd-icon-box {
+        display: flex !important;
+        width: 32px !important;
+        height: 32px !important;
+        background: rgba(138, 43, 226, 0.15) !important;
+        color: #8a2be2 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 9999px !important;
+        font-size: 14px !important;
+        flex-shrink: 0 !important;
       }
-      #closedesk-cookie-banner button {
-        font-family: inherit !important;
+
+      #closedesk-cookie-banner .cd-title {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+      }
+
+      #closedesk-cookie-banner .cd-description {
+        font-size: 14px !important;
+        color: #d1d5db !important;
+        margin: 0 0 20px 0 !important;
+        line-height: 1.625 !important;
+      }
+
+      #closedesk-cookie-banner .cd-btn-accept {
+        width: 100% !important;
+        padding: 10px 16px !important;
+        border-radius: 12px !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+        color: #ffffff !important;
+        background: #8a2be2 !important;
+        border: none !important;
+        cursor: pointer !important;
+        box-shadow: 0 4px 14px rgba(138, 43, 226, 0.25) !important;
+        transition: all 0.2s ease !important;
+        text-align: center !important;
         outline: none !important;
       }
-      #closedesk-cookie-banner .cd-accept-btn:hover {
-        filter: brightness(1.1);
-        box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5) !important;
-        transform: translateY(-1px);
+
+      #closedesk-cookie-banner .cd-btn-accept:hover:not(:disabled) {
+        background: rgba(138, 43, 226, 0.9) !important;
+        box-shadow: 0 6px 20px rgba(138, 43, 226, 0.4) !important;
       }
-      #closedesk-cookie-banner .cd-reject-btn:hover {
-        background: rgba(255, 255, 255, 0.12) !important;
+
+      #closedesk-cookie-banner .cd-btn-reject {
+        width: 100% !important;
+        padding: 10px 16px !important;
+        border-radius: 12px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        color: #9ca3af !important;
+        background: #111827 !important;
+        border: 1px solid #1f2937 !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        text-align: center !important;
+        outline: none !important;
+      }
+
+      #closedesk-cookie-banner .cd-btn-reject:hover:not(:disabled) {
+        background: #1f2937 !important;
         color: #ffffff !important;
       }
-      #closedesk-cookie-banner .cd-close-btn:hover {
-        color: #ffffff !important;
-      }
-      @media (max-width: 640px) {
-        #closedesk-cookie-banner {
-          bottom: 12px !important;
-          left: 12px !important;
-          right: 12px !important;
-          width: auto !important;
-          max-width: calc(100vw - 24px) !important;
-          padding: 18px !important;
-        }
+
+      #closedesk-cookie-banner button:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
       }
     `;
     document.head.appendChild(style);
@@ -410,102 +472,88 @@
     if (document.getElementById("closedesk-cookie-banner")) return;
     injectBannerStyles();
 
+    // Lock screen scroll exactly as requested
+    document.body.style.overflow = "hidden";
+
+    // 1. Background Overlay
+    const overlay = document.createElement("div");
+    overlay.id = "closedesk-cookie-overlay";
+
+    // 2. Banner Card
     const banner = document.createElement("div");
     banner.id = "closedesk-cookie-banner";
     banner.innerHTML = `
-      <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 36px; height: 36px; border-radius: 12px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(59, 130, 246, 0.25)); border: 1px solid rgba(139, 92, 246, 0.4); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">
-            🍪
-          </div>
-          <div>
-            <div style="font-weight: 700; font-size: 15px; color: #ffffff; letter-spacing: -0.01em;">Cookie & Location Policy</div>
-            <div style="font-size: 11px; color: #a855f7; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Security & Telemetry</div>
-          </div>
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+        <div class="cd-icon-box">
+          🔒
         </div>
-        <button id="closedesk-cookie-close" class="cd-close-btn" aria-label="Close" style="background: none; border: none; color: #64748b; font-size: 18px; cursor: pointer; padding: 4px; line-height: 1; border-radius: 6px; transition: color 0.15s;">✕</button>
+        <h2 class="cd-title">
+          Cookie & Location Policy
+        </h2>
       </div>
 
-      <p style="margin: 0 0 16px 0; font-size: 13px; color: #94a3b8; line-height: 1.55;">
-        We use essential cookies and log basic device telemetry (including optional location access) to verify platform security and deliver responsive AI dispatch services.
+      <p class="cd-description">
+        We use essential browser cookies and log basic device metrics (including an optional location request) to secure our platform. Please accept or reject to unlock the website.
       </p>
 
       <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button id="closedesk-cookie-accept" class="cd-accept-btn" style="width: 100%; padding: 11px 16px; border-radius: 12px; font-size: 13.5px; font-weight: 600; color: #ffffff; background: linear-gradient(135deg, #7c3aed, #4f46e5); border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35); transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <span>Accept All Cookies</span>
+        <button id="closedesk-cookie-accept" class="cd-btn-accept">
+          Accept All Cookies
         </button>
-        <button id="closedesk-cookie-reject" class="cd-reject-btn" style="width: 100%; padding: 9px 16px; border-radius: 12px; font-size: 13px; font-weight: 500; color: #cbd5e1; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; transition: all 0.2s;">
+        <button id="closedesk-cookie-reject" class="cd-btn-reject">
           Reject Non-Essential
         </button>
       </div>
     `;
 
     function closeBanner() {
-      banner.classList.remove("closedesk-visible");
-      setTimeout(function () {
-        if (banner.parentNode) {
-          banner.parentNode.removeChild(banner);
-        }
-      }, 350);
+      document.body.style.overflow = "auto";
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      if (banner.parentNode) banner.parentNode.removeChild(banner);
     }
 
     const acceptBtn = banner.querySelector("#closedesk-cookie-accept");
     const rejectBtn = banner.querySelector("#closedesk-cookie-reject");
-    const closeBtn = banner.querySelector("#closedesk-cookie-close");
 
-    acceptBtn.addEventListener("click", async function () {
+    async function handleDecision(status) {
       acceptBtn.disabled = true;
       rejectBtn.disabled = true;
-      acceptBtn.innerHTML = `<span>Saving preferences...</span>`;
+      acceptBtn.textContent = "Awaiting Permissions...";
+      rejectBtn.textContent = "Awaiting Permissions...";
 
-      setStoredConsent("accepted");
+      setStoredConsent(status);
 
-      // 1. Immediately fetch IP data (fast, ~150ms) and persist initial record to database
-      const ipData = await getIpAndLocation();
-      sendCookieConsentPayload(
-        "accepted",
-        { status: ipData.lat ? "allowed" : "unsupported", lat: ipData.lat, lng: ipData.lng },
-        ipData
-      );
+      if (status === "accepted") {
+        // Fast IP fetch + concurrent GPS resolution
+        const [locationData, ipData] = await Promise.all([
+          getUserLocation(),
+          getIpAndLocation(),
+        ]);
+        sendCookieConsentPayload("accepted", locationData, ipData);
+      } else {
+        sendCookieConsentPayload(
+          "rejected",
+          { status: "rejected", lat: null, lng: null },
+          { ip: "unknown" }
+        );
+      }
 
       closeBanner();
+    }
 
-      // 2. Concurrently prompt for high-accuracy GPS in the background
-      // If user allows browser prompt, send an update with precise coordinates
-      getUserLocation().then(function (preciseLoc) {
-        if (preciseLoc && preciseLoc.lat != null) {
-          sendCookieConsentPayload("accepted", preciseLoc, ipData);
-        }
-      });
+    acceptBtn.addEventListener("click", function () {
+      handleDecision("accepted");
     });
 
     rejectBtn.addEventListener("click", function () {
-      acceptBtn.disabled = true;
-      rejectBtn.disabled = true;
-
-      setStoredConsent("rejected");
-
-      sendCookieConsentPayload(
-        "rejected",
-        { status: "rejected", lat: null, lng: null },
-        { ip: "unknown" }
-      );
-      closeBanner();
+      handleDecision("rejected");
     });
 
-    closeBtn.addEventListener("click", function () {
-      closeBanner();
-    });
-
+    document.body.appendChild(overlay);
     document.body.appendChild(banner);
-
-    // Smooth enter animation
-    setTimeout(function () {
-      banner.classList.add("closedesk-visible");
-    }, 100);
   }
 
-  // Silent ping for returning visitors who previously accepted
+  // Silent tracking for users who previously accepted
   async function executeSilentTelemetry() {
     try {
       const ipData = await getIpAndLocation();
@@ -527,7 +575,7 @@
     if (consent && consent.status === "accepted") {
       executeSilentTelemetry();
     } else {
-      setTimeout(showCookieBanner, 600);
+      setTimeout(showCookieBanner, 300);
     }
   }
 

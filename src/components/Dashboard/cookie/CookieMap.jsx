@@ -101,64 +101,7 @@ const CustomGoogleMarker = memo(({ cookie, isJustNow, isActive, onMarkerClick })
   );
 });
 
-// Country Heatmap using Google Maps GeoJSON Data Layer
-const HeatmapLayer = memo(({ mappedCookies }) => {
-  const map = useMap();
-  const geoJsonLoaded = useRef(false);
 
-  const { countryCounts, maxDeviceCount } = useMemo(() => {
-    const counts = {};
-    let max = 0;
-    mappedCookies.forEach((cookie) => {
-      const matchedCountryName = cookie.ipLocation?.country;
-      if (matchedCountryName) {
-        counts[matchedCountryName] = (counts[matchedCountryName] || 0) + 1;
-        if (counts[matchedCountryName] > max) max = counts[matchedCountryName];
-      }
-    });
-    return { countryCounts: counts, maxDeviceCount: max };
-  }, [mappedCookies]);
-
-  useEffect(() => {
-    if (!map) return;
-    if (!geoJsonLoaded.current) {
-      map.data.loadGeoJson("https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json");
-      geoJsonLoaded.current = true;
-      map.data.addListener("click", (event) => {
-        const bounds = new window.google.maps.LatLngBounds();
-        event.feature.getGeometry().forEachLatLng((latLng) => {
-          bounds.extend(latLng);
-        });
-        map.fitBounds(bounds);
-      });
-    }
-
-    map.data.setStyle((feature) => {
-      const countryName = feature.getProperty("name");
-      const count = countryCounts[countryName] || 0;
-      let fillOpacity = 0.03;
-      if (count > 0) {
-        const minOpacity = 0.15;
-        const maxOpacity = 0.85;
-        if (maxDeviceCount <= 1) {
-          fillOpacity = maxOpacity;
-        } else {
-          fillOpacity = minOpacity + ((count - 1) / (maxDeviceCount - 1)) * (maxOpacity - minOpacity);
-        }
-      }
-      return {
-        fillColor: "var(--primary)",
-        fillOpacity: fillOpacity,
-        strokeColor: "var(--foreground-muted)",
-        strokeOpacity: 0.15,
-        strokeWeight: 0.5,
-        cursor: count > 0 ? "pointer" : "default" 
-      };
-    });
-  }, [map, countryCounts, maxDeviceCount]);
-
-  return null;
-});
 
 export default function CookieMap({ mappedCookies, viewMode, now, activeMapMarker, setActiveMapMarker }) {
   const [mapCenter, setMapCenter] = useState({ lat: 20, lng: 0 });
@@ -243,7 +186,6 @@ export default function CookieMap({ mappedCookies, viewMode, now, activeMapMarke
             disableDefaultUI={true}
             gestureHandling="greedy"
           >
-            <HeatmapLayer mappedCookies={mappedCookies} />
 
             {mappedCookies.map((c) => {
               const isJustNow = now - new Date(c.updatedAt).getTime() < 60000;

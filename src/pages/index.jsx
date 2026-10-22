@@ -24,7 +24,6 @@ export default function Home() {
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/icon.png" />
-        <script src="/widget.js" data-tenant="default" defer></script>
       </Head>
 
       <main className="min-h-screen w-full bg-[#0a0118] text-[#ffffff] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">

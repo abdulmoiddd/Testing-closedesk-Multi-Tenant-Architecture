@@ -56,9 +56,36 @@ async function handler(req, res, apiLogger) {
       referrer = "Direct",
     } = req.body || {};
 
+    // 🛑 MASTER GUARD: Ignore internal iframe embed and admin routes completely
+    if (
+      pagePath.startsWith("/embed") ||
+      pagePath.startsWith("/lg") ||
+      pagePath.startsWith("/logs")
+    ) {
+      return res.status(200).json({ success: true, ignored: true, reason: "Internal route" });
+    }
+
     // 1. Resolve Tenant Context
     const tenantId = resolveTenantId(req) || req.body?.tenant_id || "default";
     const isTenantScoped = tenantId && tenantId !== "default";
+
+    // 🛑 DEDUPLICATION GUARD: Prevent duplicate page_view entries within 3 seconds for the same visitor
+    if (event_type === "page_view") {
+      const metaPath = isTenantScoped
+        ? `tenants/${tenantId}/analytics/visitors/${anonId}/profile`
+        : `analytics/visitors/${anonId}/profile`;
+      
+      const existingMetaSnap = await get(ref(db, metaPath));
+      if (existingMetaSnap.exists()) {
+        const meta = existingMetaSnap.val();
+        if (meta.lastVisitedPage === pagePath && meta.lastActiveAt) {
+          const diffMs = Date.now() - new Date(meta.lastActiveAt).getTime();
+          if (diffMs < 3000) {
+            return res.status(200).json({ success: true, deduplicated: true });
+          }
+        }
+      }
+    }
 
     // 2. Map incoming event types
     let summaryField = "";

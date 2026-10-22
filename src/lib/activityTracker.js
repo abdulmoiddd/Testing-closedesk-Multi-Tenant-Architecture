@@ -36,12 +36,14 @@ async function sendAnalyticsEvent(eventType, payload = {}) {
 
   const currentPath = window.location.pathname;
 
-  // 🛑 MASTER GUARD: Completely disable tracking on admin /lg and observability /logs pages
+  // 🛑 MASTER GUARD: Completely disable tracking on admin /lg, observability /logs, and embedded chatbot iframe
   if (
     currentPath === "/lg" ||
     currentPath.startsWith("/lg/") ||
     currentPath === "/logs" ||
-    currentPath.startsWith("/logs/")
+    currentPath.startsWith("/logs/") ||
+    currentPath === "/embed" ||
+    currentPath.startsWith("/embed/")
   ) {
     return;
   }
@@ -79,8 +81,15 @@ async function sendAnalyticsEvent(eventType, payload = {}) {
  * 1. Track Website Visit (With Exclusion Guard, Multi-Tenant Support & 3-Second Deduplication Lock)
  */
 export function trackVisit(pagePath = "/", txId = null, tenantId = null) {
-  // 🛑 Skip tracking immediately if navigating to admin views
-  if (pagePath === "/lg" || pagePath.startsWith("/lg/")) {
+  // 🛑 Skip tracking immediately if navigating to admin views, logs, or embedded iframe
+  if (
+    pagePath === "/lg" ||
+    pagePath.startsWith("/lg/") ||
+    pagePath === "/logs" ||
+    pagePath.startsWith("/logs/") ||
+    pagePath === "/embed" ||
+    pagePath.startsWith("/embed/")
+  ) {
     return;
   }
 

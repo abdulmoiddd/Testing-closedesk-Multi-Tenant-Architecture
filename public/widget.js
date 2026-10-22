@@ -89,9 +89,16 @@
     return `${os} (${type})`;
   }
 
-  // 5. Host Website Visit Tracking (Multi-Tenant Scoped)
+  // 5. Host Website Visit Tracking (Multi-Tenant Scoped with Session Deduplication)
   function trackHostVisit() {
     try {
+      const pageKey = window.location.pathname + window.location.search;
+      const dedupeKey = "closedesk_visit_logged_" + pageKey;
+      if (sessionStorage.getItem(dedupeKey)) {
+        return; // Already tracked this page in current session tab
+      }
+      sessionStorage.setItem(dedupeKey, String(Date.now()));
+
       const payload = {
         event_type: "page_view",
         tenant_id: tenantId,

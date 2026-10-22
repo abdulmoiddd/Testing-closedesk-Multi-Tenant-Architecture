@@ -36,22 +36,47 @@ async function sendAnalyticsEvent(eventType, payload = {}) {
 
   const currentPath = window.location.pathname;
 
-  // 🛑 MASTER GUARD: Completely disable tracking on admin /lg, observability /logs, and embedded chatbot iframe
+  // 🛑 MASTER GUARD: Completely disable tracking on admin /lg and observability /logs
   if (
     currentPath === "/lg" ||
     currentPath.startsWith("/lg/") ||
     currentPath === "/logs" ||
-    currentPath.startsWith("/logs/") ||
-    currentPath === "/embed" ||
-    currentPath.startsWith("/embed/")
+    currentPath.startsWith("/logs/")
   ) {
     return;
   }
 
-  const anonId = getOrCreateAnonId() || "unknown";
+  // 🛑 ONLY block page_view on embedded chatbot iframe, NEVER block chatbot_opened or conversation_started!
+  if (
+    eventType === "page_view" &&
+    (currentPath === "/embed" || currentPath.startsWith("/embed/"))
+  ) {
+    return;
+  }
+
+  const urlParams =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search)
+      : null;
+  const hostParam = urlParams ? urlParams.get("host") : null;
+  const anonIdParam = urlParams ? urlParams.get("anonId") : null;
+
+  const anonId =
+    payload.anonId ||
+    anonIdParam ||
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("closedesk_anon_id") ||
+        localStorage.getItem("aicyro_anonymous_id"))) ||
+    getOrCreateAnonId() ||
+    "unknown";
+
   const storedUsername = localStorage.getItem("aicyro_username");
   const username = storedUsername || `Visitor_${anonId.substring(0, 8)}`;
   const tenantId = resolveClientTenantId(payload.tenant_id);
+  const hostUrl =
+    payload.hostUrl ||
+    hostParam ||
+    (typeof document !== "undefined" ? document.referrer || window.location.origin : "");
 
   try {
     await fetch("/api/analytics", {
@@ -67,6 +92,7 @@ async function sendAnalyticsEvent(eventType, payload = {}) {
         deviceName: getReadableDeviceName(),
         username,
         pagePath: payload.pagePath || currentPath,
+        hostUrl: payload.hostUrl || hostUrl,
         referrer: typeof document !== "undefined" ? document.referrer || "Direct" : "Direct",
         ...payload,
       }),

@@ -746,7 +746,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
   }, []);
 
   const [sessionStartTime] = useState(new Date().toISOString());
-  const [hasTrackedOpen] = useState(false);
+  const [hasTrackedOpen, setHasTrackedOpen] = useState(false);
   const [hasTrackedConvo, setHasTrackedConvo] = useState(false);
   const [avatarEffect, setAvatarEffect] = useState("");
   const [speechText, setSpeechText] = useState("");
@@ -884,7 +884,17 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     });
   }
 
-  function openChat() { setShowPeek(false); setIsOpen(true); uiLogger.info("chatbot_ui", "widget_opened", { context: { message: "User manually opened chatbot UI" } }); if (!hasTrackedOpen) trackChatOpened(tenantId); }
+  function openChat() {
+    setShowPeek(false);
+    setIsOpen(true);
+    uiLogger.info("chatbot_ui", "widget_opened", {
+      context: { message: "User manually opened chatbot UI" },
+    });
+    if (!hasTrackedOpen) {
+      setHasTrackedOpen(true);
+      trackChatOpened(tenantId);
+    }
+  }
 
   function handleCloseChat() { uiLogger.info("user_action", "widget_closed"); stopSpeech(); if (voiceState !== "IDLE" && voiceState !== "ERROR") handleEndVoiceCall(); submitLead({ ...leadDataRef.current, conversation_ended_at: new Date().toISOString() }); setMessages((prev) => prev.map((m) => ({ ...m, instant: true, spoken: true }))); setIsOpen(false); }
 
@@ -1071,6 +1081,12 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     uiLogger.info("user_action", "chatbot_button_clicked", { context: { message: `Clicked: ${label}` } });
     
     if (value.startsWith("shortcut_")) { handleTextInput({ preventDefault: () => {} }, label); return; }
+
+    if (!hasTrackedConvo) {
+      trackConversationStarted(label, tenantId);
+      setHasTrackedConvo(true);
+      uiLogger.info("user_action", "chat_started", { context: { message: "First message sent by user via button" } });
+    }
 
     addUserMessage(label);
     switch (step) {

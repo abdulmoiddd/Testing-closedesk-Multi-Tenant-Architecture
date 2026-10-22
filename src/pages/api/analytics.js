@@ -56,13 +56,15 @@ async function handler(req, res, apiLogger) {
       referrer = "Direct",
     } = req.body || {};
 
-    // 🛑 MASTER GUARD: Ignore internal iframe embed and admin routes completely
+    // 🛑 MASTER GUARD: Ignore internal iframe embed and admin routes ONLY for page_view events
+    // Important: DO NOT ignore chatbot_opened or conversation_started events from /embed/chatbot!
     if (
-      pagePath.startsWith("/embed") ||
-      pagePath.startsWith("/lg") ||
-      pagePath.startsWith("/logs")
+      event_type === "page_view" &&
+      (pagePath.startsWith("/embed") ||
+        pagePath.startsWith("/lg") ||
+        pagePath.startsWith("/logs"))
     ) {
-      return res.status(200).json({ success: true, ignored: true, reason: "Internal route" });
+      return res.status(200).json({ success: true, ignored: true, reason: "Internal route pageview" });
     }
 
     // 1. Resolve Tenant Context

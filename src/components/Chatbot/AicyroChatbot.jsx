@@ -216,6 +216,8 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     || (typeof window !== "undefined" && (window.__CLOSEDESK_TENANT_ID__ || new URLSearchParams(window.location.search).get("tenant") || new URLSearchParams(window.location.search).get("tenant_id")))
     || "default";
   const [isOpen, setIsOpen] = useState(false);
+  const [showPeek, setShowPeek] = useState(false);
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
   useEffect(() => {
@@ -230,8 +232,6 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
       );
     }
   }, [isOpen, showPeek]);
-  const [hasAutoOpened, setHasAutoOpened] = useState(false);
-  const [showPeek, setShowPeek] = useState(false);
   const [step, setStep] = useState(STEPS.WELCOME);
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");

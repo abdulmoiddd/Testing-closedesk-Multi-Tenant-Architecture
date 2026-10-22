@@ -4,10 +4,8 @@ import { useRouter } from "next/router";
 import "@/styles/globals.css";
 import RootLayout from "./layout";
 import ThemeProvider from "../components/ThemeProvider";
-import CookieConsentBanner from "../components/Essential/CookieConsentBanner";
-import { trackVisit } from "../lib/activityTracker";
-import Popupform from "@/components/Form/PopupModel";
 import GlobalActivityTracker from "../components/GlobalActivityTracker";
+import { trackVisit } from "../lib/activityTracker";
 
 // Import tracing utility
 import { generateCorrelationId } from "../lib/tracer";
@@ -21,7 +19,6 @@ export default function App({ Component, pageProps }) {
   useEffect(() => {
     if (router.isReady) {
       const initialPageTxId = generateCorrelationId();
-      // 🚨 TICKET 3: page_loaded
       routerLogger.info("navigation", "page_loaded", {
         correlation: { correlation_id: initialPageTxId },
         context: { endpoint: router.pathname },
@@ -31,7 +28,6 @@ export default function App({ Component, pageProps }) {
 
     const handleRouteChange = (url) => {
       const routeTxId = generateCorrelationId();
-      // 🚨 TICKET 3: page_loaded
       routerLogger.info("navigation", "page_loaded", {
         correlation: { correlation_id: routeTxId },
         context: { endpoint: url },
@@ -43,21 +39,11 @@ export default function App({ Component, pageProps }) {
     return () => router.events.off("routeChangeComplete", handleRouteChange);
   }, [router.isReady, router.pathname]);
 
-  const isLogsPage = router.pathname === "/logs";
-
   return (
     <ThemeProvider>
       <RootLayout>
         <GlobalActivityTracker />
-
         <Component {...pageProps} />
-
-        {!isLogsPage && (
-          <>
-            {/* <Popupform /> */}
-            <CookieConsentBanner />
-          </>
-        )}
       </RootLayout>
     </ThemeProvider>
   );

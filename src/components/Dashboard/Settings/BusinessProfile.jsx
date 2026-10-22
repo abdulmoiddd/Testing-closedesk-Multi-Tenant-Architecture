@@ -161,19 +161,8 @@ export default function BusinessProfile({ onNavigate }) {
       setLogoPreview(base64Image);
 
       try {
-        const response = await fetch("/api/upload-logo", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: base64Image }),
-        });
-
-        if (response.ok) {
-          showToast("Logo updated globally!", "success");
-        } else {
-          showToast("Failed to update logo.", "error");
-        }
-      } catch (err) {
-        showToast("Network error during logo upload.", "error");
+        await set(ref(db, "settings/branding/logo"), base64Image);
+        showToast("Logo updated successfully!", "success");
       } finally {
         setIsUploadingLogo(false);
       }

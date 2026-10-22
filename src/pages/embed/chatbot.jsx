@@ -24,9 +24,28 @@ export default function EmbeddedChatbotPage() {
     <>
       <Head>
         <title>CloseDesk AI Assistant</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
+        />
         <meta name="robots" content="noindex, nofollow" />
       </Head>
+
+      {/* Force entire iframe document transparent */}
+      <style jsx global>{`
+        html,
+        body,
+        #__next {
+          background: transparent !important;
+          background-color: transparent !important;
+          overflow: hidden !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `}</style>
+
       <div className="w-full h-full bg-transparent overflow-hidden">
         <AicyroChatbot tenantId={activeTenantId} />
       </div>

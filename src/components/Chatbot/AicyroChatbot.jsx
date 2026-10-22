@@ -216,12 +216,20 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     || (typeof window !== "undefined" && (window.__CLOSEDESK_TENANT_ID__ || new URLSearchParams(window.location.search).get("tenant") || new URLSearchParams(window.location.search).get("tenant_id")))
     || "default";
   const [isOpen, setIsOpen] = useState(false);
+  const isInIframe = typeof window !== "undefined" && window.self !== window.top;
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: "CLOSEDESK_WIDGET_RESIZE", isExpanded: isOpen }, "*");
+      window.parent.postMessage(
+        { 
+          type: "CLOSEDESK_WIDGET_RESIZE", 
+          isExpanded: isOpen,
+          hasPeek: showPeek
+        }, 
+        "*"
+      );
     }
-  }, [isOpen]);
+  }, [isOpen, showPeek]);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const [showPeek, setShowPeek] = useState(false);
   const [step, setStep] = useState(STEPS.WELCOME);
@@ -1120,7 +1128,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[99999] flex flex-col items-end gap-4 font-sans">
+    <div className={`fixed ${isInIframe ? "bottom-2 right-2" : "bottom-4 right-4 sm:bottom-6 sm:right-6"} z-[99999] flex flex-col items-end gap-2 font-sans`}>
       <style>{`
         @keyframes acy-avatar-float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
         .animate-avatar-float { animation: acy-avatar-float 3.5s ease-in-out infinite; }
@@ -1172,10 +1180,10 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
           <div onClick={openChat} onMouseEnter={handleAvatarHover} onMouseLeave={handleAvatarLeave} className={`absolute cursor-pointer pointer-events-auto transition-all duration-500 ease-in-out ${showPeek ? "-top-[64px] right-0 w-20 h-20 animate-avatar-float drop-shadow-[0_10px_20px_rgba(0,0,0,0.3)] z-20 scale-100" : "inset-0 m-auto w-16 h-16 animate-robot-peek group-hover:opacity-0 -z-10 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] scale-90"} ${avatarEffect}`}>
             <img src={currentAvatarSrc} alt="AI Avatar" className="w-full h-full object-contain filter hover:brightness-110 transition-all" />
           </div>
-          <button className={`relative z-10 flex items-center justify-center text-white shadow-[0_4px_20px_var(--lead-glow)] transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_8px_30px_var(--lead-glow)] h-14 px-6 rounded-full rotate-0 bg-[var(--primary)] outline-none`} onClick={openChat} aria-label="Open Chat">
+          <button className={`relative z-10 flex items-center justify-center text-white shadow-[0_4px_20px_var(--lead-glow)] transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_8px_30px_var(--lead-glow)] h-14 px-6 rounded-full rotate-0 bg-[var(--primary)] outline-none whitespace-nowrap shrink-0`} onClick={openChat} aria-label="Open Chat">
             <div className="flex items-center gap-2.5">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-              <span className="text-[15px] font-bold tracking-tight pr-1">{botConfig.launcherText}</span>
+              <span className="text-[15px] font-bold tracking-tight pr-1 whitespace-nowrap">{botConfig.launcherText}</span>
             </div>
             <span className="absolute top-0 right-0 flex h-3.5 w-3.5 -mt-0.5 -mr-0.5 z-50">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent-blue)] opacity-75"></span>
@@ -1186,7 +1194,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
       )}
 
       {isOpen && (
-        <div className="fixed inset-0 sm:inset-auto sm:absolute sm:bottom-4 sm:right-0 w-full sm:w-[380px] z-50 sm:animate-acy-spring sm:origin-bottom-right flex flex-col">
+        <div className={`fixed inset-0 ${isInIframe ? "sm:inset-auto sm:absolute sm:bottom-0 sm:right-0" : "sm:inset-auto sm:absolute sm:bottom-4 sm:right-0"} w-full sm:w-[380px] z-50 sm:animate-acy-spring sm:origin-bottom-right flex flex-col`}>
           <div onMouseEnter={handleAvatarHover} onMouseLeave={handleAvatarLeave} onClick={handleAvatarClick} className={`hidden sm:block absolute -top-20 right-6 w-24 h-24 z-50 cursor-pointer pointer-events-auto transition-transform hover:scale-110 active:scale-95 drop-shadow-[0_0_20px_var(--lead-glow)] ${avatarEffect ? avatarEffect : isTyping || isProcessing ? "animate-avatar-thinking" : "animate-avatar-float"}`}>
             <img src={currentAvatarSrc} alt="AI Avatar" className="w-full h-full object-contain filter hover:brightness-110 transition-all" />
             {isHovered && speechText && (

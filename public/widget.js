@@ -6,7 +6,8 @@
  * - Automatic Host Website Visit Tracking (page_view) scoped to tenant_id
  * - Shared Visitor UUID across host page and chatbot iframe
  * - Full-Duplex WebRTC Voice & Multimodal Camera inspection
- * - Responsive auto-sizing (80px bubble -> full-screen modal)
+ * - Responsive auto-sizing (Pill launcher -> full-screen modal)
+ * - 100% transparent iframe rendering without background blocking
  *
  * Usage:
  * <script src="https://YOUR_DOMAIN/widget.js" data-tenant="brightstar_hvac" defer></script>
@@ -102,10 +103,11 @@
   trackHostVisit();
 
   // 6. Create Floating Widget Container
+  // Initial size is set to the collapsed launcher size (280px x 96px) to avoid blocking host content.
   const container = document.createElement("div");
   container.id = "closedesk-widget-container";
   container.style.cssText =
-    "position: fixed; bottom: 20px; right: 20px; z-index: 2147483647; width: 420px; height: 680px; max-width: 95vw; max-height: 90vh; pointer-events: none; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;";
+    "position: fixed; bottom: 20px; right: 20px; z-index: 2147483647; width: 280px; height: 96px; max-width: 95vw; max-height: 95vh; pointer-events: none; background: transparent !important; transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), height 0.3s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1), right 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; overflow: visible;";
 
   // 7. Create Headless Iframe
   const iframe = document.createElement("iframe");
@@ -116,8 +118,9 @@
     window.location.origin
   )}`;
   iframe.allow = "microphone; camera; autoplay";
+  iframe.setAttribute("allowtransparency", "true");
   iframe.style.cssText =
-    "width: 100%; height: 100%; border: none; background: transparent; pointer-events: auto; color-scheme: normal;";
+    "width: 100%; height: 100%; border: none; background: transparent !important; pointer-events: auto; color-scheme: normal; display: block; overflow: hidden;";
 
   container.appendChild(iframe);
 
@@ -136,14 +139,31 @@
   window.addEventListener("message", function (event) {
     if (!event.data || typeof event.data !== "object") return;
     if (event.data.type === "CLOSEDESK_WIDGET_RESIZE") {
+      const isMobile = window.innerWidth < 640;
       if (event.data.isExpanded) {
-        container.style.width = window.innerWidth < 640 ? "100vw" : "420px";
-        container.style.height = window.innerWidth < 640 ? "100vh" : "680px";
-        container.style.bottom = window.innerWidth < 640 ? "0px" : "20px";
-        container.style.right = window.innerWidth < 640 ? "0px" : "20px";
+        if (isMobile) {
+          container.style.width = "100vw";
+          container.style.height = "100vh";
+          container.style.maxWidth = "100vw";
+          container.style.maxHeight = "100vh";
+          container.style.bottom = "0px";
+          container.style.right = "0px";
+        } else {
+          container.style.width = "420px";
+          container.style.height = "720px";
+          container.style.maxWidth = "95vw";
+          container.style.maxHeight = "95vh";
+          container.style.bottom = "20px";
+          container.style.right = "20px";
+        }
       } else {
-        container.style.width = "80px";
-        container.style.height = "80px";
+        const isPeek = !!event.data.hasPeek;
+        container.style.width = isPeek ? "330px" : "280px";
+        container.style.height = isPeek ? "260px" : "96px";
+        container.style.maxWidth = "95vw";
+        container.style.maxHeight = "95vh";
+        container.style.bottom = "20px";
+        container.style.right = "20px";
       }
     }
   });

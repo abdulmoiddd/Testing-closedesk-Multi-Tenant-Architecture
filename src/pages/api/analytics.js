@@ -5,6 +5,15 @@ import { db } from "../../lib/firebase";
 import { resolveTenantId } from "../../lib/tenantResolver";
 
 async function handler(req, res, apiLogger) {
+  // CORS Headers for cross-domain SDK embed requests
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-tenant-id, x-correlation-id, x-session-id");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // GET: Fetch analytics summary (Scoped by tenant or platform)
   // ──────────────────────────────────────────────────────────────────────────

@@ -159,15 +159,15 @@ const CustomGoogleMarker = memo(({ cookie, isJustNow, isActive, onMarkerClick })
 
         {/* Selected Marker Detail Card */}
         {isActive && (
-          <div className="absolute bottom-[36px] flex flex-col items-center pointer-events-none bg-gray-950 text-white px-3.5 py-2 rounded-xl shadow-2xl border border-gray-800 min-w-max animate-in fade-in zoom-in-95 duration-200 z-50">
-            <span className="text-xs font-bold text-white tracking-wide leading-tight">{cookie.username}</span>
+          <div className="absolute bottom-[36px] flex flex-col items-center pointer-events-none bg-white text-gray-900 px-3.5 py-2 rounded-xl shadow-2xl border border-gray-200 min-w-max animate-in fade-in zoom-in-95 duration-200 z-50">
+            <span className="text-xs font-bold text-gray-900 tracking-wide leading-tight">{cookie.username}</span>
             <span className="text-[11px] font-semibold text-[var(--primary)] leading-tight mt-1">
               {placeName || `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`}
             </span>
-            <span className="text-[9px] text-gray-400 font-mono mt-0.5">
+            <span className="text-[9px] text-gray-500 font-mono mt-0.5">
               ({lat.toFixed(4)}, {lng.toFixed(4)})
             </span>
-            <div className="w-2.5 h-2.5 bg-gray-950 border-r border-b border-gray-800 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2"></div>
+            <div className="w-2.5 h-2.5 bg-white border-r border-b border-gray-200 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2"></div>
           </div>
         )}
       </div>

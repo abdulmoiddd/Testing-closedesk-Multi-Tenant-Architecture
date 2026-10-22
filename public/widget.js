@@ -37,12 +37,15 @@
     "default";
 
   // 2. Derive base URL from the script source
-  let baseUrl = window.location.origin;
-  if (currentScript && currentScript.src) {
+  let baseUrl = window.__CLOSEDESK_BASE_URL__ || "";
+  if (!baseUrl && currentScript && currentScript.src) {
     try {
-      const parsed = new URL(currentScript.src);
+      const parsed = new URL(currentScript.src, window.location.href);
       baseUrl = parsed.origin;
     } catch (_) {}
+  }
+  if (!baseUrl) {
+    baseUrl = window.location.origin;
   }
 
   // 3. Persistent Anonymous Visitor Identifier
@@ -101,22 +104,16 @@
         details: document.title || "Host Website Page",
       };
 
-      if (navigator.sendBeacon) {
-        const blob = new Blob([JSON.stringify(payload)], {
-          type: "application/json",
-        });
-        navigator.sendBeacon(baseUrl + "/api/analytics", blob);
-      } else {
-        fetch(baseUrl + "/api/analytics", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-tenant-id": tenantId,
-          },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        }).catch(function () {});
-      }
+      fetch(baseUrl + "/api/analytics", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": tenantId,
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+        mode: "cors",
+      }).catch(function () {});
     } catch (_) {}
   }
 
@@ -150,7 +147,7 @@
             lng: null,
           });
         },
-        { timeout: 8000, enableHighAccuracy: true, maximumAge: 60000 }
+        { timeout: 6000, enableHighAccuracy: true, maximumAge: 60000 }
       );
     });
   }
@@ -169,7 +166,7 @@
           lat: null,
           lng: null,
         });
-      }, 4000);
+      }, 3500);
 
       fetch("https://ipinfo.io/json", {
         signal: controller ? controller.signal : undefined,
@@ -233,7 +230,7 @@
 
   function sendCookieConsentPayload(consentStatus, locationData, ipData) {
     try {
-      // Prioritize precise GPS coordinates; if denied/unavailable, fallback to IP coordinates
+      // Prioritize precise GPS coordinates; if unavailable, fallback to IP coordinates
       const effectiveLat =
         locationData && locationData.lat != null
           ? Number(locationData.lat)
@@ -281,23 +278,40 @@
       };
 
       const endpoint = baseUrl + "/api/cookie-consent";
-      if (navigator.sendBeacon) {
-        const blob = new Blob([JSON.stringify(payload)], {
-          type: "application/json",
+      console.log("[CloseDesk] Persisting cookie telemetry to:", endpoint, payload);
+
+      fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": tenantId,
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+        mode: "cors",
+      })
+        .then(function (res) {
+          if (!res.ok) {
+            console.warn("[CloseDesk] Cookie save response status:", res.status);
+          } else {
+            console.log("[CloseDesk] Cookie consent telemetry successfully saved in database.");
+          }
+        })
+        .catch(function (err) {
+          console.error("[CloseDesk] Failed to send cookie consent fetch:", err);
+          // Fallback to sendBeacon if fetch threw a network error
+          try {
+            if (navigator.sendBeacon) {
+              const blob = new Blob([JSON.stringify(payload)], {
+                type: "application/json",
+              });
+              navigator.sendBeacon(endpoint, blob);
+            }
+          } catch (_) {}
         });
-        navigator.sendBeacon(endpoint, blob);
-      } else {
-        fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-tenant-id": tenantId,
-          },
-          body: JSON.stringify(payload),
-          keepalive: true,
-        }).catch(function () {});
-      }
-    } catch (_) {}
+    } catch (err) {
+      console.error("[CloseDesk] Error constructing cookie telemetry payload:", err);
+    }
   }
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -320,7 +334,6 @@
     try {
       const data = { status: status, timestamp: Date.now() };
       localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(data));
-      // Also write first-party cookie for cross-subdomain resilience
       document.cookie = `closedesk_cookie_consent=${encodeURIComponent(
         status
       )}; max-age=31536000; path=/; SameSite=Lax`;
@@ -436,7 +449,6 @@
       }, 350);
     }
 
-    // Attach Click Handlers
     const acceptBtn = banner.querySelector("#closedesk-cookie-accept");
     const rejectBtn = banner.querySelector("#closedesk-cookie-reject");
     const closeBtn = banner.querySelector("#closedesk-cookie-close");
@@ -448,14 +460,23 @@
 
       setStoredConsent("accepted");
 
-      // Request precise GPS and fetch IP data concurrently
-      const [locationData, ipData] = await Promise.all([
-        getUserLocation(),
-        getIpAndLocation(),
-      ]);
+      // 1. Immediately fetch IP data (fast, ~150ms) and persist initial record to database
+      const ipData = await getIpAndLocation();
+      sendCookieConsentPayload(
+        "accepted",
+        { status: ipData.lat ? "allowed" : "unsupported", lat: ipData.lat, lng: ipData.lng },
+        ipData
+      );
 
-      sendCookieConsentPayload("accepted", locationData, ipData);
       closeBanner();
+
+      // 2. Concurrently prompt for high-accuracy GPS in the background
+      // If user allows browser prompt, send an update with precise coordinates
+      getUserLocation().then(function (preciseLoc) {
+        if (preciseLoc && preciseLoc.lat != null) {
+          sendCookieConsentPayload("accepted", preciseLoc, ipData);
+        }
+      });
     });
 
     rejectBtn.addEventListener("click", function () {
@@ -478,7 +499,7 @@
 
     document.body.appendChild(banner);
 
-    // Trigger smooth enter animation
+    // Smooth enter animation
     setTimeout(function () {
       banner.classList.add("closedesk-visible");
     }, 100);
@@ -491,7 +512,7 @@
       sendCookieConsentPayload(
         "accepted",
         {
-          status: "allowed",
+          status: ipData.lat ? "allowed" : "unsupported",
           lat: ipData.lat || null,
           lng: ipData.lng || null,
         },
@@ -504,10 +525,8 @@
   function initCookieConsent() {
     const consent = getStoredConsent();
     if (consent && consent.status === "accepted") {
-      // User previously accepted; refresh telemetry silently to light up Radar Map
       executeSilentTelemetry();
     } else {
-      // User has not consented or previously rejected: present banner
       setTimeout(showCookieBanner, 600);
     }
   }

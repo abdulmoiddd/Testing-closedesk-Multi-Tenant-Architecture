@@ -41,30 +41,41 @@ export default function CookieDataDisplay() {
   useEffect(() => {
     const cookiesRef = ref(db, "user_cookies");
 
-    const unsubscribe = onValue(cookiesRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const currentTime = Date.now();
-        const validData = [];
-        Object.keys(data).forEach((key) => {
-          const item = data[key];
-          if (item.isArchived && item.archivedAt) {
-            const archiveTime = new Date(item.archivedAt).getTime();
-            if (currentTime - archiveTime >= THIRTY_DAYS_MS) {
-              remove(ref(db, `user_cookies/${key}`)).catch(console.error);
-              return;
+    const unsubscribe = onValue(
+      cookiesRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const currentTime = Date.now();
+          const validData = [];
+          Object.keys(data).forEach((key) => {
+            const item = data[key];
+            if (item.isArchived && item.archivedAt) {
+              const archiveTime = new Date(item.archivedAt).getTime();
+              if (currentTime - archiveTime >= THIRTY_DAYS_MS) {
+                remove(ref(db, `user_cookies/${key}`)).catch(console.error);
+                return;
+              }
             }
-          }
-          validData.push({ id: key, ...item });
-        });
+            validData.push({ id: key, ...item });
+          });
 
-        const formattedData = validData.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-        setCookies(formattedData);
-      } else {
-        setCookies([]);
+          const formattedData = validData.sort((a, b) => {
+            const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            return timeB - timeA;
+          });
+          setCookies(formattedData);
+        } else {
+          setCookies([]);
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Firebase Cookie Data read error:', err);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
 
     return () => unsubscribe();
   }, []);

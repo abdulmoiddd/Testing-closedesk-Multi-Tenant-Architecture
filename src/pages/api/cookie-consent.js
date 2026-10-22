@@ -4,11 +4,22 @@ import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
 import { resolveTenantId } from "../../lib/tenantResolver";
 
+// Helper: Safely deep-sanitize objects to ensure NO property contains `undefined`
+// which causes Firebase Realtime Database set() to throw fatal errors
+function sanitizeForFirebase(obj) {
+  return JSON.parse(
+    JSON.stringify(obj, (key, value) => (value === undefined ? null : value))
+  );
+}
+
 async function handler(req, res, apiLogger) {
   // CORS Headers for cross-domain SDK embed requests
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-tenant-id, x-correlation-id, x-session-id");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, x-tenant-id, x-correlation-id, x-session-id"
+  );
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -19,6 +30,26 @@ async function handler(req, res, apiLogger) {
   }
 
   try {
+    // Robust body parsing: handle objects, raw JSON strings, and buffers
+    let body = req.body;
+    if (typeof body === "string") {
+      try {
+        body = JSON.parse(body);
+      } catch (_) {
+        body = {};
+      }
+    } else if (Buffer.isBuffer(body)) {
+      try {
+        body = JSON.parse(body.toString("utf8"));
+      } catch (_) {
+        body = {};
+      }
+    }
+
+    if (!body || typeof body !== "object") {
+      body = {};
+    }
+
     const {
       anonId,
       username,
@@ -33,7 +64,7 @@ async function handler(req, res, apiLogger) {
       hostUrl = "",
       pagePath = "",
       tenant_id,
-    } = req.body || {};
+    } = body;
 
     if (!anonId) {
       return res.status(400).json({ error: "anonId is required" });
@@ -51,34 +82,36 @@ async function handler(req, res, apiLogger) {
             .trim();
 
     // Parse numeric coordinates safely for Google Maps markers
-    const numLat = location.lat != null && !isNaN(Number(location.lat))
-      ? Number(location.lat)
-      : ipLocation.lat != null && !isNaN(Number(ipLocation.lat))
-      ? Number(ipLocation.lat)
-      : null;
+    const numLat =
+      location && location.lat != null && !isNaN(Number(location.lat))
+        ? Number(location.lat)
+        : ipLocation && ipLocation.lat != null && !isNaN(Number(ipLocation.lat))
+        ? Number(ipLocation.lat)
+        : null;
 
-    const numLng = location.lng != null && !isNaN(Number(location.lng))
-      ? Number(location.lng)
-      : ipLocation.lng != null && !isNaN(Number(ipLocation.lng))
-      ? Number(ipLocation.lng)
-      : null;
+    const numLng =
+      location && location.lng != null && !isNaN(Number(location.lng))
+        ? Number(location.lng)
+        : ipLocation && ipLocation.lng != null && !isNaN(Number(ipLocation.lng))
+        ? Number(ipLocation.lng)
+        : null;
 
     const locationStatus =
-      location.status ||
+      (location && location.status) ||
       (consentStatus === "accepted" && numLat != null ? "allowed" : "rejected");
 
-    const payload = {
-      id: anonId,
-      anonId,
-      username: username || `Visitor_${anonId.substring(4, 12)}`,
+    const payload = sanitizeForFirebase({
+      id: String(anonId),
+      anonId: String(anonId),
+      username: username || `Visitor_${String(anonId).substring(4, 12)}`,
       deviceName: deviceName || "Unknown Device",
-      consentStatus,
+      consentStatus: String(consentStatus),
       ipAddress: clientIp,
       ipLocation: {
         ip: clientIp,
-        city: ipLocation.city || "Unknown",
-        region: ipLocation.region || "Unknown",
-        country: ipLocation.country || "Unknown",
+        city: (ipLocation && ipLocation.city) || "Unknown",
+        region: (ipLocation && ipLocation.region) || "Unknown",
+        country: (ipLocation && ipLocation.country) || "Unknown",
         lat: numLat,
         lng: numLng,
       },
@@ -90,12 +123,12 @@ async function handler(req, res, apiLogger) {
       language: language || "en-US",
       timeZone: timeZone || "UTC",
       rawUserAgent: rawUserAgent || req.headers["user-agent"] || "unknown",
-      hostUrl,
-      pagePath,
+      hostUrl: hostUrl || "",
+      pagePath: pagePath || "/",
       tenant_id: tenantId,
       isArchived: false,
       updatedAt: timestamp,
-    };
+    });
 
     // 1. Write to global user_cookies partition (consumed by Pulse Dashboard /lg)
     const globalCookieRef = ref(db, `user_cookies/${anonId}`);

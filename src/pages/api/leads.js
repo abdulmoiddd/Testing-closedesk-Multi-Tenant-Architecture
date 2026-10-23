@@ -16,19 +16,16 @@ async function handler(req, res, apiLogger) {
     try {
       const tenantId = resolveTenantId(req);
       const leadsPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads` : "leads";
-      let snapshot = await get(ref(db, leadsPath));
-      if (!snapshot.exists() && tenantId !== "default") {
-        snapshot = await get(ref(db, "leads"));
-      }
+      const snapshot = await get(ref(db, leadsPath));
       
       apiLogger.info("lead_lifecycle", "bulk_fetch_success", { 
-        context: { message: "Fetched all leads for dashboard" } 
+        context: { message: "Fetched leads for dashboard", tenantId } 
       });
 
       if (snapshot.exists()) {
-        return res.status(200).json(snapshot.val()); // Returns all leads
+        return res.status(200).json(snapshot.val()); // Returns tenant-isolated leads
       } else {
-        return res.status(200).json({}); // Returns empty object if no leads exist
+        return res.status(200).json({}); // Returns empty object if no leads exist for this tenant
       }
     } catch (error) {
       apiLogger.error("lead_lifecycle", "bulk_fetch_failed", { error });

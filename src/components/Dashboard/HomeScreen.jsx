@@ -29,7 +29,9 @@ export default function HomeScreen({ onLogout }) {
   // --- FIREBASE REALTIME DATABASE LISTENERS ---
   useEffect(() => {
     // 1. Listen for Actual Leads (Single Source of Truth across all pages)
-    const leadsRef = ref(db, "leads");
+    const activeTenant = typeof window !== "undefined" ? localStorage.getItem("currentTenant") : null;
+    const leadsPath = activeTenant && activeTenant !== "default" ? `tenants/${activeTenant}/leads` : "leads";
+    const leadsRef = ref(db, leadsPath);
     const unsubscribeLeads = onValue(
       leadsRef,
       (snapshot) => {
@@ -69,7 +71,8 @@ export default function HomeScreen({ onLogout }) {
     );
 
     // 2. Listen for Analytics Summary (Visitors & Opens)
-    const analyticsRef = ref(db, "analytics/summary");
+    const analyticsPath = activeTenant && activeTenant !== "default" ? `tenants/${activeTenant}/analytics/summary` : "analytics/summary";
+    const analyticsRef = ref(db, analyticsPath);
     const unsubscribeAnalytics = onValue(analyticsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {

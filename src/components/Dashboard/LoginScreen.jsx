@@ -10,6 +10,11 @@ import { generateCorrelationId } from "../../lib/tracer";
 
 const baseLogger = createWebsiteLogger("PulseLogin");
 
+// Helper function to generate a random 6-character CAPTCHA
+const generateCaptcha = () => {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+};
+
 
 const checkUserMatch = (user, targetUser, targetPass) => {
   if (!user || typeof user !== "object") return false;
@@ -28,6 +33,12 @@ export default function LoginScreen({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // --- CAPTCHA & BRUTE FORCE STATE ---
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const [captchaValue, setCaptchaValue] = useState("");
+  const [userCaptchaInput, setUserCaptchaInput] = useState("");
 
 
 
@@ -141,6 +152,8 @@ export default function LoginScreen({
         localStorage.removeItem("currentSuperAdmin");
         localStorage.setItem("currentUser", resolvedUserName);
         localStorage.setItem("currentTenant", resolvedTenantId);
+        setFailedAttempts(0);
+        setShowCaptcha(false);
 
         txLogger.info("auth", "login_success", {
           context: { user_id: resolvedUserName, tenant_id: resolvedTenantId },
@@ -153,10 +166,20 @@ export default function LoginScreen({
           });
         }
       } else {
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+
         txLogger.warn("auth", "login_failed_invalid_credentials", {
-          context: { user_id: cleanUsername },
+          context: { user_id: cleanUsername, attempts: newAttempts },
         });
-        setError("Invalid username or password.");
+
+        if (newAttempts >= 3) {
+          setCaptchaValue(generateCaptcha());
+          setShowCaptcha(true);
+          setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
+        } else {
+          setError(`Invalid username or password. (${3 - newAttempts} attempts left)`);
+        }
       }
     } catch (err) {
       txLogger.error("auth", "login_error", {
@@ -170,6 +193,21 @@ export default function LoginScreen({
   };
 
 
+
+  const handleCaptchaSubmit = (e) => {
+    e.preventDefault();
+    if (userCaptchaInput.toUpperCase() === captchaValue) {
+      setShowCaptcha(false);
+      setFailedAttempts(0);
+      setUserCaptchaInput("");
+      setError("");
+      setPassword("");
+    } else {
+      setError("Incorrect CAPTCHA. Please try again.");
+      setCaptchaValue(generateCaptcha());
+      setUserCaptchaInput("");
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4 font-sans text-[var(--foreground)] relative overflow-hidden">
@@ -197,7 +235,7 @@ export default function LoginScreen({
             Aicyro Pulse
           </h1>
           <p className="text-[var(--foreground-muted)] text-sm mt-1 font-medium">
-            Sign in to access your tenant dashboard
+            {showCaptcha ? "Security Verification Required" : "Sign in to access your tenant dashboard"}
           </p>
         </div>
 
@@ -207,7 +245,37 @@ export default function LoginScreen({
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-5 animate-fade-in">
+        {showCaptcha ? (
+          // --- CAPTCHA FORM ---
+          <form onSubmit={handleCaptchaSubmit} className="space-y-5 animate-fade-in">
+            <div className="flex flex-col items-center bg-[var(--background)] border border-[var(--border-color)] p-6 rounded-xl">
+              <span className="text-xs text-[var(--foreground-muted)] uppercase tracking-widest font-bold mb-2">Type this code</span>
+              <div className="text-3xl font-black tracking-[0.3em] text-[var(--primary)] select-none bg-[var(--card-bg)] px-6 py-3 rounded-lg border border-[var(--primary)]/20 line-through decoration-[var(--foreground-muted)] decoration-2">
+                {captchaValue}
+              </div>
+            </div>
+            
+            <div>
+              <input
+                type="text"
+                value={userCaptchaInput}
+                onChange={(e) => setUserCaptchaInput(e.target.value.toUpperCase())}
+                className="w-full text-center tracking-[0.2em] font-bold bg-[var(--background)] border border-[var(--border-color)] text-[var(--foreground)] px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all font-mono"
+                placeholder="ENTER CAPTCHA"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full bg-[var(--primary)] text-white font-bold py-3.5 rounded-xl shadow-[0_4px_15px_var(--lead-glow)] hover:opacity-90 active:scale-[0.98] transition-all"
+            >
+              Verify & Return to Login
+            </button>
+          </form>
+        ) : (
+          // --- STANDARD LOGIN FORM ---
+          <form onSubmit={handleLogin} className="space-y-5 animate-fade-in">
             <div>
               <label
                 htmlFor="username"
@@ -267,6 +335,7 @@ export default function LoginScreen({
               )}
             </button>
           </form>
+        )}
 
         <div className="mt-8 pt-6 border-t border-[var(--border-color)] text-center">
           <p className="text-xs text-[var(--foreground-muted)] font-medium">

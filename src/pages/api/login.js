@@ -4,54 +4,6 @@ import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase"; 
 import { recordAuditTrail } from "../../lib/auditTracer";
 
-// --- SECURITY: Server-Side Brute Force Rate Limiter ---
-const loginAttemptsMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15-minute window
-const MAX_FAILED_ATTEMPTS = 5; // Lock after 5 consecutive failed attempts
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15-minute lockout
-
-function getRateKey(req, username) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const clientIp = forwarded ? forwarded.split(",")[0].trim() : req.socket?.remoteAddress || "unknown_ip";
-  return `${clientIp}_${username.toLowerCase()}`;
-}
-
-function checkRateLimit(rateKey) {
-  const now = Date.now();
-  const record = loginAttemptsMap.get(rateKey);
-
-  if (!record) return { isLocked: false };
-
-  // Check if actively locked out
-  if (record.lockedUntil && now < record.lockedUntil) {
-    const remainingSeconds = Math.ceil((record.lockedUntil - now) / 1000);
-    return { isLocked: true, remainingSeconds };
-  }
-
-  // Reset if window has elapsed
-  if (now - record.firstAttempt > RATE_LIMIT_WINDOW_MS) {
-    loginAttemptsMap.delete(rateKey);
-    return { isLocked: false };
-  }
-
-  return { isLocked: false };
-}
-
-function recordFailedAttempt(rateKey) {
-  const now = Date.now();
-  const record = loginAttemptsMap.get(rateKey) || { count: 0, firstAttempt: now };
-
-  record.count += 1;
-  if (record.count >= MAX_FAILED_ATTEMPTS) {
-    record.lockedUntil = now + LOCKOUT_DURATION_MS;
-  }
-  loginAttemptsMap.set(rateKey, record);
-}
-
-function recordSuccessfulLogin(rateKey) {
-  loginAttemptsMap.delete(rateKey);
-}
-
 const checkUserMatch = (user, targetUser, targetPass) => {
   if (!user || typeof user !== "object") return false;
   const uName = (user.name || user.username || "").trim().toLowerCase();
@@ -75,20 +27,6 @@ async function handler(req, res, apiLogger) {
   const cleanUsername = String(username).trim();
   const cleanPassword = String(password).trim();
   const cleanTenantId = tenant_id ? String(tenant_id).trim() : null;
-
-  // 🚨 SECURITY: Check Brute Force Rate Limit
-  const rateKey = getRateKey(req, cleanUsername);
-  const { isLocked, remainingSeconds } = checkRateLimit(rateKey);
-
-  if (isLocked) {
-    apiLogger.warn("auth", "login_rate_limited", {
-      context: { user_id: cleanUsername, remainingSeconds }
-    });
-    return res.status(429).json({ 
-      error: `Too many failed login attempts. Account temporarily locked. Please try again in ${Math.ceil(remainingSeconds / 60)} minutes.`,
-      retryAfter: remainingSeconds
-    });
-  }
 
   try {
     let isValidUser = false;
@@ -141,9 +79,6 @@ async function handler(req, res, apiLogger) {
     }
 
     if (isValidUser) {
-      // Clear rate limiting tracking on success
-      recordSuccessfulLogin(rateKey);
-
       recordAuditTrail(apiLogger, "login_success", {
         who: cleanUsername,
         target: "pulse_dashboard",
@@ -153,9 +88,6 @@ async function handler(req, res, apiLogger) {
       
       return res.status(200).json({ success: true, tenant_id: matchedTenantId });
     } else {
-      // Record failed attempt for rate limiting
-      recordFailedAttempt(rateKey);
-
       recordAuditTrail(apiLogger, "login_failure", {
         who: cleanUsername,
         target: "pulse_dashboard",

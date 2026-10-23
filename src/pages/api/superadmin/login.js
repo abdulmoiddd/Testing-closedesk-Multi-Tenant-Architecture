@@ -4,51 +4,6 @@ import { withApiLogger } from "../../../lib/apiMiddleware";
 import { db } from "../../../lib/firebase";
 import { recordAuditTrail } from "../../../lib/auditTracer";
 
-// --- SECURITY: Server-Side Rate Limiter for SuperAdmin Login ---
-const superAdminAttemptsMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
-
-function getRateKey(req, username) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const clientIp = forwarded ? forwarded.split(",")[0].trim() : req.socket?.remoteAddress || "unknown_ip";
-  return `superadmin_${clientIp}_${username.toLowerCase()}`;
-}
-
-function checkRateLimit(rateKey) {
-  const now = Date.now();
-  const record = superAdminAttemptsMap.get(rateKey);
-
-  if (!record) return { isLocked: false };
-
-  if (record.lockedUntil && now < record.lockedUntil) {
-    const remainingSeconds = Math.ceil((record.lockedUntil - now) / 1000);
-    return { isLocked: true, remainingSeconds };
-  }
-
-  if (now - record.firstAttempt > RATE_LIMIT_WINDOW_MS) {
-    superAdminAttemptsMap.delete(rateKey);
-    return { isLocked: false };
-  }
-
-  return { isLocked: false };
-}
-
-function recordFailedAttempt(rateKey) {
-  const now = Date.now();
-  const record = superAdminAttemptsMap.get(rateKey) || { count: 0, firstAttempt: now };
-  record.count += 1;
-  if (record.count >= MAX_FAILED_ATTEMPTS) {
-    record.lockedUntil = now + LOCKOUT_DURATION_MS;
-  }
-  superAdminAttemptsMap.set(rateKey, record);
-}
-
-function recordSuccessfulLogin(rateKey) {
-  superAdminAttemptsMap.delete(rateKey);
-}
-
 async function handler(req, res, apiLogger) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -62,20 +17,6 @@ async function handler(req, res, apiLogger) {
 
   const cleanUsername = String(username).trim();
   const cleanPassword = String(password).trim();
-
-  // Rate limit check
-  const rateKey = getRateKey(req, cleanUsername);
-  const { isLocked, remainingSeconds } = checkRateLimit(rateKey);
-
-  if (isLocked) {
-    apiLogger.warn("auth", "superadmin_rate_limited", {
-      context: { user_id: cleanUsername, remainingSeconds }
-    });
-    return res.status(429).json({
-      error: `Too many failed SuperAdmin login attempts. Locked for ${Math.ceil(remainingSeconds / 60)} minutes.`,
-      retryAfter: remainingSeconds
-    });
-  }
 
   try {
     const adminRef = ref(db, "superAdmin");
@@ -96,8 +37,6 @@ async function handler(req, res, apiLogger) {
     );
 
     if (matchedAdmin) {
-      recordSuccessfulLogin(rateKey);
-
       recordAuditTrail(apiLogger, "superadmin_login_success", {
         who: cleanUsername,
         target: "superadmin_console",
@@ -109,8 +48,6 @@ async function handler(req, res, apiLogger) {
         name: matchedAdmin.name,
       });
     } else {
-      recordFailedAttempt(rateKey);
-
       recordAuditTrail(apiLogger, "superadmin_login_failure", {
         who: cleanUsername,
         target: "superadmin_console",

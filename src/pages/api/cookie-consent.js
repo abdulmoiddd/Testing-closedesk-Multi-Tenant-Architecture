@@ -3,6 +3,7 @@ import { ref, set } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
 import { resolveTenantId } from "../../lib/tenantResolver";
+import { sanitizeFirebaseKey } from "../../lib/sanitizer";
 
 // Helper: Safely deep-sanitize objects to ensure NO property contains `undefined`
 // which causes Firebase Realtime Database set() to throw fatal errors
@@ -66,8 +67,9 @@ async function handler(req, res, apiLogger) {
       tenant_id,
     } = body;
 
-    if (!anonId) {
-      return res.status(400).json({ error: "anonId is required" });
+    const safeAnonId = sanitizeFirebaseKey(anonId, "visitor");
+    if (!anonId || !safeAnonId) {
+      return res.status(400).json({ error: "Valid anonId is required" });
     }
 
     const tenantId = resolveTenantId(req) || tenant_id || "default";
@@ -131,12 +133,12 @@ async function handler(req, res, apiLogger) {
     });
 
     // 1. Write to global user_cookies partition (consumed by Pulse Dashboard /lg)
-    const globalCookieRef = ref(db, `user_cookies/${anonId}`);
+    const globalCookieRef = ref(db, `user_cookies/${safeAnonId}`);
     await set(globalCookieRef, payload);
 
     // 2. Also write to tenant-scoped partition for multi-tenant isolation
     if (tenantId && tenantId !== "default") {
-      const tenantCookieRef = ref(db, `tenants/${tenantId}/user_cookies/${anonId}`);
+      const tenantCookieRef = ref(db, `tenants/${tenantId}/user_cookies/${safeAnonId}`);
       await set(tenantCookieRef, payload);
     }
 

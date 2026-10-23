@@ -6,6 +6,7 @@ import { ref, update, get } from "firebase/database";
 import { traceAiExecution } from "../../lib/aiTracer"; // 🔥 Integrates Ticket 5 Tracer for the abandoned summaries
 import { executeDbWithTrace } from "../../lib/dbTracer";
 import { resolveTenantId } from "../../lib/tenantResolver";
+import { sanitizeFirebaseKey, sanitizeFirebasePayload } from "../../lib/sanitizer";
 
 
 async function handler(req, res, apiLogger) {
@@ -37,19 +38,19 @@ async function handler(req, res, apiLogger) {
   // POST REQUEST: SAVE LEAD FROM CHATBOT
   // ==========================================
   if (req.method === "POST") {
-    const data = req.body;
-    
-    // 🚨 TICKET 9: Every lead MUST have a lead_id and reference a session
-    const lead_id = data.firebaseId || `lead_${Date.now()}`;
-    const session_id = data.anonId || data.session_id || lead_id;
-
-    // 🚨 TICKET 9: lead_validation_failed
-    if (!data || typeof data !== "object" || Object.keys(data).length === 0) {
+    if (!req.body || typeof req.body !== "object" || Object.keys(req.body).length === 0) {
       apiLogger.warn("lead_lifecycle", "lead_validation_failed", {
-        context: { lead_id, session_id, reason: "Payload is empty or malformed" }
+        context: { reason: "Payload is empty or malformed" }
       });
       return res.status(400).json({ error: "Invalid payload format" });
     }
+
+    // 🚨 SECURITY: Deep sanitize payload and keys to prevent NoSQL path traversal injection
+    const data = sanitizeFirebasePayload(req.body);
+    const rawLeadId = data.firebaseId || `lead_${Date.now()}`;
+    const lead_id = sanitizeFirebaseKey(rawLeadId, "lead");
+    const rawSessionId = data.anonId || data.session_id || lead_id;
+    const session_id = sanitizeFirebaseKey(rawSessionId, "session");
 
     const hasContactInfo = Boolean(data.name || data.email || data.phone);
 

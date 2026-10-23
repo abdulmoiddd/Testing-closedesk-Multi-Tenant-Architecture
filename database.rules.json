@@ -1,6 +1,39 @@
 {
   "rules": {
     ".read": true,
-    ".write": true
+    ".write": true,
+    "superAdmin": {
+      ".indexOn": ["name"]
+    },
+    "login": {
+      ".indexOn": ["username", "name"]
+    },
+    "leads": {
+      ".indexOn": ["timestamp", "booking_status", "urgency_level", "tenant_id"]
+    },
+    "user_cookies": {
+      ".indexOn": ["updatedAt", "isArchived", "anonId", "tenant_id"]
+    },
+    "tenants": {
+      "$tenant_id": {
+        "leads": {
+          ".indexOn": ["timestamp", "booking_status", "urgency_level"]
+        },
+        "user_cookies": {
+          ".indexOn": ["updatedAt", "isArchived", "anonId"]
+        },
+        "users": {
+          ".indexOn": ["username", "name"]
+        }
+      }
+    },
+    "system_logs": {
+      "structured_events": {
+        ".indexOn": ["timestamp", "service", "level", "tenant_id"]
+      },
+      "activity_events": {
+        ".indexOn": ["timestamp"]
+      }
+    }
   }
 }

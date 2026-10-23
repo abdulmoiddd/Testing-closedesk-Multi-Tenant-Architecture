@@ -1,13 +1,82 @@
+// src/pages/api/insights.js
 import OpenAI from "openai";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
-import { ref, get } from "firebase/database";
+import { ref, get, set } from "firebase/database";
+import { resolveTenantId } from "../../lib/tenantResolver";
 
 async function handler(req, res, apiLogger) {
-  if (req.method !== "POST") {
+  if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed." });
   }
 
+  // 1. Resolve Tenant Context
+  const tenantId = resolveTenantId(req);
+  const isTenant = tenantId && tenantId !== "default";
+
+  // 🚨 SECURITY GATE: Verify tenant existence to prevent cross-tenant traversal or unauthorized access
+  if (isTenant) {
+    try {
+      const tenantSnap = await get(ref(db, `tenants/${tenantId}`));
+      if (!tenantSnap.exists()) {
+        apiLogger.warn("security", "unauthorized_fake_tenant_access", {
+          context: {
+            tenantId,
+            ip: req.headers["x-forwarded-for"] || req.socket?.remoteAddress,
+          },
+        });
+        return res
+          .status(404)
+          .json({ error: `Tenant '${tenantId}' not found or unauthorized.` });
+      }
+    } catch (dbErr) {
+      apiLogger.error("database", "tenant_verification_failed", { error: dbErr });
+      return res.status(500).json({ error: "Database verification failed." });
+    }
+  }
+
+  const insightsPath = isTenant ? `tenants/${tenantId}/insights` : "insights";
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GET REQUEST: Fetch existing insights or placeholder
+  // ──────────────────────────────────────────────────────────────────────────
+  if (req.method === "GET") {
+    try {
+      const snap = await get(ref(db, insightsPath));
+      if (snap.exists()) {
+        return res.status(200).json(snap.val());
+      }
+      return res.status(200).json({
+        status: "ok",
+        tenantId,
+        detailed_bullets: [
+          "No insights generated yet for this tenant. Click 'Get Insights' to generate.",
+        ],
+        kpis: {
+          total_conversations: "0 Total Chats",
+          conversion_rate: "0% Booked",
+          top_service: "N/A",
+          after_hours_stat: "0 leads",
+          top_dropoff: "None",
+          pricing_inquiries_stat: "0 asked",
+          urgent_requests_stat: "0 High Urgency",
+          top_objection: "None",
+        },
+        charts: {
+          service_demand: [],
+          visitor_intent: [],
+          time_distribution: [],
+        },
+      });
+    } catch (err) {
+      apiLogger.error("Error fetching insights:", err);
+      return res.status(500).json({ error: "Failed to fetch insights." });
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // POST REQUEST: Generate AI insights strictly scoped to tenant leads
+  // ──────────────────────────────────────────────────────────────────────────
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return res
@@ -16,9 +85,8 @@ async function handler(req, res, apiLogger) {
   }
 
   try {
-    // 1. Fetch recent conversations from Firebase to analyze
-    const leadsRef = ref(db, "leads");
-    const snapshot = await get(leadsRef);
+    const leadsPath = isTenant ? `tenants/${tenantId}/leads` : "leads";
+    const snapshot = await get(ref(db, leadsPath));
 
     let conversationData = "";
 
@@ -44,12 +112,11 @@ async function handler(req, res, apiLogger) {
     } else {
       return res
         .status(200)
-        .json({ detailed_bullets: ["No conversation data found yet."] });
+        .json({ detailed_bullets: ["No conversation data found yet for this tenant."] });
     }
 
     const openai = new OpenAI({ apiKey });
 
-    // 2. Instruct ChatGPT 4.0 Mini on exactly what to extract
     const systemPrompt = `
       You are a Business Intelligence analyst. Review the provided chatbot conversation transcripts and extract key KPIs and chart data.
       Return the data STRICTLY as a JSON object matching this exact structure:
@@ -99,11 +166,18 @@ async function handler(req, res, apiLogger) {
 
     const aiInsights = JSON.parse(completion.choices[0].message.content);
 
-    // 3. Return the generated insights to the frontend
+    // Save insights under tenant-scoped path for caching
+    try {
+      await set(ref(db, insightsPath), aiInsights);
+    } catch (saveErr) {
+      apiLogger.warn("Failed to cache insights to database:", saveErr);
+    }
+
     return res.status(200).json(aiInsights);
   } catch (error) {
     apiLogger.error("Error generating insights:", error);
     return res.status(500).json({ error: "Failed to process insights." });
   }
 }
+
 export default withApiLogger(handler, "Insights-API");

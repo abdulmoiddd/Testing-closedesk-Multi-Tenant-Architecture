@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -32,12 +32,35 @@ export default function Insight() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    const fetchExistingInsights = async () => {
+      try {
+        const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+        const res = await fetch(`/api/insights?tenant=${encodeURIComponent(tenantId)}`, {
+          headers: { "x-tenant-id": tenantId },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.kpis) {
+            setInsights(data);
+          }
+        }
+      } catch (_) {}
+    };
+    fetchExistingInsights();
+  }, []);
+
   const handleGetInsights = async () => {
     setIsGenerating(true);
     setError("");
     try {
-      const response = await fetch("/api/insights", {
+      const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+      const response = await fetch(`/api/insights?tenant=${encodeURIComponent(tenantId)}`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": tenantId,
+        },
       });
 
       if (!response.ok) {

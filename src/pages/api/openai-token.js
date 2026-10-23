@@ -28,11 +28,27 @@ async function handler(req, res, apiLogger) {
     return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { session_id, retrievedKnowledge = "" } = req.body || {};
+    const tenantId = resolveTenantId(req);
+    const isTenant = tenantId && tenantId !== "default";
 
-    if (!session_id || !isValidSessionId(session_id)) {
-      return res.status(400).json({ error: "A valid session_id is required." });
+    // 🚨 SECURITY GATE: Verify tenant validity
+    if (isTenant) {
+      const tenantSnap = await get(ref(db, `tenants/${tenantId}`));
+      if (!tenantSnap.exists()) {
+        apiLogger.warn("security", "unauthorized_fake_tenant_voice_token_access", {
+          context: { tenantId }
+        });
+        return res.status(404).json({ error: `Tenant '${tenantId}' not found or unauthorized.` });
+      }
     }
+
+    const { session_id: rawSessionId, retrievedKnowledge = "" } = req.body || {};
+
+    // Auto-generate a valid session_id if none provided or validate existing
+    const session_id =
+      rawSessionId && isValidSessionId(rawSessionId)
+        ? rawSessionId
+        : `lead_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     // --- SECURITY: Enforce Rate Limits ---
     const clientIp =
@@ -66,8 +82,12 @@ async function handler(req, res, apiLogger) {
     let privacyPatch = [];
     let factualSummary = "No prior conversation.";
 
+    const prospectPath = isTenant ? `tenants/${tenantId}/prospects/${session_id}` : `prospects/${session_id}`;
     try {
-      const prospectSnap = await get(ref(db, `prospects/${session_id}`));
+      let prospectSnap = await get(ref(db, prospectPath));
+      if (!prospectSnap.exists() && isTenant) {
+        prospectSnap = await get(ref(db, `prospects/${session_id}`));
+      }
       if (prospectSnap.exists()) {
         const prospectData = prospectSnap.val();
         serverContext = prospectData.context_patch || {};
@@ -84,6 +104,7 @@ async function handler(req, res, apiLogger) {
       "voice",
       serverContext,
       retrievedKnowledge,
+      tenantId,
     );
 
     // --- HARD ROLLBACK GATE ---

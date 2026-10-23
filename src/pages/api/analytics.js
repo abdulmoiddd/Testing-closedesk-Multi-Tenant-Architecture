@@ -21,16 +21,35 @@ async function handler(req, res, apiLogger) {
     try {
       const tenantId = resolveTenantId(req);
       const isTenant = tenantId && tenantId !== "default";
+
+      // 🚨 SECURITY GATE: Block unauthorized or non-existent tenant data access
+      if (isTenant) {
+        const tenantSnap = await get(ref(db, `tenants/${tenantId}`));
+        if (!tenantSnap.exists()) {
+          apiLogger.warn("security", "unauthorized_fake_tenant_analytics_access", {
+            context: { tenantId }
+          });
+          return res.status(404).json({ error: `Tenant '${tenantId}' not found or unauthorized.` });
+        }
+      }
+
       const summaryPath = isTenant
         ? `tenants/${tenantId}/analytics/summary`
         : "analytics/summary";
 
-      let snapshot = await get(ref(db, summaryPath));
-      if (!snapshot.exists() && isTenant) {
-        snapshot = await get(ref(db, "analytics/summary"));
+      const snapshot = await get(ref(db, summaryPath));
+
+      if (!snapshot.exists()) {
+        return res.status(200).json({
+          total_website_visitors: 0,
+          total_chatbot_opens: 0,
+          total_conversations_started: 0,
+          total_conversations: 0,
+          total_leads_captured: 0,
+        });
       }
 
-      return res.status(200).json(snapshot.exists() ? snapshot.val() : {});
+      return res.status(200).json(snapshot.val());
     } catch (err) {
       apiLogger.error("Failed to fetch analytics summary:", err);
       return res.status(500).json({ error: "Failed to fetch analytics" });

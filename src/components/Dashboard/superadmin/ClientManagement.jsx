@@ -165,24 +165,28 @@ export default function ClientManagement() {
   const verifyPin = async (pinToVerify) => {
     setActionLoading(true);
     try {
-      const adminRef = ref(db, "superAdmin");
-      const snap = await get(adminRef);
-      if (snap.exists()) {
-        const admins = snap.val();
-        const currentAdminName = localStorage.getItem("currentSuperAdmin");
-        const admin = admins.find((a) => a && a.name === currentAdminName);
+      const currentAdminName = localStorage.getItem("currentSuperAdmin") || "admin";
+      const response = await fetch("/api/superadmin/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentAdminName,
+          pin: pinToVerify,
+        }),
+      });
 
-        if (admin && admin.pin === pinToVerify) {
-          executeSecuredAction(pinModal.action);
-          setPinModal({ isOpen: false, action: null, error: "" });
-          setPinInput("");
-        } else {
-          setPinModal((prev) => ({
-            ...prev,
-            error: "Invalid PIN. Access denied.",
-          }));
-          setPinInput("");
-        }
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        executeSecuredAction(pinModal.action);
+        setPinModal({ isOpen: false, action: null, error: "" });
+        setPinInput("");
+      } else {
+        setPinModal((prev) => ({
+          ...prev,
+          error: data.error || "Invalid PIN. Access denied.",
+        }));
+        setPinInput("");
       }
     } catch (error) {
       console.error("PIN check error:", error);

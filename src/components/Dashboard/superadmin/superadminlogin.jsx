@@ -131,46 +131,40 @@ export default function SuperAdminLoginScreen({
     });
 
     try {
-      const adminRef = ref(db, "superAdmin");
-      const snapshot = await get(adminRef);
+      const response = await fetch("/api/superadmin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
 
-      if (snapshot.exists()) {
-        const adminData = snapshot.val();
-        const matchedAdmin = adminData.find(
-          (admin) =>
-            admin && admin.name === username && admin.password === password,
-        );
+      const data = await response.json();
 
-        if (matchedAdmin) {
-          localStorage.setItem("currentSuperAdmin", matchedAdmin.name);
-          setFailedAttempts(0); // Reset on success
+      if (response.ok && data.success) {
+        localStorage.setItem("currentSuperAdmin", data.name);
+        setFailedAttempts(0); // Reset on success
 
-          txLogger.info("auth", "superadmin_login_success", {
-            context: { user_id: username },
-          });
-          onLoginSuccess();
-        } else {
-          // --- BRUTE FORCE CHECK ---
-          const newAttempts = failedAttempts + 1;
-          setFailedAttempts(newAttempts);
-
-          txLogger.warn("auth", "superadmin_login_invalid", {
-            context: { user_id: username, attempts: newAttempts },
-          });
-
-          if (newAttempts >= 3) {
-            setCaptchaValue(generateCaptcha());
-            setShowCaptcha(true);
-            setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
-          } else {
-            setError(`Invalid super admin credentials. (${3 - newAttempts} attempts left)`);
-          }
-        }
-      } else {
-        txLogger.error("auth", "superadmin_db_unavailable", {
+        txLogger.info("auth", "superadmin_login_success", {
           context: { user_id: username },
         });
-        setError("Error connecting to the authentication server.");
+        onLoginSuccess();
+      } else {
+        // --- BRUTE FORCE CHECK ---
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+
+        txLogger.warn("auth", "superadmin_login_invalid", {
+          context: { user_id: username, attempts: newAttempts },
+        });
+
+        if (response.status === 429) {
+          setError(data.error || "Too many failed attempts. Account locked temporarily.");
+        } else if (newAttempts >= 3) {
+          setCaptchaValue(generateCaptcha());
+          setShowCaptcha(true);
+          setError("Too many failed attempts. Please solve the CAPTCHA to continue.");
+        } else {
+          setError(data.error || `Invalid super admin credentials. (${3 - newAttempts} attempts left)`);
+        }
       }
     } catch (err) {
       txLogger.error("auth", "superadmin_login_error", {

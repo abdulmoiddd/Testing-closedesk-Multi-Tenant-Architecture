@@ -146,6 +146,7 @@ export default function LoginScreen({
       // 3. Evaluate Authentication Result
       // -------------------------------------------------------------
       if (isSuccess) {
+        localStorage.removeItem("currentSuperAdmin");
         localStorage.setItem("currentUser", resolvedUserName);
         localStorage.setItem("currentTenant", resolvedTenantId);
         setFailedAttempts(0); // Reset on success

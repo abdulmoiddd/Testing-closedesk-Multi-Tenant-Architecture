@@ -36,7 +36,9 @@ export default function BookingsScreen({ onLogout }) {
 
   // --- FIREBASE REALTIME DATABASE LISTENER & STATUS SYNC ---
   useEffect(() => {
-    const leadsRef = ref(db, "leads");
+    const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+    const leadsPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads` : "leads";
+    const leadsRef = ref(db, leadsPath);
 
     const unsubscribe = onValue(
       leadsRef,
@@ -213,7 +215,9 @@ export default function BookingsScreen({ onLogout }) {
 
   const handleStatusUpdate = async (bookingId, newStatus) => {
     try {
-      const bookingRef = ref(db, `leads/${bookingId}`);
+      const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+      const bookingPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads/${bookingId}` : `leads/${bookingId}`;
+      const bookingRef = ref(db, bookingPath);
       await update(bookingRef, { booking_status: newStatus });
       setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
     } catch (error) {

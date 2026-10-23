@@ -248,20 +248,27 @@ export default function LeadsDashboard() {
       return (
         <SuperAdminLoginScreen
           onLoginSuccess={() => setIsAuthenticated(true)}
-          onNavigateToUserLogin={() => setLoginView("user")}
+          onNavigateToUserLogin={() => {
+            localStorage.removeItem("currentSuperAdmin");
+            setLoginView("user");
+          }}
         />
       );
     }
     return (
       <LoginScreen
         onLoginSuccess={() => setIsAuthenticated(true)}
-        onNavigateToSuperAdmin={() => setLoginView("superadmin")}
+        onNavigateToSuperAdmin={() => {
+          localStorage.removeItem("currentUser");
+          localStorage.removeItem("currentTenant");
+          setLoginView("superadmin");
+        }}
       />
     );
   }
 
-  // 3. Handle Authenticated Super Admin View
-  if (isSuperAdminLoggedIn) {
+  // 3. Handle Authenticated Super Admin View (Strictly gated by loginView and superadmin session)
+  if (isSuperAdminLoggedIn && loginView === "superadmin") {
     return <SuperAdminDashboard onLogout={handleLogout} />;
   }
 

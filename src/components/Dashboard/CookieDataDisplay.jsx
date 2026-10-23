@@ -38,8 +38,14 @@ export default function CookieDataDisplay() {
     return () => clearInterval(timer);
   }, []);
 
+  const getCookieDbPath = (subId = "") => {
+    const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+    const basePath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/user_cookies` : "user_cookies";
+    return subId ? `${basePath}/${subId}` : basePath;
+  };
+
   useEffect(() => {
-    const cookiesRef = ref(db, "user_cookies");
+    const cookiesRef = ref(db, getCookieDbPath());
 
     const unsubscribe = onValue(
       cookiesRef,
@@ -53,7 +59,7 @@ export default function CookieDataDisplay() {
             if (item.isArchived && item.archivedAt) {
               const archiveTime = new Date(item.archivedAt).getTime();
               if (currentTime - archiveTime >= THIRTY_DAYS_MS) {
-                remove(ref(db, `user_cookies/${key}`)).catch(console.error);
+                remove(ref(db, getCookieDbPath(key))).catch(console.error);
                 return;
               }
             }
@@ -171,7 +177,7 @@ export default function CookieDataDisplay() {
       onConfirm: async () => {
         try {
           const archivePromises = selectedCookies.map((id) =>
-            update(ref(db, `user_cookies/${id}`), { isArchived: true, archivedAt: new Date().toISOString() })
+            update(ref(db, getCookieDbPath(id)), { isArchived: true, archivedAt: new Date().toISOString() })
           );
           await Promise.all(archivePromises);
           showToast(`Successfully archived ${selectedCookies.length} sessions.`, "success");
@@ -188,7 +194,7 @@ export default function CookieDataDisplay() {
   const handleRestoreSelected = async () => {
     try {
       const restorePromises = selectedCookies.map((id) =>
-        update(ref(db, `user_cookies/${id}`), { isArchived: false, archivedAt: null })
+        update(ref(db, getCookieDbPath(id)), { isArchived: false, archivedAt: null })
       );
       await Promise.all(restorePromises);
       showToast(`Restored ${selectedCookies.length} sessions.`, "success");
@@ -208,7 +214,7 @@ export default function CookieDataDisplay() {
       confirmColor: "bg-red-500 hover:bg-red-600",
       onConfirm: async () => {
         try {
-          const deletePromises = selectedCookies.map((id) => remove(ref(db, `user_cookies/${id}`)));
+          const deletePromises = selectedCookies.map((id) => remove(ref(db, getCookieDbPath(id))));
           await Promise.all(deletePromises);
           showToast(`Deleted ${selectedCookies.length} sessions.`, "success");
           setSelectedCookies([]);

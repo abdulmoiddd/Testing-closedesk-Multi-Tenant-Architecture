@@ -33,9 +33,16 @@ export default function Report({ onLogout }) {
   };
 
   useEffect(() => {
-    const leadsRef = ref(db, "leads");
-    const analyticsRef = ref(db, "analytics/summary");
-    const profileRef = ref(db, "settings/business_profile/basic_info");
+    const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+    const isTenant = tenantId && tenantId !== "default";
+
+    const leadsPath = isTenant ? `tenants/${tenantId}/leads` : "leads";
+    const analyticsPath = isTenant ? `tenants/${tenantId}/analytics/summary` : "analytics/summary";
+    const profilePath = isTenant ? `tenants/${tenantId}/business_profile/basic_info` : "settings/business_profile/basic_info";
+
+    const leadsRef = ref(db, leadsPath);
+    const analyticsRef = ref(db, analyticsPath);
+    const profileRef = ref(db, profilePath);
 
     const unsubscribeLeads = onValue(leadsRef, (snapshot) => {
       const data = snapshot.val();

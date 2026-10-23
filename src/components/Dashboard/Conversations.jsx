@@ -15,7 +15,9 @@ export default function Conversations({ onLogout }) {
 
   // --- FIREBASE REALTIME DATABASE LISTENER ---
   useEffect(() => {
-    const leadsRef = ref(db, "leads");
+    const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+    const leadsPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads` : "leads";
+    const leadsRef = ref(db, leadsPath);
 
     const unsubscribe = onValue(
       leadsRef,

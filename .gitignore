@@ -36,6 +36,37 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+.cursor/
+*.sublime-project
+*.sublime-workspace
 
 # Local Netlify folder
 .netlify/
+
+# OS Artifacts
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp
+*.temp
+*~
+._*
+.Spotlight-V100
+.Trashes
+
+# Test Outputs & Visual Artifacts
+test_screenshots/
+screenshots/
+coverage/
+.nyc_output/
+test-results/
+
+# Temporary / Generated Documents
+*.docx
+.docs/
+
+# Caches & Build Artifacts
+.eslintcache
+.turbo/
+*.tsbuildinfo

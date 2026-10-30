@@ -88,32 +88,18 @@ export default function BookingsScreen({ onLogout }) {
 
               const isPastMeeting = hasValidDate && meetingTime.getTime() < now.getTime();
 
-              // 1. Terminal statuses take absolute priority
-              if (lowerStatus === "completed") {
+              // Status Mapping: Default remains "Upcoming" if no explicit status is selected
+              if (lowerStatus === "reschedule" || lowerStatus === "rescheduled") {
+                mappedStatus = "Reschedule";
+              } else if (lowerStatus === "cancel" || lowerStatus === "cancelled") {
+                mappedStatus = "Cancel";
+              } else if (lowerStatus === "completed") {
                 mappedStatus = "Completed";
-              } else if (lowerStatus === "cancelled") {
-                mappedStatus = "Cancelled";
               } else if (lowerStatus === "no-show") {
                 mappedStatus = "No-show";
-              } else if (lowerStatus === "rescheduled") {
-                mappedStatus = "Rescheduled";
-              }
-              // 2. If it has a real date, calculate dynamic scheduling state
-              else if (hasValidDate) {
-                const diffMs = meetingTime.getTime() - now.getTime();
-                const diffHours = diffMs / (1000 * 60 * 60);
-
-                if (diffMs < 0) {
-                  mappedStatus = "No-show"; // Time has already passed
-                } else if (diffHours <= 24) {
-                  mappedStatus = "Near upcoming"; // Less than 24 hours away
-                } else {
-                  mappedStatus = "Upcoming"; // More than 1 day away
-                }
-              }
-              // 3. Fallback for NO DATE
-              else {
-                mappedStatus = "Pending Scheduling";
+              } else {
+                // Ensure if no status is explicitly selected, default state remains "Upcoming"
+                mappedStatus = "Upcoming";
               }
 
               // Prepare a reliable display time
@@ -203,7 +189,11 @@ export default function BookingsScreen({ onLogout }) {
         bkg.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         bkg.id.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesTab = activeTab === "All" || bkg.status === activeTab;
+      const matchesTab =
+        activeTab === "All" ||
+        bkg.status === activeTab ||
+        (activeTab === "Rescheduled" && (bkg.status === "Rescheduled" || bkg.status === "Reschedule")) ||
+        (activeTab === "Cancelled" && (bkg.status === "Cancelled" || bkg.status === "Cancel"));
 
       return matchesSearch && matchesTab;
     });
@@ -230,9 +220,11 @@ export default function BookingsScreen({ onLogout }) {
       case "Completed":
         return "bg-[var(--primary)]/10 border-[var(--primary)]/30 text-[var(--primary)]";
       case "Rescheduled":
+      case "Reschedule":
         return "bg-purple-500/10 border-purple-500/30 text-purple-400";
       case "No-show":
       case "Cancelled":
+      case "Cancel":
         return "bg-red-500/10 border-red-500/30 text-red-400";
       default:
         return "bg-[var(--foreground-muted)]/10 border-[var(--border-color)] text-[var(--foreground-muted)]";
@@ -513,12 +505,22 @@ export default function BookingsScreen({ onLogout }) {
                       </div>
                     </td>
 
-                    <td className="px-4 sm:px-6 py-3 sm:py-4">
-                      <span
-                        className={`inline-flex items-center px-2 sm:px-2.5 py-1 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border ${getStatusStyles(bkg.status)}`}
+                    <td className="px-4 sm:px-6 py-3 sm:py-4" onClick={(e) => e.stopPropagation()}>
+                      <select
+                        value={
+                          bkg.status === "Rescheduled" || bkg.status === "Reschedule"
+                            ? "Reschedule"
+                            : bkg.status === "Cancelled" || bkg.status === "Cancel"
+                            ? "Cancel"
+                            : "Upcoming"
+                        }
+                        onChange={(e) => handleStatusUpdate(bkg.id, e.target.value)}
+                        className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 sm:px-2.5 py-1 rounded border cursor-pointer focus:outline-none transition-colors ${getStatusStyles(bkg.status)}`}
                       >
-                        {bkg.status}
-                      </span>
+                        <option value="Upcoming" className="bg-[var(--card-bg)] text-blue-400">Upcoming</option>
+                        <option value="Reschedule" className="bg-[var(--card-bg)] text-purple-400">Reschedule</option>
+                        <option value="Cancel" className="bg-[var(--card-bg)] text-red-400">Cancel</option>
+                      </select>
                     </td>
                   </tr>
                 );
@@ -703,10 +705,15 @@ export default function BookingsScreen({ onLogout }) {
                     Update Status
                   </h3>
                   <div className="flex flex-wrap gap-2 sm:gap-3">
-                    {["Completed", "Rescheduled", "Cancelled", "No-show"].map(
+                    {["Upcoming", "Reschedule", "Cancel"].map(
                       (statusOption) => {
-                        const isActive =
-                          selectedBooking.status === statusOption;
+                        const currentStatus =
+                          selectedBooking.status === "Rescheduled" || selectedBooking.status === "Reschedule"
+                            ? "Reschedule"
+                            : selectedBooking.status === "Cancelled" || selectedBooking.status === "Cancel"
+                            ? "Cancel"
+                            : "Upcoming";
+                        const isActive = currentStatus === statusOption;
                         return (
                           <button
                             key={statusOption}

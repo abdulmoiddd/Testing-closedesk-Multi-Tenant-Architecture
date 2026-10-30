@@ -438,6 +438,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     botName: "Aicyro Front Desk", launcherText: "Need help?", greetingMessage: "Hi! I'm Aicyro's AI Assistant. How can I help you today?",
     botAvatar: "ai_spark", customAvatarSvg: "", botVoice: "Joanna", voiceEnabled: true,
     voiceChatAgent: true, photoUploads: true,
+    enableDirectBooking: true, calendarActive: true,
   });
 
   const logVoiceError = (stage, message, rawError = null) => {
@@ -743,6 +744,18 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
           const photoState = data.photoUploads !== undefined
             ? data.photoUploads !== false
             : (data.photoUploadsEnabled !== undefined ? data.photoUploadsEnabled !== false : true);
+
+          const calExists = Boolean(
+            data.calendarActive !== false &&
+            (data.calendarIntegration || data.calendarActive || data.integrations?.calendar || data.integrations?.GoogleCalendar || data.integrations?.Make || data.bookingRule)
+          );
+          const directBooking = (data.enableDirectBooking === false || data.enableDirectBooking === null)
+            ? (calExists ? true : false)
+            : (data.enableDirectBooking !== undefined ? data.enableDirectBooking : (calExists || true));
+          const calActive = (data.calendarActive === false || data.calendarActive === null)
+            ? (calExists ? true : false)
+            : (data.calendarActive !== undefined ? data.calendarActive : true);
+
           setBotConfig({
             botName: data.botName || "Aicyro Front Desk", launcherText: data.launcherText || "Need help?",
             greetingMessage: data.greetingMessage || "Hi! I'm Aicyro's AI Assistant. How can I help you today?",
@@ -750,6 +763,8 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
             botVoice: data.botVoice || "Joanna", voiceEnabled: voiceState,
             voiceChatAgent: voiceState,
             photoUploads: photoState,
+            enableDirectBooking: directBooking,
+            calendarActive: calActive,
           });
           if (!voiceState) {
             setAgentMode("text");
@@ -1022,7 +1037,43 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
       aiHistory.push({ role: "user", content: val });
 
       try {
-        const response = await fetchWithTrace("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ session_id: firebaseDbId, current_lead_data: leadData, messages: aiHistory }) }, txId);
+        const isBookingToolActive = Boolean(botConfig.enableDirectBooking !== false && botConfig.calendarActive !== false);
+        const bookingToolDefinition = isBookingToolActive ? {
+          type: "function",
+          function: {
+            name: "schedule_calendar_meeting",
+            description: "Directly triggers the calendar booking tool when user asks to book a meeting and provides Name, Email, and Phone.",
+            parameters: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                email: { type: "string" },
+                phone: { type: "string" },
+                preferred_date: { type: "string" },
+                preferred_time: { type: "string" }
+              },
+              required: ["name", "email", "phone"]
+            }
+          }
+        } : null;
+
+        const response = await fetchWithTrace("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
+          body: JSON.stringify({
+            session_id: firebaseDbId,
+            current_lead_data: {
+              ...leadData,
+              enableDirectBooking: botConfig.enableDirectBooking,
+              calendarActive: botConfig.calendarActive,
+            },
+            messages: aiHistory,
+            enableDirectBooking: botConfig.enableDirectBooking,
+            calendarActive: botConfig.calendarActive,
+            booking_tool_active: isBookingToolActive,
+            tools: bookingToolDefinition ? [bookingToolDefinition] : [],
+          })
+        }, txId);
 
         if (!response.ok) throw new Error(`API returned status ${response.status}`);
         const data = await response.json();
@@ -1035,7 +1086,12 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
         const preferredDate = bookingReq.preferred_date || leadData.preferred_date; const preferredTime = bookingReq.preferred_time || leadData.preferred_time;
         let currentBookingStatus = leadData.booking_status || "In Progress"; let requestedAction = leadData.requested_action || "In Progress";
 
-        const isCallbackTrigger = data.next_action === "REQUEST_CALLBACK" || data.flags?.includes("TRIGGER_CALLBACK");
+        const explicitBookingIntent = /\b(book|schedule|appointment|meeting|demo|calendar|consultation)\b/i.test(val);
+        const hasContactInfoForBooking = Boolean((contactInfo.name || leadData.name) && (contactInfo.email || leadData.email) && (contactInfo.phone || leadData.phone));
+        const shouldTriggerDirectBooking = (data.next_action === "SCHEDULE_CONSULTATION" || data.ready_to_book === true || extracted.ready_to_book === true) ||
+          (isBookingToolActive && explicitBookingIntent && hasContactInfoForBooking);
+
+        const isCallbackTrigger = !shouldTriggerDirectBooking && (data.next_action === "REQUEST_CALLBACK" || data.flags?.includes("TRIGGER_CALLBACK"));
         if (isCallbackTrigger) { currentBookingStatus = "Callback Requested"; requestedAction = "Callback Requested"; }
 
         const updatedLeadData = {
@@ -1067,10 +1123,10 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
         }
 
         if (updatedLeadData.name || updatedLeadData.email || updatedLeadData.phone || updatedLeadData.business_name || updatedLeadData.service_requested) {
-          submitLead({ ...updatedLeadData, booking_status: isCallbackTrigger ? "Callback Requested" : "Lead Captured - Unbooked", requested_action: isCallbackTrigger ? "Callback Requested" : "Lead Captured - Unbooked" });
+          submitLead({ ...updatedLeadData, booking_status: isCallbackTrigger ? "Callback Requested" : (shouldTriggerDirectBooking ? "In Progress - Booking Calendar" : "Lead Captured - Unbooked"), requested_action: isCallbackTrigger ? "Callback Requested" : (shouldTriggerDirectBooking ? "Scheduling Meeting" : "Lead Captured - Unbooked") });
         }
 
-        if ((data.next_action === "SCHEDULE_CONSULTATION" || data.ready_to_book === true || extracted.ready_to_book === true) && updatedLeadData.name && updatedLeadData.email) {
+        if ((shouldTriggerDirectBooking || data.next_action === "SCHEDULE_CONSULTATION" || data.ready_to_book === true || extracted.ready_to_book === true) && updatedLeadData.name && updatedLeadData.email) {
           setTimeout(() => {
             if (updatedLeadData.preferred_date && updatedLeadData.preferred_time) {
               const exactTimeText = `${updatedLeadData.preferred_date} at ${updatedLeadData.preferred_time}`;

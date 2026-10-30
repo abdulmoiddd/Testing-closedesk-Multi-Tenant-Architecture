@@ -94,6 +94,10 @@ export async function getMasterRuleBook(
       "Website Audit",
     ],
 
+    // --- BOOKING & CALENDAR FEATURE FLAGS ---
+    enableDirectBooking: true,
+    calendarActive: true,
+
     // --- VOICE FEATURE FLAG & CONFIG ---
     voiceEnabled: true, // Master kill switch
     voiceChatAgent: true,
@@ -133,6 +137,17 @@ export async function getMasterRuleBook(
         ? data.photoUploads !== false
         : (data.photoUploadsEnabled !== undefined ? data.photoUploadsEnabled !== false : true);
 
+      const calExists = Boolean(
+        data.calendarActive !== false &&
+        (data.calendarIntegration || data.calendarActive || data.integrations?.calendar || data.integrations?.GoogleCalendar || data.integrations?.Make || data.bookingRule)
+      );
+      const directBooking = (data.enableDirectBooking === false || data.enableDirectBooking === null)
+        ? (calExists ? true : false)
+        : (data.enableDirectBooking !== undefined ? data.enableDirectBooking : (calExists || true));
+      const calActive = (data.calendarActive === false || data.calendarActive === null)
+        ? (calExists ? true : false)
+        : (data.calendarActive !== undefined ? data.calendarActive : true);
+
       botConfig = {
         ...botConfig,
         ...data,
@@ -150,6 +165,8 @@ export async function getMasterRuleBook(
         voiceChatAgent: voiceActive,
         voiceEnabled: voiceActive,
         photoUploads: photoActive,
+        enableDirectBooking: directBooking,
+        calendarActive: calActive,
         leadCaptureFields:
           Array.isArray(data.leadCaptureFields) && data.leadCaptureFields.length
             ? data.leadCaptureFields
@@ -188,8 +205,16 @@ export async function getMasterRuleBook(
   }
 
   // Allows the regression suite (US-05.07) to dynamically test different flows without changing the live DB
-  if (currentLeadData && currentLeadData.serviceCategory) {
-    botConfig.serviceCategory = currentLeadData.serviceCategory;
+  if (currentLeadData) {
+    if (currentLeadData.serviceCategory) {
+      botConfig.serviceCategory = currentLeadData.serviceCategory;
+    }
+    if (currentLeadData.enableDirectBooking !== undefined) {
+      botConfig.enableDirectBooking = currentLeadData.enableDirectBooking;
+    }
+    if (currentLeadData.calendarActive !== undefined) {
+      botConfig.calendarActive = currentLeadData.calendarActive;
+    }
   }
 
   const today = new Date();
@@ -360,11 +385,12 @@ ${botConfig.qualificationQuestions?.length ? `\nQUALIFICATION QUESTIONS (Weave n
 ${botConfig.faqs?.filter(f => f && f.question && f.answer)?.length ? `\nFREQUENTLY ASKED QUESTIONS (Pre-fed Authoritative Answers):\n${botConfig.faqs.filter(f => f && f.question && f.answer).map(f => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")}\n` : ""}
 
 OPERATIONAL RULES & POLICIES:
+- DIRECT CALENDAR BOOKING PRIORITY (CRITICAL): If the user explicitly asks to book a meeting and provides their Name, Email, and Phone Number, you MUST immediately trigger the calendar booking function/tool. Do NOT offer a callback unless the calendar tool explicitly fails.
 - Booking Calendar Policy: ${botConfig.bookingRule === "require_all" ? "Require both Phone Number and Email before booking." : botConfig.bookingRule === "require_email" ? "Require Email before booking." : "Allow direct booking immediately."}
 - Escalation Behavior: ${botConfig.escalationRule === "email_admin" ? "Take a message and inform the visitor that admin will email them." : "Provide the support phone number directly."}
 - After-Hours Policy: ${botConfig.unavailableBehavior === "collect_lead" ? "Collect contact details and promise next-day callback." : "Handle inquiries normally regardless of business hours."}
 - Data Validation: ${botConfig.strictValidation ? "Strict format enforcement for contact information." : "Conversational, fluid contact data entry."}
-- Feature Availability: Voice Agent is ${botConfig.voiceChatAgent && botConfig.voiceEnabled ? "ENABLED" : "DISABLED"}; Photo Uploads are ${botConfig.photoUploads ? "ENABLED" : "DISABLED"}.
+- Feature Availability: Voice Agent is ${botConfig.voiceChatAgent && botConfig.voiceEnabled ? "ENABLED" : "DISABLED"}; Photo Uploads are ${botConfig.photoUploads ? "ENABLED" : "DISABLED"}; Direct Calendar Booking is ${botConfig.enableDirectBooking && botConfig.calendarActive ? "ENABLED" : "DISABLED"}.
 
 ======================================================================
 12. CROSS-INDUSTRY CONVERSATION RULES (STRICTLY ENFORCED)
@@ -383,7 +409,8 @@ OPERATIONAL RULES & POLICIES:
 12. BAN ROBOTIC VOCABULARY: NEVER use robotic phrases like "As an AI...", "Please provide your...", or "I have updated your context." INSTEAD, force the use of natural contractions (I'm, we'll, let's) and conversational fillers ("Got it," "Makes sense," "Sure thing."). Speak like a real human concierge.
 13. MANDATORY MESSAGE CHUNKING: You MUST use the pipe delimiter "|" to separate distinct thoughts. Never write a long paragraph. If your response is longer than two sentences, you MUST insert a "|" to split it into separate chat bubbles. (Example: "Aicyro provides automated AI business systems. | We offer two main tiers: Starter for $97/mo and Pro for $297/mo. | What features are you looking for?").
 14. STRICT SHORTCUT BUTTON CONTROL: You must leave the "suggested_shortcuts" array EMPTY [] by default. ONLY populate it if you are actively asking a multiple-choice question in the "reply" field. DO NOT repeat shortcuts on every turn.
-15. NO MARKDOWN FORMATTING: You must NEVER use asterisks (**bold**) or any other markdown formatting. Output pure, plain text only.`;
+15. NO MARKDOWN FORMATTING: You must NEVER use asterisks (**bold**) or any other markdown formatting. Output pure, plain text only.
+16. DIRECT CALENDAR BOOKING OVERRIDE: If the user explicitly asks to book a meeting and provides their Name, Email, and Phone Number, you MUST immediately trigger the calendar booking function/tool. Do NOT offer a callback unless the calendar tool explicitly fails.`;
 
   if (mode === "text") {
     instructions += `\n\nCURRENTLY COLLECTED DATA:\n${JSON.stringify(currentLeadData || {})}`;
@@ -440,7 +467,7 @@ Output strictly as a raw JSON object matching this schema. Note that 'business_c
   "flags": ["TRIGGER_CALLBACK", "TRIGGER_DATA_DELETION"],
   "analytics_events": [],
   "state": "string",
-  "next_action": "SCHEDULE_CONSULTATION | REQUEST_CALLBACK | NONE",
+  "next_action": "SCHEDULE_CONSULTATION | REQUEST_CALLBACK | NONE (CRITICAL: If the user explicitly asks to book a meeting and provides their Name, Email, and Phone Number, you MUST immediately trigger the calendar booking function/tool by setting next_action to 'SCHEDULE_CONSULTATION'. Do NOT offer a callback unless the calendar tool explicitly fails.)",
   "factual_summary": null
 }`;
   } else if (mode === "voice") {
@@ -450,7 +477,8 @@ Output strictly as a raw JSON object matching this schema. Note that 'business_c
 - PROGRESSIVE CAPTURE & PRIVACY: If a user refuses to provide a piece of information, accept it gracefully. Use 'record_privacy_preference' to log it. Offer an alternative path in a short spoken response.
 - CONCISE TURNS: Default to 1-3 short sentences maximum per turn. Never monologue. Maximum ONE question per turn.
 - CHUNK LONG EXPLANATIONS: Speak a short introductory part and explicitly ask whether the user wants to hear more.
-- STT CONFIRMATION PROTOCOL: You MUST explicitly verbally confirm Emails, Phone Numbers, Website URLs, and ZIP codes/Addresses before saving them.`;
+- STT CONFIRMATION PROTOCOL: You MUST explicitly verbally confirm Emails, Phone Numbers, Website URLs, and ZIP codes/Addresses before saving them.
+- DIRECT CALENDAR BOOKING: If the user explicitly asks to book a meeting and provides their Name, Email, and Phone Number, you MUST immediately trigger the calendar booking function/tool ('request_consultation'). Do NOT offer a callback unless the calendar tool explicitly fails.`;
   }
 
   return { instructions, botConfig };

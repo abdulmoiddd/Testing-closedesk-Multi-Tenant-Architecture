@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { db } from "../../lib/firebase";
-import { ref, onValue, update } from "firebase/database";
+import { ref, onValue, update, get } from "firebase/database";
 
 // Helper to format seconds into "Xm Ys"
 const formatTime = (seconds) => {
@@ -237,9 +237,24 @@ export default function BookingsScreen({ onLogout }) {
       const bookingPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads/${bookingId}` : `leads/${bookingId}`;
       const bookingRef = ref(db, bookingPath);
       await update(bookingRef, { booking_status: newStatus });
-      setSelectedBooking((prev) => ({ ...prev, status: newStatus }));
+      setSelectedBooking((prev) => (prev && prev.id === bookingId ? { ...prev, status: newStatus, booking_status: newStatus } : prev));
     } catch (error) {
       console.error("Failed to update booking status:", error);
+    }
+  };
+
+  const handleRowClick = async (booking) => {
+    setSelectedBooking(booking);
+    try {
+      const tenantId = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+      const leadPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads/${booking.id}` : `leads/${booking.id}`;
+      const snapshot = await get(ref(db, leadPath));
+      if (snapshot.exists()) {
+        const leadData = snapshot.val();
+        setSelectedBooking((prev) => (prev && prev.id === booking.id ? { ...prev, ...leadData } : prev));
+      }
+    } catch (error) {
+      console.error("Failed to fetch booking details:", error);
     }
   };
 
@@ -425,7 +440,7 @@ export default function BookingsScreen({ onLogout }) {
                 return (
                   <tr
                     key={bkg.id}
-                    onClick={() => setSelectedBooking(bkg)}
+                    onClick={() => handleRowClick(bkg)}
                     className="hover:bg-[var(--background)] transition-colors cursor-pointer group"
                   >
                     <td className="px-4 sm:px-6 py-3 sm:py-4">
@@ -541,202 +556,148 @@ export default function BookingsScreen({ onLogout }) {
         </div>
       </div>
 
-      {/* ================= ENTERPRISE SLIDE-OVER DOSSIER PANEL ================= */}
+      {/* ================= DETAIL POPUP MODAL (TerminalScreen UI & Schema) ================= */}
       <div
-        className={`fixed inset-0 z-50 mt-16 sm:mt-20 transition-opacity duration-300 ${selectedBooking ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 z-50 transition-opacity duration-300 ${selectedBooking ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
       >
         <div
           className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           onClick={() => setSelectedBooking(null)}
         ></div>
         <div
-          className={`absolute right-0 top-0 h-full w-full sm:max-w-xl bg-[var(--card-bg)] border-l border-[var(--border-color)] shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${selectedBooking ? "translate-x-0" : "translate-x-full"}`}
+          className={`absolute right-0 top-0 h-full mt-16 sm:mt-20 w-full max-w-xl bg-[var(--background)] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col transform transition-transform duration-300 ease-out ${selectedBooking ? "translate-x-0" : "translate-x-full"}`}
         >
           {selectedBooking && (
             <>
-              <div className="relative flex-shrink-0 px-5 sm:px-8 py-6 sm:py-8 border-b border-[var(--border-color)] overflow-hidden bg-gradient-to-br from-[var(--lead-from)] via-[var(--card-bg)] to-[var(--background)] z-10">
-                <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-[var(--primary)] blur-[100px] opacity-20 pointer-events-none"></div>
-
+              {/* Modal Header */}
+              <div className="relative flex-shrink-0 px-8 py-8 border-b border-[var(--border-color)] overflow-hidden bg-gradient-to-br from-[var(--lead-from)] via-[var(--card-bg)] to-[var(--background)] z-10">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--primary)] blur-[100px] opacity-20 pointer-events-none"></div>
                 <div className="relative z-10 flex justify-between items-start">
-                  <div className="pr-4">
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
                       <span
-                        className={`px-2 py-1 rounded-md text-[8px] sm:text-[9px] font-bold uppercase tracking-widest border ${getStatusStyles(selectedBooking.status)}`}
+                        className={`px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest ${getStatusStyles(selectedBooking.status)}`}
                       >
-                        {selectedBooking.status}
+                        {selectedBooking.status || "Upcoming"}
                       </span>
-                      <span className="text-[var(--foreground-muted)] font-mono text-[9px] sm:text-[10px] tracking-wider">
-                        ID: {selectedBooking.id}
+                      <span className="text-[var(--foreground-muted)] font-mono text-[10px] tracking-wider">
+                        REF: {selectedBooking.id}
                       </span>
                     </div>
-                    <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] tracking-tight">
-                      {selectedBooking.name}
+                    <h2 className="text-3xl font-black text-[var(--foreground)] tracking-tight">
+                      {selectedBooking.name || "Anonymous Prospect"}
                     </h2>
-                    <div className="text-[var(--foreground-muted)] text-xs sm:text-sm font-medium mt-1.5 flex flex-wrap items-center gap-2 sm:gap-3">
-                      <span className="truncate">{selectedBooking.email}</span>
-                      <span className="w-1 h-1 rounded-full bg-[var(--border-color)] shrink-0"></span>
-                      <span>{selectedBooking.phone || "No Phone"}</span>
-                    </div>
+                    {selectedBooking.email && (
+                      <a
+                        href={`mailto:${selectedBooking.email}`}
+                        className="text-[var(--accent-blue)] text-sm font-medium hover:underline mt-1 inline-flex items-center gap-1.5"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        {selectedBooking.email}
+                      </a>
+                    )}
                   </div>
                   <button
                     onClick={() => setSelectedBooking(null)}
-                    className="p-2 shrink-0 text-[var(--foreground)] hover:text-[var(--primary)] bg-[var(--background)]/50 backdrop-blur-md rounded-full border border-[var(--border-color)] transition-all hover:scale-110"
+                    className="p-2 text-[var(--foreground)] hover:text-[var(--primary)] bg-[var(--background)]/50 backdrop-blur-md rounded-full border border-[var(--border-color)] transition-all hover:scale-110"
                   >
-                    <svg
-                      className="w-4 h-4 sm:w-5 sm:h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
               </div>
 
-              <div className="flex-grow overflow-y-auto p-5 sm:p-8 flex flex-col gap-4 sm:gap-6 custom-scrollbar bg-[var(--background)]">
-                <div className="bg-[var(--card-bg)] border border-[var(--primary)]/30 rounded-2xl p-4 sm:p-6 shadow-[0_4px_30px_var(--lead-glow)] flex items-center gap-4 sm:gap-5">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-xl bg-[var(--primary)]/10 border border-[var(--primary)]/30 flex items-center justify-center text-[var(--primary)]">
-                    <svg
-                      className="w-6 h-6 sm:w-7 sm:h-7"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-[9px] sm:text-[10px] font-bold text-[var(--foreground-muted)] uppercase tracking-widest mb-0.5 sm:mb-1">
-                      Scheduled For
-                    </h3>
-                    <p className="text-lg sm:text-xl font-bold text-[var(--foreground)] tracking-tight">
-                      {selectedBooking.display_time}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-b from-[var(--card-gradient-start)] to-[var(--card-gradient-end)] border border-[var(--border-color)] rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[var(--primary)] to-[var(--accent-blue)] opacity-60"></div>
-                    <h3 className="text-[9px] sm:text-[10px] font-bold text-[var(--foreground-muted)] uppercase tracking-widest mb-3 sm:mb-4 border-b border-[var(--border-color)] pb-2">
-                      Booking Logistics
-                    </h3>
-                    <div className="space-y-2.5 sm:space-y-3 text-xs sm:text-sm">
-                      <div>
-                        <span className="text-[var(--foreground-muted)] text-[10px] sm:text-[11px] block uppercase tracking-wide">
-                          Type
-                        </span>{" "}
-                        <span className="font-semibold text-[var(--foreground)]">
-                          {selectedBooking.booking_type}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--foreground-muted)] text-[10px] sm:text-[11px] block uppercase tracking-wide">
-                          Source
-                        </span>{" "}
-                        <span className="font-medium text-[var(--foreground)]">
-                          {selectedBooking.source}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--foreground-muted)] text-[10px] sm:text-[11px] block uppercase tracking-wide">
-                          Created On
-                        </span>{" "}
-                        <span className="font-medium text-[var(--foreground)]">
-                          {new Date(
-                            selectedBooking.timestamp,
-                          ).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-b from-[var(--card-gradient-start)] to-[var(--card-gradient-end)] border border-[var(--border-color)] rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[var(--primary)] to-[var(--accent-blue)] opacity-60"></div>
-                    <h3 className="text-[9px] sm:text-[10px] font-bold text-[var(--foreground-muted)] uppercase tracking-widest mb-3 sm:mb-4 border-b border-[var(--border-color)] pb-2">
-                      System Metrics
-                    </h3>
-                    <div className="space-y-2.5 sm:space-y-3 text-xs sm:text-sm">
-                      <div>
-                        <span className="text-[var(--foreground-muted)] text-[10px] sm:text-[11px] block uppercase tracking-wide">
-                          Calendar Sync
-                        </span>{" "}
-                        <span
-                          className={`font-semibold ${selectedBooking.calendar_sync === "Synced" ? "text-green-400" : "text-amber-400"}`}
-                        >
-                          {selectedBooking.calendar_sync}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[var(--foreground-muted)] text-[10px] sm:text-[11px] block uppercase tracking-wide">
-                          Time to Book
-                        </span>
-                        <span className="font-bold text-[var(--primary)] flex items-center gap-1.5">
-                          {formatTime(selectedBooking.time_to_booking_seconds)}
-                          {selectedBooking.time_to_booking_seconds < 120 && (
-                            <svg
-                              className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" />
-                            </svg>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-b from-[var(--card-gradient-start)] to-[var(--card-gradient-end)] border border-[var(--border-color)] rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
+              {/* Modal Content: Strictly Lead details, Chat summary, Chat detail */}
+              <div className="flex-grow overflow-y-auto p-8 flex flex-col gap-6 custom-scrollbar bg-[var(--background)] relative z-0 pb-32">
+                {/* 1. Lead details */}
+                <section className="bg-gradient-to-b from-[var(--card-gradient-start)] to-[var(--card-gradient-end)] border border-[var(--border-color)] rounded-2xl p-5 shadow-lg relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[var(--primary)] to-[var(--accent-blue)] opacity-60"></div>
-                  <h3 className="text-[9px] sm:text-[10px] font-bold text-[var(--foreground-muted)] uppercase tracking-widest mb-3 sm:mb-4 border-b border-[var(--border-color)] pb-2">
-                    Update Status
+                  <h3 className="text-[10px] font-bold text-[var(--foreground-muted)] uppercase tracking-widest mb-4 border-b border-[var(--border-color)] pb-2">
+                    Lead details
                   </h3>
-                  <div className="flex flex-wrap gap-2 sm:gap-3">
-                    {["Upcoming", "Reschedule", "Cancel"].map(
-                      (statusOption) => {
-                        const currentStatus =
-                          selectedBooking.status === "Rescheduled" || selectedBooking.status === "Reschedule"
-                            ? "Reschedule"
-                            : selectedBooking.status === "Cancelled" || selectedBooking.status === "Cancel"
-                            ? "Cancel"
-                            : "Upcoming";
-                        const isActive = currentStatus === statusOption;
-                        return (
-                          <button
-                            key={statusOption}
-                            onClick={() =>
-                              handleStatusUpdate(
-                                selectedBooking.id,
-                                statusOption,
-                              )
-                            }
-                            disabled={isActive}
-                            className={`px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg border transition-all duration-200 ${
-                              isActive
-                                ? "bg-[var(--primary)]/20 border-[var(--primary)]/50 text-[var(--primary)] opacity-60 cursor-not-allowed"
-                                : "bg-[var(--background)] hover:bg-[var(--primary)]/10 border-[var(--border-color)] hover:border-[var(--primary)]/50 text-[var(--foreground)] hover:text-[var(--primary)] shadow-sm"
-                            }`}
-                          >
-                            {statusOption}
-                          </button>
-                        );
-                      },
-                    )}
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <span className="text-[var(--foreground-muted)] text-[11px] block uppercase tracking-wide">Phone</span>
+                      <span className="font-medium text-[var(--foreground)]">{selectedBooking.phone || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--foreground-muted)] text-[11px] block uppercase tracking-wide">Location</span>
+                      <span className="font-medium text-[var(--foreground)]">{selectedBooking.location || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--foreground-muted)] text-[11px] block uppercase tracking-wide">Company</span>
+                      <span className="font-medium text-[var(--foreground)]">{selectedBooking.business_name || selectedBooking.business_type || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--foreground-muted)] text-[11px] block uppercase tracking-wide">Device</span>
+                      <span className="font-medium text-[var(--foreground)]">{selectedBooking.deviceName || "—"}</span>
+                    </div>
                   </div>
-                </div>
+                </section>
+
+                {/* 2. Chat summary */}
+                <section className="bg-gradient-to-b from-[var(--card-gradient-start)] to-[var(--card-gradient-end)] border border-[var(--border-color)] rounded-2xl p-6 shadow-lg">
+                  <h3 className="text-xs font-bold text-[var(--foreground-muted)] uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[var(--border-color)] pb-3">
+                    <svg className="w-4 h-4 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Chat summary
+                  </h3>
+                  <div className="bg-[var(--background)] border border-[var(--border-color)] rounded-xl p-5 text-[14px] text-[var(--foreground)] leading-relaxed shadow-inner">
+                    {selectedBooking.conversation_summary && selectedBooking.conversation_summary !== "In progress..."
+                      ? selectedBooking.conversation_summary
+                      : "No summary available for this lead yet."}
+                  </div>
+                </section>
+
+                {/* 3. Chat detail */}
+                <section className="bg-gradient-to-b from-[var(--card-gradient-start)] to-[var(--card-gradient-end)] border border-[var(--border-color)] rounded-2xl p-6 shadow-lg">
+                  <h3 className="text-xs font-bold text-[var(--foreground-muted)] uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[var(--border-color)] pb-3">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                    </svg>
+                    Chat detail
+                  </h3>
+                  <div className="bg-[var(--background)] border border-[var(--border-color)] rounded-xl p-5 font-mono text-[13px] text-[var(--foreground)] leading-loose overflow-x-auto shadow-inner">
+                    {selectedBooking.full_conversation_transcript
+                      ? selectedBooking.full_conversation_transcript.split("\n").map((line, i) => {
+                          const isBot = line.startsWith("[BOT]");
+                          const isUser = line.startsWith("[USER]");
+                          
+                          let displayText = line;
+                          let renderImage = false;
+
+                          if (isUser && displayText.includes("📷 [Photo submitted for inspection]")) {
+                            displayText = "[USER]: 📷 Image Uploaded";
+                            renderImage = true;
+                          }
+
+                          if (isBot && displayText.includes("🔍 **Inspection Result**")) {
+                            displayText = displayText.replace(/\*\*Inspection Result\*\*\s*\([^)]+\):?/i, "Inspection Result:");
+                          }
+
+                          return (
+                            <div key={i} className={`mb-2 ${isBot ? "text-[var(--primary)]" : isUser ? "text-[var(--foreground)]" : "text-[var(--foreground-muted)]"}`}>
+                              <div className="whitespace-pre-wrap">{displayText}</div>
+                              {renderImage && selectedBooking.last_inspected_image && (
+                                <div className="mt-2.5 mb-3">
+                                  <img 
+                                    src={selectedBooking.last_inspected_image} 
+                                    alt="User Inspected Defect" 
+                                    className="w-full max-w-sm max-h-64 object-cover rounded-xl border border-[var(--border-color)] shadow-sm cursor-pointer hover:opacity-90 transition-opacity" 
+                                    onClick={() => window.open(selectedBooking.last_inspected_image, "_blank")}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      : "Transcript unavailable."}
+                  </div>
+                </section>
               </div>
             </>
           )}

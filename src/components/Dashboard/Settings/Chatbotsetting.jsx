@@ -89,7 +89,10 @@ export default function ChatbotSettings({ onNavigate }) {
     unavailableBehavior: "collect_lead",
     aiModel: "gpt-4o-mini",
     temperature: 0.4, 
-    strictValidation: false, 
+    strictValidation: false,
+    voiceChatAgent: true,
+    photoUploads: true,
+    voiceEnabled: true,
   });
 
   const showToast = (message, type = "success") => {
@@ -106,9 +109,14 @@ export default function ChatbotSettings({ onNavigate }) {
         const snapshot = await get(ref(db, "settings/chatbot_config"));
         if (snapshot.exists()) {
           const data = snapshot.val();
+          const voiceVal = data.voiceChatAgent !== undefined ? data.voiceChatAgent : (data.voiceEnabled !== undefined ? data.voiceEnabled : true);
+          const photoVal = data.photoUploads !== undefined ? data.photoUploads : (data.photoUploadsEnabled !== undefined ? data.photoUploadsEnabled : true);
           setConfig((prev) => ({
             ...prev,
             ...data,
+            voiceChatAgent: voiceVal,
+            photoUploads: photoVal,
+            voiceEnabled: voiceVal,
             leadCaptureFields: data.leadCaptureFields || prev.leadCaptureFields,
             businessIntelligenceFields:
               data.businessIntelligenceFields ||
@@ -126,9 +134,12 @@ export default function ChatbotSettings({ onNavigate }) {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const val = type === "checkbox" ? checked : value;
     setConfig((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: val,
+      ...(name === "voiceChatAgent" ? { voiceEnabled: val } : {}),
+      ...(name === "voiceEnabled" ? { voiceChatAgent: val } : {}),
     }));
   };
 
@@ -163,6 +174,9 @@ export default function ChatbotSettings({ onNavigate }) {
     setIsSaving(true);
     const cleanedConfig = {
       ...config,
+      voiceChatAgent: config.voiceChatAgent !== false,
+      photoUploads: config.photoUploads !== false,
+      voiceEnabled: config.voiceChatAgent !== false,
       leadCaptureFields: config.leadCaptureFields.filter(
         (f) => f.trim() !== "",
       ),
@@ -456,6 +470,57 @@ export default function ChatbotSettings({ onNavigate }) {
                   <option value="Ruth">Ruth (Female, US)</option>
                   <option value="Stephen">Stephen (Male, US)</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl p-6 md:p-8 shadow-sm">
+            <h2 className="text-lg font-bold text-[var(--foreground)] tracking-tight border-b border-[var(--border-color)] pb-4 mb-6">
+              Feature Toggles
+            </h2>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--foreground-muted)] uppercase tracking-widest flex items-center">
+                    VoiceChatAgent
+                    <InfoTooltip text="Enable or disable real-time AI voice conversation." />
+                  </label>
+                  <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                    Allow visitors to start a voice call with the AI agent.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    name="voiceChatAgent"
+                    checked={Boolean(config.voiceChatAgent)}
+                    onChange={handleInputChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-[var(--border-color)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-sm peer-checked:bg-[var(--primary)] transition-colors"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-[var(--border-color)]">
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--foreground-muted)] uppercase tracking-widest flex items-center">
+                    Photo Uploads
+                    <InfoTooltip text="Enable or disable photo upload and camera snapshot capability." />
+                  </label>
+                  <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                    Allow visitors to capture or upload images for diagnostic analysis.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    name="photoUploads"
+                    checked={Boolean(config.photoUploads)}
+                    onChange={handleInputChange}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-[var(--border-color)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all after:shadow-sm peer-checked:bg-[var(--primary)] transition-colors"></div>
+                </label>
               </div>
             </div>
           </div>

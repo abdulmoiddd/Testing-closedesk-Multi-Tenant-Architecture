@@ -290,6 +290,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
 
   // --- WebRTC Camera Setup for "Take a Photo" ---
   const openWebcam = async () => {
+    if (!botConfig.photoUploads) return;
     setShowImagePicker(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -333,6 +334,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
 
   // --- Shared Vision Processing Logic ---
   const processBase64Image = async (base64Jpeg) => {
+    if (!botConfig.photoUploads) return;
     setIsUploadingImage(true);
     setIsProcessing(true);
 
@@ -399,6 +401,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
   };
 
   const handleGallerySelected = async (e) => {
+    if (!botConfig.photoUploads) return;
     const file = e.target.files?.[0];
     if (!file) return;
     setShowImagePicker(false);
@@ -434,6 +437,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
   const [botConfig, setBotConfig] = useState({
     botName: "Aicyro Front Desk", launcherText: "Need help?", greetingMessage: "Hi! I'm Aicyro's AI Assistant. How can I help you today?",
     botAvatar: "ai_spark", customAvatarSvg: "", botVoice: "Joanna", voiceEnabled: true,
+    voiceChatAgent: true, photoUploads: true,
   });
 
   const logVoiceError = (stage, message, rawError = null) => {
@@ -491,7 +495,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
       trackConversationStarted("Voice session initiated", tenantId);
       setHasTrackedConvo(true);
     }
-    if (!botConfig.voiceEnabled) return;
+    if (!botConfig.voiceChatAgent || !botConfig.voiceEnabled) return;
     const txId = generateCorrelationId();
     const callLogger = voiceLogger.child({ correlation: { correlation_id: txId } });
 
@@ -682,7 +686,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     uiLogger.info("voice_lifecycle", transitionEvent, { context: { session_id: firebaseDbId }});
 
     stopSpeech();
-    if (agentMode === "text") { setAgentMode("voice"); } 
+    if (agentMode === "text") { if (!botConfig.voiceChatAgent || !botConfig.voiceEnabled) return; setAgentMode("voice"); } 
     else {
       if (voiceState !== "IDLE" && voiceState !== "ERROR") handleEndVoiceCall();
       setAgentMode("text");
@@ -733,12 +737,23 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
         const snapshot = await get(ref(db, "settings/chatbot_config"));
         if (snapshot.exists()) {
           const data = snapshot.val();
+          const voiceState = data.voiceChatAgent !== undefined
+            ? data.voiceChatAgent !== false
+            : (data.voiceEnabled !== false);
+          const photoState = data.photoUploads !== undefined
+            ? data.photoUploads !== false
+            : (data.photoUploadsEnabled !== undefined ? data.photoUploadsEnabled !== false : true);
           setBotConfig({
             botName: data.botName || "Aicyro Front Desk", launcherText: data.launcherText || "Need help?",
             greetingMessage: data.greetingMessage || "Hi! I'm Aicyro's AI Assistant. How can I help you today?",
             botAvatar: data.botAvatar || "ai_spark", customAvatarSvg: data.customAvatarSvg || "",
-            botVoice: data.botVoice || "Joanna", voiceEnabled: data.voiceEnabled !== false,
+            botVoice: data.botVoice || "Joanna", voiceEnabled: voiceState,
+            voiceChatAgent: voiceState,
+            photoUploads: photoState,
           });
+          if (!voiceState) {
+            setAgentMode("text");
+          }
         }
       } catch (err) { uiLogger.error("config", "load_failed", { error: err }); }
     };
@@ -1241,7 +1256,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
                 <button type="button" onClick={() => { if (!isMuted) stopSpeech(); setIsMuted(!isMuted); }} className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-[var(--foreground-muted)] hover:text-[var(--foreground)] bg-[var(--background)] rounded-full ring-1 ring-[var(--border-color)] transition-colors outline-none" title={isMuted ? "Unmute Bot Voice" : "Mute Bot Voice"}>
                   {isMuted ? "🔇" : "🔊"}
                 </button>
-                {botConfig.voiceEnabled && (
+                {(botConfig.voiceChatAgent && botConfig.voiceEnabled) && (
                   <button onClick={handleToggleMode} className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-white bg-[var(--primary)] rounded-full shadow-md transition-all hover:scale-105 outline-none" title={agentMode === "text" ? "Switch to Call" : "Switch to Text"}>
                     {agentMode === "text" ? (
                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -1253,7 +1268,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
               </div>
             </div>
 
-            {voiceState === "PERMISSION_DENIED" && (
+            {voiceState === "PERMISSION_DENIED" && (botConfig.voiceChatAgent && botConfig.voiceEnabled) && (
               <div role="alert" className="w-full bg-[var(--primary)] text-[var(--card-bg)] px-4 py-3 text-[13px] flex justify-between items-center shadow-sm shrink-0 z-20">
                 <span className="font-bold">Microphone access denied.</span>
                 <button onClick={handleStartVoiceCall} className="bg-[var(--card-bg)] text-[var(--primary)] px-3 py-1.5 rounded-lg font-bold text-xs hover:scale-105 outline-none">Request Again</button>
@@ -1261,7 +1276,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
             )}
 
             {/* 🔥 WebRTC Camera UI Overlay */}
-            {showWebcam && (
+            {botConfig.photoUploads && showWebcam && (
               <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center animate-acy-fade">
                 <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
                 
@@ -1276,7 +1291,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
             )}
 
             <div className="flex-1 overflow-y-auto overscroll-contain acy-scroll relative">
-              {agentMode === "text" ? (
+              {agentMode === "text" || (!botConfig.voiceChatAgent || !botConfig.voiceEnabled) ? (
                 <div className="px-4 py-5 flex flex-col gap-5 bg-[var(--background)] min-h-full">
                   {messages.map((msg) => {
                     if (msg.type === "demo_card") {
@@ -1376,43 +1391,47 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
             <div className="p-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] sm:pb-3 bg-[var(--background)] border-t border-[var(--border-color)] shrink-0 z-20">
               {[STEPS.AI_CHAT_MODE].includes(step) ? (
                 <>
-                  <input type="file" ref={fileGalleryInputRef} accept="image/*" className="hidden" onChange={handleGallerySelected} />
+                  {botConfig.photoUploads && (
+                    <input type="file" ref={fileGalleryInputRef} accept="image/*" className="hidden" onChange={handleGallerySelected} />
+                  )}
 
                   <form className="relative flex items-center gap-2 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-full pl-3 pr-1.5 py-1.5 focus-within:border-[var(--primary)] transition-all" onSubmit={handleTextInput}>
                     
                     {/* Wrapped the camera button in the imagePickerRef */}
-                    <div ref={imagePickerRef} className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowImagePicker(!showImagePicker)}
-                        disabled={isUploadingImage || isProcessing}
-                        className="p-1.5 rounded-full text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background)] transition-all outline-none"
-                        title="Send Photo of the Issue"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </button>
+                    {botConfig.photoUploads && (
+                      <div ref={imagePickerRef} className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowImagePicker(!showImagePicker)}
+                          disabled={isUploadingImage || isProcessing}
+                          className="p-1.5 rounded-full text-[var(--foreground-muted)] hover:text-[var(--foreground)] hover:bg-[var(--background)] transition-all outline-none"
+                          title="Send Photo of the Issue"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </button>
 
-                      {/* Moved the popup slightly inside the ref container so it clicks-outside cleanly */}
-                      {showImagePicker && (
-                        <div className="absolute bottom-12 left-0 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-50 min-w-[200px] animate-acy-spring origin-bottom-left">
-                          <div
-                            onClick={(e) => { e.stopPropagation(); openWebcam(); }}
-                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--background)] rounded-xl transition-colors text-left w-full cursor-pointer"
-                          >
-                            <span>📸</span> Take a Photo
+                        {/* Moved the popup slightly inside the ref container so it clicks-outside cleanly */}
+                        {showImagePicker && (
+                          <div className="absolute bottom-12 left-0 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-50 min-w-[200px] animate-acy-spring origin-bottom-left">
+                            <div
+                              onClick={(e) => { e.stopPropagation(); openWebcam(); }}
+                              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--background)] rounded-xl transition-colors text-left w-full cursor-pointer"
+                            >
+                              <span>📸</span> Take a Photo
+                            </div>
+                            <div
+                              onClick={(e) => { e.stopPropagation(); setShowImagePicker(false); fileGalleryInputRef.current?.click(); }}
+                              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--background)] rounded-xl transition-colors text-left w-full cursor-pointer"
+                            >
+                              <span>🖼</span> Upload from Gallery
+                            </div>
                           </div>
-                          <div
-                            onClick={(e) => { e.stopPropagation(); setShowImagePicker(false); fileGalleryInputRef.current?.click(); }}
-                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--background)] rounded-xl transition-colors text-left w-full cursor-pointer"
-                          >
-                            <span>🖼</span> Upload from Gallery
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
 
                     <button type="button" onClick={toggleListening} className={`p-1.5 rounded-full transition-all outline-none ${isListening ? "bg-red-500 text-white animate-pulse" : "text-[var(--foreground-muted)] hover:text-[var(--foreground)]"}`} title={isListening ? "Stop listening" : "Speak to type"}>
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 016 0v6a3 3 0 01-3 3z" /></svg>

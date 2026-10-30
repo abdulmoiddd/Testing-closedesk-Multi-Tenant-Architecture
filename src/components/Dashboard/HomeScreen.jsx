@@ -154,14 +154,14 @@ export default function HomeScreen({ onLogout }) {
   const maxTimingCount = Math.max(afterHoursLeads, businessHoursLeads, 1);
 
   // Scaled Analytics logic
-  const filterRatio = leads.length > 0 ? filteredLeads.length / leads.length : 0;
-  const scaledVisitors = timeFrame === "All" ? totalWebsiteVisitors : Math.max(Math.round(totalWebsiteVisitors * filterRatio), leadsCaptured);
-  const scaledOpens = timeFrame === "All" ? totalChatbotOpens : Math.max(Math.round(totalChatbotOpens * filterRatio), leadsCaptured);
-  const scaledConvos = timeFrame === "All" ? totalConversationsStarted : Math.max(Math.round(totalConversationsStarted * filterRatio), leadsCaptured);
+ const filterRatio = leads.length > 0 ? filteredLeads.length / leads.length : 0;
+const scaledVisitors = timeFrame === "All" ? totalWebsiteVisitors : Math.max(Math.round(totalWebsiteVisitors * filterRatio), leadsCaptured);
+const scaledOpens = timeFrame === "All" ? totalChatbotOpens : Math.max(Math.round(totalChatbotOpens * filterRatio), leadsCaptured);
+const scaledConvos = timeFrame === "All" ? totalConversationsStarted : Math.max(Math.round(totalConversationsStarted * filterRatio), leadsCaptured);
 
-  const conversionRate = scaledConvos > 0 ? ((leadsCaptured / scaledConvos) * 100).toFixed(1) : 0;
-  const bookingRate = leadsCaptured > 0 ? ((bookedAppointments / leadsCaptured) * 100).toFixed(1) : 0;
-  const estimatedValue = qualifiedLeads * avgJobValue;
+const conversionRate = qualifiedLeads > 0 ? ((qualifiedLeads/ leadsCaptured ) * 100).toFixed(1) : 0;
+const bookingRate = leadsCaptured > 0 ? ((bookedAppointments / leadsCaptured) * 100).toFixed(1) : 0;
+const estimatedValue = qualifiedLeads * avgJobValue;
 
   // Funnel logic
   const safeConvos = Math.max(scaledConvos, leadsCaptured);

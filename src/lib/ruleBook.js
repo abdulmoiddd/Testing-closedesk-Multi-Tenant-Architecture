@@ -82,8 +82,22 @@ export async function getMasterRuleBook(
     unavailableBehavior: "collect_lead",
     aiModel: "gpt-4o-mini",
 
+    // --- DYNAMIC RULES & BASE PROMPT DEFAULTS ---
+    basePrompt:
+      "Act as a friendly, human-like concierge. Build rapport and naturally weave your questions into a conversational flow. Avoid sounding like a strict robotic form.",
+    additionalConversationalRules:
+      "1. Acknowledge user input before asking the next question.\n2. Keep responses brief but warm.",
+    services: [
+      "AI Voice Agent",
+      "Text Chatbot",
+      "Automated Booking",
+      "Website Audit",
+    ],
+
     // --- VOICE FEATURE FLAG & CONFIG ---
     voiceEnabled: true, // Master kill switch
+    voiceChatAgent: true,
+    photoUploads: true,
     aiVoiceModel: "gpt-realtime-2.1-mini",
     voice: "ash",
 
@@ -99,7 +113,7 @@ export async function getMasterRuleBook(
   };
 
   try {
-    // Multi-tenant partition lookup with fallback to global settings
+    // Multi-tenant partition lookup with fallback to global settings populated by Chatbotsetting.jsx
     let snapshot = null;
     if (tenantId && tenantId !== "default") {
       try {
@@ -112,11 +126,58 @@ export async function getMasterRuleBook(
     }
     if (snapshot.exists()) {
       const data = snapshot.val();
+      const voiceActive = data.voiceChatAgent !== undefined
+        ? data.voiceChatAgent !== false
+        : (data.voiceEnabled !== false);
+      const photoActive = data.photoUploads !== undefined
+        ? data.photoUploads !== false
+        : (data.photoUploadsEnabled !== undefined ? data.photoUploadsEnabled !== false : true);
+
       botConfig = {
         ...botConfig,
         ...data,
+        botName: data.botName || botConfig.botName,
+        botIdentity: data.botIdentity || botConfig.botIdentity,
+        companyContext: data.companyContext || botConfig.companyContext,
+        serviceCategory: data.serviceCategory || botConfig.serviceCategory,
+        customRules: data.customRules || botConfig.customRules,
+        additionalConversationalRules:
+          data.additionalConversationalRules || botConfig.additionalConversationalRules,
+        basePrompt: data.basePrompt || botConfig.basePrompt,
+        tone: data.tone || botConfig.tone,
+        botVoice: data.botVoice || data.voice || botConfig.voice,
+        voice: data.botVoice || data.voice || botConfig.voice,
+        voiceChatAgent: voiceActive,
+        voiceEnabled: voiceActive,
+        photoUploads: photoActive,
+        leadCaptureFields:
+          Array.isArray(data.leadCaptureFields) && data.leadCaptureFields.length
+            ? data.leadCaptureFields
+            : botConfig.leadCaptureFields,
+        businessIntelligenceFields:
+          Array.isArray(data.businessIntelligenceFields) && data.businessIntelligenceFields.length
+            ? data.businessIntelligenceFields
+            : botConfig.businessIntelligenceFields,
+        services:
+          Array.isArray(data.services) && data.services.length
+            ? data.services
+            : (Array.isArray(data.capabilities) && data.capabilities.length ? data.capabilities : botConfig.services),
         capabilities:
-          data.capabilities || data.services || botConfig.capabilities,
+          Array.isArray(data.services) && data.services.length
+            ? data.services
+            : (data.capabilities || botConfig.capabilities),
+        faqs: Array.isArray(data.faqs) && data.faqs.length ? data.faqs : botConfig.faqs,
+        qualificationQuestions:
+          Array.isArray(data.qualificationQuestions) && data.qualificationQuestions.length
+            ? data.qualificationQuestions
+            : botConfig.qualificationQuestions,
+        bookingRule: data.bookingRule || botConfig.bookingRule,
+        escalationRule: data.escalationRule || botConfig.escalationRule,
+        unavailableBehavior: data.unavailableBehavior || botConfig.unavailableBehavior,
+        aiModel: data.aiModel || botConfig.aiModel,
+        temperature: typeof data.temperature === "number" ? data.temperature : botConfig.temperature,
+        strictValidation:
+          data.strictValidation !== undefined ? Boolean(data.strictValidation) : botConfig.strictValidation,
         integrations: data.integrations || botConfig.integrations,
         approvedPricing: data.approvedPricing || botConfig.approvedPricing,
         objections: data.objections || botConfig.objections,
@@ -287,8 +348,23 @@ COMPANY CONTEXT & KNOWLEDGE:
 Company Context: ${botConfig.companyContext}
 Service Category: ${botConfig.serviceCategory || "General"}
 Capabilities: ${botConfig.capabilities?.length ? botConfig.capabilities.join(", ") : "N/A"}
+Services: ${(botConfig.services?.length ? botConfig.services : botConfig.capabilities || []).join(", ")}
 Approved Pricing: ${botConfig.approvedPricing?.length ? JSON.stringify(botConfig.approvedPricing) : "Unlisted"}
 ${categorySpecificFlow ? `\n${categorySpecificFlow}\n` : ""}
+${botConfig.basePrompt ? `\nCORE SYSTEM OBJECTIVE:\n${botConfig.basePrompt}\n` : ""}
+${botConfig.customRules ? `\nCUSTOM BEHAVIORAL DIRECTIVES:\n${botConfig.customRules}\n` : ""}
+${botConfig.additionalConversationalRules ? `\nCONVERSATIONAL FLOW DIRECTIVES:\n${botConfig.additionalConversationalRules}\n` : ""}
+${botConfig.leadCaptureFields?.length ? `\nLEAD CAPTURE TARGETS (Naturally collect during conversation):\n${botConfig.leadCaptureFields.map((f, i) => `${i + 1}. ${f}`).join("\n")}\n` : ""}
+${botConfig.businessIntelligenceFields?.length ? `\nBUSINESS INTELLIGENCE TARGETS (Listen for and extract silently):\n${botConfig.businessIntelligenceFields.map((f, i) => `${i + 1}. ${f}`).join("\n")}\n` : ""}
+${botConfig.qualificationQuestions?.length ? `\nQUALIFICATION QUESTIONS (Weave naturally into conversation):\n${botConfig.qualificationQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n` : ""}
+${botConfig.faqs?.filter(f => f && f.question && f.answer)?.length ? `\nFREQUENTLY ASKED QUESTIONS (Pre-fed Authoritative Answers):\n${botConfig.faqs.filter(f => f && f.question && f.answer).map(f => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")}\n` : ""}
+
+OPERATIONAL RULES & POLICIES:
+- Booking Calendar Policy: ${botConfig.bookingRule === "require_all" ? "Require both Phone Number and Email before booking." : botConfig.bookingRule === "require_email" ? "Require Email before booking." : "Allow direct booking immediately."}
+- Escalation Behavior: ${botConfig.escalationRule === "email_admin" ? "Take a message and inform the visitor that admin will email them." : "Provide the support phone number directly."}
+- After-Hours Policy: ${botConfig.unavailableBehavior === "collect_lead" ? "Collect contact details and promise next-day callback." : "Handle inquiries normally regardless of business hours."}
+- Data Validation: ${botConfig.strictValidation ? "Strict format enforcement for contact information." : "Conversational, fluid contact data entry."}
+- Feature Availability: Voice Agent is ${botConfig.voiceChatAgent && botConfig.voiceEnabled ? "ENABLED" : "DISABLED"}; Photo Uploads are ${botConfig.photoUploads ? "ENABLED" : "DISABLED"}.
 
 ======================================================================
 12. CROSS-INDUSTRY CONVERSATION RULES (STRICTLY ENFORCED)

@@ -86,6 +86,8 @@ export default function ChatbotSettings({ onNavigate }) {
     qualificationQuestions: [""],
     escalationRule: "email_admin",
     bookingRule: "require_all",
+    enableDirectBooking: true,
+    calendarActive: true,
     unavailableBehavior: "collect_lead",
     aiModel: "gpt-4o-mini",
     temperature: 0.4, 
@@ -111,9 +113,25 @@ export default function ChatbotSettings({ onNavigate }) {
           const data = snapshot.val();
           const voiceVal = data.voiceChatAgent !== undefined ? data.voiceChatAgent : (data.voiceEnabled !== undefined ? data.voiceEnabled : true);
           const photoVal = data.photoUploads !== undefined ? data.photoUploads : (data.photoUploadsEnabled !== undefined ? data.photoUploadsEnabled : true);
+          
+          // Check if calendar integration exists
+          const calendarExists = Boolean(
+            data.calendarActive !== false &&
+            (data.calendarIntegration || data.calendarActive || data.integrations?.calendar || data.integrations?.GoogleCalendar || data.integrations?.Make || data.bookingRule)
+          );
+          // If the tenant's booking setting defaults to false or null, enforce a fallback that allows booking if calendar integration exists
+          const directBooking = (data.enableDirectBooking === false || data.enableDirectBooking === null)
+            ? (calendarExists ? true : false)
+            : (data.enableDirectBooking !== undefined ? data.enableDirectBooking : (calendarExists || true));
+          const calActive = (data.calendarActive === false || data.calendarActive === null)
+            ? (calendarExists ? true : false)
+            : (data.calendarActive !== undefined ? data.calendarActive : true);
+
           setConfig((prev) => ({
             ...prev,
             ...data,
+            enableDirectBooking: directBooking,
+            calendarActive: calActive,
             voiceChatAgent: voiceVal,
             photoUploads: photoVal,
             voiceEnabled: voiceVal,
@@ -231,6 +249,24 @@ export default function ChatbotSettings({ onNavigate }) {
       voiceChatAgent: config.voiceChatAgent !== false,
       photoUploads: config.photoUploads !== false,
       voiceEnabled: config.voiceChatAgent !== false,
+      enableDirectBooking: (() => {
+        const calExists = Boolean(
+          config.calendarActive !== false &&
+          (config.calendarIntegration || config.calendarActive || config.integrations?.calendar || config.integrations?.GoogleCalendar || config.integrations?.Make || config.bookingRule)
+        );
+        return (config.enableDirectBooking === false || config.enableDirectBooking === null)
+          ? (calExists ? true : false)
+          : (config.enableDirectBooking !== undefined ? config.enableDirectBooking : (calExists || true));
+      })(),
+      calendarActive: (() => {
+        const calExists = Boolean(
+          config.calendarActive !== false &&
+          (config.calendarIntegration || config.calendarActive || config.integrations?.calendar || config.integrations?.GoogleCalendar || config.integrations?.Make || config.bookingRule)
+        );
+        return (config.calendarActive === false || config.calendarActive === null)
+          ? (calExists ? true : false)
+          : (config.calendarActive !== undefined ? config.calendarActive : true);
+      })(),
     };
 
     // Strict fallback validation: ensure no field remains null, undefined, or empty string

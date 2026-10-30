@@ -58,21 +58,35 @@ export default function BookingsScreen({ onLogout }) {
               let meetingTime = null;
               let hasValidDate = false;
 
-              if (b.booked_slot) {
-                meetingTime = new Date(b.booked_slot);
-              } else if (b.selected_date) {
-                meetingTime = new Date(b.selected_date);
-              } else if (
-                b.preferred_date &&
-                b.preferred_date !== "null" &&
-                b.preferred_time
-              ) {
-                meetingTime = new Date(`${b.preferred_date} ${b.preferred_time}`);
+              const candidateDates = [
+                b.booked_slot,
+                b.selected_date,
+                b.preferred_date && b.preferred_date !== "null" && b.preferred_time
+                  ? `${b.preferred_date} ${b.preferred_time}`
+                  : null,
+                b.preferred_date && b.preferred_date !== "null" ? b.preferred_date : null,
+                b.meeting_time,
+                b.display_time && b.display_time !== "Not Scheduled" && b.display_time !== "null"
+                  ? b.display_time
+                  : null,
+              ].filter(Boolean);
+
+              for (const raw of candidateDates) {
+                let parsed = new Date(raw);
+                if (isNaN(parsed.getTime())) {
+                  parsed = new Date(String(raw).replace(/\s+at\s+/i, " "));
+                }
+                if (!isNaN(parsed.getTime())) {
+                  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+                    parsed.setHours(23, 59, 59, 999);
+                  }
+                  meetingTime = parsed;
+                  hasValidDate = true;
+                  break;
+                }
               }
 
-              if (meetingTime && !isNaN(meetingTime.getTime())) {
-                hasValidDate = true;
-              }
+              const isPastMeeting = hasValidDate && meetingTime.getTime() < now.getTime();
 
               // 1. Terminal statuses take absolute priority
               if (lowerStatus === "completed") {
@@ -132,6 +146,9 @@ export default function BookingsScreen({ onLogout }) {
                 display_time: finalDisplayTime,
                 booked_slot: b.booked_slot || b.selected_date,
                 status: mappedStatus,
+                meetingTime,
+                hasValidDate,
+                isPastMeeting,
                 calendar_sync:
                   b.calendar_sync ||
                   (finalDisplayTime === "Not Scheduled" ? "Pending" : "Synced"),
@@ -146,8 +163,12 @@ export default function BookingsScreen({ onLogout }) {
                 ...b,
               };
             })
-            // STRICT PARITY WITH HOME SCREEN: Explicitly filter only valid bookings or terminal states
+            // STRICT PARITY WITH HOME SCREEN: Filter out past meetings completely from view
             .filter((b) => {
+              // Completely hide if the date of the meeting has passed
+              if (b.isPastMeeting) {
+                return false;
+              }
               const isBooked = b.booking_status === "Meeting Booked" || !!b.booked_slot || !!b.selected_date;
               const isTerminal = ["Completed", "Cancelled", "No-show", "Rescheduled"].includes(b.status);
               return isBooked || isTerminal;
@@ -171,7 +192,12 @@ export default function BookingsScreen({ onLogout }) {
 
   // Filter Logic
   const filteredBookings = useMemo(() => {
+    const now = new Date();
     return bookings.filter((bkg) => {
+      // Ensure past meetings remain hidden even during runtime
+      if (bkg.hasValidDate && bkg.meetingTime && bkg.meetingTime.getTime() < now.getTime()) {
+        return false;
+      }
       const matchesSearch =
         bkg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         bkg.email.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -172,25 +172,74 @@ export default function ChatbotSettings({ onNavigate }) {
 
   const handleSaveConfig = async () => {
     setIsSaving(true);
+    const fallbackDefault = "General default information";
+
+    const ensureValue = (val) => {
+      if (val === undefined || val === null) return fallbackDefault;
+      if (typeof val === "string" && val.trim() === "") return fallbackDefault;
+      return val;
+    };
+
+    const ensureArray = (arr) => {
+      if (!Array.isArray(arr) || arr.length === 0) return [fallbackDefault];
+      const cleaned = arr
+        .map((item) => (typeof item === "string" ? item.trim() : item))
+        .filter((item) => item !== "" && item !== undefined && item !== null);
+      return cleaned.length > 0 ? cleaned : [fallbackDefault];
+    };
+
+    const ensureFaqs = (faqs) => {
+      if (!Array.isArray(faqs) || faqs.length === 0) {
+        return [{ question: fallbackDefault, answer: fallbackDefault }];
+      }
+      const cleaned = faqs
+        .map((f) => ({
+          question: ensureValue(f?.question),
+          answer: ensureValue(f?.answer),
+        }))
+        .filter((f) => f.question !== fallbackDefault || f.answer !== fallbackDefault);
+      return cleaned.length > 0 ? cleaned : [{ question: fallbackDefault, answer: fallbackDefault }];
+    };
+
+    // Construct payload ensuring every input field is present and validated against null/empty
     const cleanedConfig = {
-      ...config,
+      serviceCategory: ensureValue(config.serviceCategory),
+      botAvatar: ensureValue(config.botAvatar),
+      customAvatarSvg: ensureValue(config.customAvatarSvg),
+      botName: ensureValue(config.botName),
+      launcherText: ensureValue(config.launcherText),
+      themeColor: ensureValue(config.themeColor),
+      greetingMessage: ensureValue(config.greetingMessage),
+      botIdentity: ensureValue(config.botIdentity),
+      companyContext: ensureValue(config.companyContext),
+      customRules: ensureValue(config.customRules),
+      additionalConversationalRules: ensureValue(config.additionalConversationalRules),
+      tone: ensureValue(config.tone),
+      botVoice: ensureValue(config.botVoice),
+      basePrompt: ensureValue(config.basePrompt),
+      leadCaptureFields: ensureArray(config.leadCaptureFields),
+      businessIntelligenceFields: ensureArray(config.businessIntelligenceFields),
+      services: ensureArray(config.services),
+      faqs: ensureFaqs(config.faqs),
+      qualificationQuestions: ensureArray(config.qualificationQuestions),
+      escalationRule: ensureValue(config.escalationRule),
+      bookingRule: ensureValue(config.bookingRule),
+      unavailableBehavior: ensureValue(config.unavailableBehavior),
+      aiModel: ensureValue(config.aiModel),
+      temperature: typeof config.temperature === "number" ? config.temperature : (parseFloat(config.temperature) || 0.4),
+      strictValidation: Boolean(config.strictValidation),
       voiceChatAgent: config.voiceChatAgent !== false,
       photoUploads: config.photoUploads !== false,
       voiceEnabled: config.voiceChatAgent !== false,
-      leadCaptureFields: config.leadCaptureFields.filter(
-        (f) => f.trim() !== "",
-      ),
-      businessIntelligenceFields: config.businessIntelligenceFields.filter(
-        (f) => f.trim() !== "",
-      ),
-      services: config.services.filter((s) => s.trim() !== ""),
-      qualificationQuestions: config.qualificationQuestions.filter(
-        (q) => q.trim() !== "",
-      ),
-      faqs: config.faqs.filter(
-        (f) => f.question.trim() !== "" && f.answer.trim() !== "",
-      ),
     };
+
+    // Strict fallback validation: ensure no field remains null, undefined, or empty string
+    Object.keys(cleanedConfig).forEach((key) => {
+      const val = cleanedConfig[key];
+      if (val === undefined || val === null || (typeof val === "string" && val.trim() === "")) {
+        cleanedConfig[key] = fallbackDefault;
+      }
+    });
 
     try {
       await set(ref(db, "settings/chatbot_config"), {

@@ -8,6 +8,10 @@
 2. [Subsystem 2: Pulse Dashboard Architecture (Tenant & Super Admin)](#subsystem-2-pulse-dashboard-architecture-tenant--super-admin)
 3. [Subsystem 3: CloseDesk Multimodal Chatbot Widget Architecture](#subsystem-3-closedesk-multimodal-chatbot-widget-architecture)
 
+> [!IMPORTANT]
+> **Pilot Scope & Subsystem Audit Notice (P0 Baseline CD01):**
+> Any historical or external claim of "324 verified subsystems" or "79 entries" is factually unsupported by individual test assertions in this codebase. The verified architecture consists of **3 foundational subsystems** (Marketing & Embed Engine, Pulse Operations Dashboard, Multimodal Chatbot Widget) comprising **6 core architectural modules** (documented in `ARCHITECTURE.md`). Automated verification on disk covers exactly 9 bounded capabilities across pilot test suites (`evaluations/report_v2.1.0.json`, `scripts/industry_regression_suite.js`, `scripts/qa-simulator.js`, `scripts/vad_tuning_harness.js`, and `scripts/e2e_master_suite.js`).
+
 ---
 
 # Subsystem 1: Public Marketing & Conversion Architecture

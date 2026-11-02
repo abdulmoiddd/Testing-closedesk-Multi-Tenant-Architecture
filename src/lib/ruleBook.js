@@ -59,7 +59,7 @@ export async function getMasterRuleBook(
       "Existing chatbot":
         "Most bots are rigid decision trees. CloseDesk uses conversational AI to adapt fluidly to the user.",
       "Phone preference":
-        "CloseDesk includes a Voice AI agent that handles phone calls naturally.",
+        "CloseDesk includes a WebRTC Browser Voice AI agent that handles voice conversations naturally.",
       "Customer resistance":
         "The AI is designed to be warm and conversational, and it seamlessly escalates to humans when needed.",
       Price:

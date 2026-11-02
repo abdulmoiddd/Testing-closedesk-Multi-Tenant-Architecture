@@ -43,8 +43,12 @@ Two policy documents drive the AI:
 
 | Policy                  | File                        | Version                                                                    |
 | ----------------------- | --------------------------- | -------------------------------------------------------------------------- |
-| Text + voice front desk | `src/lib/ruleBook.js`       | `2.11.0` (merged with `settings/chatbot_config`, including `voiceEnabled`) |
+| Text + voice front desk | `src/lib/ruleBook.js`       | `2.14.0` (merged with `settings/chatbot_config`, including `voiceEnabled`) |
 | Image diagnostics       | `src/lib/visionRuleBook.js` | `1.1.0` (`gpt-4o-mini`)                                                    |
+
+> [!NOTE]
+> **Subsystem & Entry Count Resolution (CD01 Audit):**
+> Historical or vendor claims of "324 verified subsystems" or "79 entries" do not reflect the physical codebase. The active codebase contains **122 tracked files** (74 in `src/`), **3 foundational subsystems** (`SUBSYSTEM_ARCHITECTURE.md`), and **6 architectural modules** (`ARCHITECTURE.md`). Verification is strictly bounded to the 9 core pilot capabilities.
 
 ---
 

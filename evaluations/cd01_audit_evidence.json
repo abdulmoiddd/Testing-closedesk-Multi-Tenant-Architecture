@@ -1,8 +1,8 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-02T19:05:38.875Z",
+  "generated_at": "2026-11-02T19:07:38.297Z",
   "git": {
-    "headCommit": "53b952fb4ac853b81417d24428350017e6b42be6",
+    "headCommit": "0df8eafe7e18d896d64b42e1f1ef15c51cc4498f",
     "branch": "feat/cd02-privileged-access-sessions"
   },
   "runtime": {

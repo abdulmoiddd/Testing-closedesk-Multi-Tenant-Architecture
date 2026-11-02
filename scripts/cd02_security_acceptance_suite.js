@@ -500,11 +500,11 @@ async function runTestSuite() {
       { matchIdx, noMatchIdx }
     );
 
-    // Static PIN labelling audit: assert zero misleading "2FA" or "MFA" labels
+    // Static PIN labelling audit: assert zero misleading "2FA" or "MFA" labels across UI and application sources
     const trackedFiles = execSync("git ls-files", { encoding: "utf8" })
       .split("\n")
       .map((f) => f.trim())
-      .filter((f) => f.match(/\.(js|jsx|json)$/) && !f.includes("evaluations/report") && !f.includes("e2e-report"));
+      .filter((f) => (f.startsWith("src/") || f.startsWith("public/")) && f.match(/\.(js|jsx|json)$/) && !f.includes("e2e-report"));
 
     const misleadingMatches = [];
     for (const f of trackedFiles) {

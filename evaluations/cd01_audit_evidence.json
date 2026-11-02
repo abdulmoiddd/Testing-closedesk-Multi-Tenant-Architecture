@@ -1,8 +1,8 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-02T17:35:16.737Z",
+  "generated_at": "2026-11-02T18:33:04.678Z",
   "git": {
-    "headCommit": "14451721a2ff20510836ce7b7135718474b6d01c",
+    "headCommit": "6174d4ef362f21ae301152f7334a4f6bc2360173",
     "branch": "feat/cd01-capability-evidence-baseline"
   },
   "runtime": {

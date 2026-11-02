@@ -143,11 +143,30 @@ export default function SuperAdminEmailProtocol() {
     }
 
     try {
-      await update(ref(db, "settings/email_config"), finalConfig);
+      const token = localStorage.getItem("cd_session_token");
+      const res = await fetch("/api/superadmin/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+          ...(token ? { "x-cd-session": token } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          section: "email_config",
+          payload: finalConfig,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to save email settings");
+      }
+
       showToast("Sender configuration updated!");
     } catch (error) {
       pulseLogger.error("settings_update", "sender_email_config_failed", { error });
-      showToast("Failed to save sender configuration.", "error");
+      showToast("Failed to save sender configuration: " + error.message, "error");
     }
     setIsSavingEmail(false);
   };
@@ -156,15 +175,34 @@ export default function SuperAdminEmailProtocol() {
     setShowDisconnectConfirm(false);
     setIsDisconnecting(true);
     try {
-      await update(ref(db, "settings/email_config"), {
+      const token = localStorage.getItem("cd_session_token");
+      const disconnectPayload = {
         refreshToken: null,
         clientId: null,
         clientSecret: null,
         smtpEmail: "",
         connectedAt: null,
         provider: "custom",
-        smtpService: "custom_smtp"
+        smtpService: "custom_smtp",
+      };
+      const res = await fetch("/api/superadmin/settings", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+          ...(token ? { "x-cd-session": token } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          section: "email_config",
+          payload: disconnectPayload,
+        }),
       });
+
+      if (!res.ok) {
+        throw new Error("Failed to disconnect account");
+      }
+
       setEmailConfig((prev) => ({
         ...prev,
         refreshToken: "",
@@ -172,7 +210,7 @@ export default function SuperAdminEmailProtocol() {
         clientSecret: "",
         smtpEmail: "",
         provider: "custom",
-        smtpService: "custom_smtp"
+        smtpService: "custom_smtp",
       }));
       setSavedProvider("");
       setSavedService("");

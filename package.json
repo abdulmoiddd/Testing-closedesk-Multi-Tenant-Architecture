@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test:ai": "node scripts/run_evaluations.js",
-    "audit:cd01": "node scripts/cd01_baseline_audit.js"
+    "audit:cd01": "node scripts/cd01_baseline_audit.js",
+    "test:cd02": "node scripts/cd02_security_acceptance_suite.js"
   },
   "engines": {
     "node": ">=20"

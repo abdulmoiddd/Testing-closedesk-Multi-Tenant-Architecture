@@ -136,13 +136,20 @@ export default function SuperAdminLoginScreen({
     try {
       const response = await fetch("/api/superadmin/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+        },
+        credentials: "include",
         body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
+        if (data.token) {
+          localStorage.setItem("cd_session_token", data.token);
+        }
         localStorage.setItem("currentSuperAdmin", data.name);
         setFailedAttempts(0);
         setShowCaptcha(false);

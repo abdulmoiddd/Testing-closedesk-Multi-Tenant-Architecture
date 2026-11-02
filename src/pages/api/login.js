@@ -1,16 +1,28 @@
 // src/pages/api/login.js
-import { ref, get } from "firebase/database";
+import { ref, get, update } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase"; 
 import { recordAuditTrail } from "../../lib/auditTracer";
+import { verifyPassword, hashPassword } from "../../lib/authCrypto";
+import {
+  signSessionToken,
+  serializeSessionCookie,
+} from "../../lib/authSession";
+import {
+  checkRateLimit,
+  recordFailedAttempt,
+  resetRateLimit,
+  getClientIp,
+} from "../../lib/persistentRateLimiter";
 
 const checkUserMatch = (user, targetUser, targetPass) => {
-  if (!user || typeof user !== "object") return false;
+  if (!user || typeof user !== "object") return { match: false, needsUpgrade: false };
   const uName = (user.name || user.username || "").trim().toLowerCase();
   const tName = (targetUser || "").trim().toLowerCase();
-  const uPass = String(user.password || "").trim();
-  const tPass = String(targetPass || "").trim();
-  return Boolean(uName && uPass && uName === tName && uPass === tPass);
+  if (!uName || uName !== tName) {
+    return { match: false, needsUpgrade: false };
+  }
+  return verifyPassword(targetPass, String(user.password || ""));
 };
 
 async function handler(req, res, apiLogger) {
@@ -27,10 +39,29 @@ async function handler(req, res, apiLogger) {
   const cleanUsername = String(username).trim();
   const cleanPassword = String(password).trim();
   const cleanTenantId = tenant_id ? String(tenant_id).trim() : null;
+  const clientIp = getClientIp(req);
+  const rateLimitKey = `login_${clientIp}_${cleanUsername.toLowerCase()}`;
+
+  // 1. Check persistent rate limiting
+  const rateCheck = await checkRateLimit(rateLimitKey, {
+    maxAttempts: 5,
+    lockoutMs: 15 * 60 * 1000,
+  });
+
+  if (!rateCheck.allowed) {
+    return res.status(429).json({
+      error: `Too many failed login attempts. Locked for ${Math.ceil(
+        rateCheck.retryAfter / 60
+      )} minutes.`,
+      retryAfter: rateCheck.retryAfter,
+    });
+  }
 
   try {
     let isValidUser = false;
     let matchedTenantId = cleanTenantId || "default";
+    let matchedUserNode = null; // for auto-upgrading password
+    let matchedUserKey = null;
 
     // 1. Check tenant-specific partition if tenant_id is provided
     if (cleanTenantId && cleanTenantId !== "default") {
@@ -38,8 +69,25 @@ async function handler(req, res, apiLogger) {
       const tenantUsersSnap = await get(tenantUsersRef);
       if (tenantUsersSnap.exists()) {
         const users = tenantUsersSnap.val();
-        const userList = Array.isArray(users) ? users : Object.values(users);
-        isValidUser = userList.some((user) => checkUserMatch(user, cleanUsername, cleanPassword));
+        const userEntries = Array.isArray(users)
+          ? users.map((u, i) => [i, u])
+          : Object.entries(users);
+        for (const [k, user] of userEntries) {
+          const { match, needsUpgrade } = checkUserMatch(user, cleanUsername, cleanPassword);
+          if (match) {
+            isValidUser = true;
+            matchedTenantId = cleanTenantId;
+            matchedUserNode = `tenants/${cleanTenantId}/users/${k}`;
+            if (needsUpgrade) {
+              try {
+                await update(ref(db, matchedUserNode), { password: hashPassword(cleanPassword) });
+              } catch (e) {
+                // ignore upgrade write error
+              }
+            }
+            break;
+          }
+        }
       }
     }
 
@@ -50,10 +98,24 @@ async function handler(req, res, apiLogger) {
 
       if (snapshot.exists()) {
         const users = snapshot.val();
-        const userList = Array.isArray(users) ? users : Object.values(users);
-        isValidUser = userList.some((user) => checkUserMatch(user, cleanUsername, cleanPassword));
-        if (isValidUser) {
-          matchedTenantId = "default";
+        const userEntries = Array.isArray(users)
+          ? users.map((u, i) => [i, u])
+          : Object.entries(users);
+        for (const [k, user] of userEntries) {
+          const { match, needsUpgrade } = checkUserMatch(user, cleanUsername, cleanPassword);
+          if (match) {
+            isValidUser = true;
+            matchedTenantId = "default";
+            matchedUserNode = `login/${k}`;
+            if (needsUpgrade) {
+              try {
+                await update(ref(db, matchedUserNode), { password: hashPassword(cleanPassword) });
+              } catch (e) {
+                // ignore
+              }
+            }
+            break;
+          }
         }
       }
     }
@@ -66,36 +128,86 @@ async function handler(req, res, apiLogger) {
         const tenantsData = allTenantsSnap.val();
         for (const [tId, tVal] of Object.entries(tenantsData)) {
           if (tVal && tVal.users) {
-            const userList = Array.isArray(tVal.users) ? tVal.users : Object.values(tVal.users);
-            const match = userList.some((user) => checkUserMatch(user, cleanUsername, cleanPassword));
-            if (match) {
-              isValidUser = true;
-              matchedTenantId = tId;
-              break;
+            const userEntries = Array.isArray(tVal.users)
+              ? tVal.users.map((u, i) => [i, u])
+              : Object.entries(tVal.users);
+            for (const [k, user] of userEntries) {
+              const { match, needsUpgrade } = checkUserMatch(user, cleanUsername, cleanPassword);
+              if (match) {
+                isValidUser = true;
+                matchedTenantId = tId;
+                matchedUserNode = `tenants/${tId}/users/${k}`;
+                if (needsUpgrade) {
+                  try {
+                    await update(ref(db, matchedUserNode), { password: hashPassword(cleanPassword) });
+                  } catch (e) {
+                    // ignore
+                  }
+                }
+                break;
+              }
             }
+            if (isValidUser) break;
           }
         }
       }
     }
 
     if (isValidUser) {
+      // Reset rate limiter on successful login
+      await resetRateLimit(rateLimitKey);
+
+      // Issue signed session token with role: "tenant_operator"
+      const token = signSessionToken({
+        sub: cleanUsername,
+        role: "tenant_operator",
+        tenantId: matchedTenantId,
+        stepUpVerified: true,
+        sessionVersion: 1,
+        expiresIn: 24 * 60 * 60, // 24 hours
+      });
+
+      // Deliver via HttpOnly SameSite=Strict cookie
+      const sessionCookie = serializeSessionCookie(token, 24 * 60 * 60);
+      res.setHeader("Set-Cookie", sessionCookie);
+
       recordAuditTrail(apiLogger, "login_success", {
         who: cleanUsername,
         target: "pulse_dashboard",
         tenant_id: matchedTenantId,
-        status: "success"
+        status: "success",
       });
-      
-      return res.status(200).json({ success: true, tenant_id: matchedTenantId });
+
+      return res.status(200).json({
+        success: true,
+        tenant_id: matchedTenantId,
+        token,
+      });
     } else {
+      const attemptResult = await recordFailedAttempt(rateLimitKey, {
+        maxAttempts: 5,
+        lockoutMs: 15 * 60 * 1000,
+      });
+
       recordAuditTrail(apiLogger, "login_failure", {
         who: cleanUsername,
         target: "pulse_dashboard",
         status: "failed",
-        reason: "Invalid credentials"
+        reason: "Invalid credentials",
+        attemptsRemaining: attemptResult.locked ? 0 : 5 - attemptResult.count,
       });
-      
-      return res.status(401).json({ error: "Invalid username or password" });
+
+      if (attemptResult.locked) {
+        return res.status(429).json({
+          error: "Too many failed login attempts. Account locked for 15 minutes.",
+          retryAfter: attemptResult.retryAfter,
+        });
+      }
+
+      return res.status(401).json({
+        error: "Invalid username or password",
+        attemptsRemaining: 5 - attemptResult.count,
+      });
     }
   } catch (error) {
     apiLogger.error("Login Error:", error);

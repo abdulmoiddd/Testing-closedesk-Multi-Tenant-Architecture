@@ -226,12 +226,30 @@ export default function LeadsDashboard() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const isSuperAdmin = Boolean(localStorage.getItem("currentSuperAdmin"));
+      const logoutEndpoint = isSuperAdmin ? "/api/superadmin/logout" : "/api/logout";
+      const token = localStorage.getItem("cd_session_token");
+      await fetch(logoutEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+          ...(token ? { "x-cd-session": token } : {}),
+        },
+        credentials: "include",
+      });
+    } catch (e) {
+      console.warn("Logout notification failed:", e);
+    }
     setIsAuthenticated(false);
     setIsSidebarOpen(false);
     setLoginView("user");
     localStorage.removeItem("currentUser");
     localStorage.removeItem("currentSuperAdmin");
+    localStorage.removeItem("currentTenant");
+    localStorage.removeItem("cd_session_token");
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.style.removeProperty("--primary");
     document.documentElement.style.removeProperty("--secondary");

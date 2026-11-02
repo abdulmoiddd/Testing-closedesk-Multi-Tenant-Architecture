@@ -1,9 +1,9 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-02T18:33:04.678Z",
+  "generated_at": "2026-11-02T19:07:38.297Z",
   "git": {
-    "headCommit": "6174d4ef362f21ae301152f7334a4f6bc2360173",
-    "branch": "feat/cd01-capability-evidence-baseline"
+    "headCommit": "0df8eafe7e18d896d64b42e1f1ef15c51cc4498f",
+    "branch": "feat/cd02-privileged-access-sessions"
   },
   "runtime": {
     "node": "v26.8.2",
@@ -19,14 +19,15 @@
         "start": "next start",
         "lint": "eslint .",
         "test:ai": "node scripts/run_evaluations.js",
-        "audit:cd01": "node scripts/cd01_baseline_audit.js"
+        "audit:cd01": "node scripts/cd01_baseline_audit.js",
+        "test:cd02": "node scripts/cd02_security_acceptance_suite.js"
       }
     }
   },
   "policy_hashes": {
     "ruleBook": "8125aa618e7c4871d8f5fb62d4c1f9510dcc66c01f49b63fc44588cf8c5f57ee",
     "visionRuleBook": "09bccc15b48f40efda925497b1d8ca5f84a01947ce9bbdfae17a2a5804c71a19",
-    "databaseRules": "9ec535e1cac8a830b232d80019e1c715c91a5fa26039da0f72ffee365b8d871a"
+    "databaseRules": "73c9895e6969771bf8c3c337221e1fa43309ecb438d764dee1f0b3bb1f58887c"
   },
   "evaluation_artifact": {
     "rawReportPath": "evaluations/report_v2.1.0.json",
@@ -89,7 +90,7 @@
   "verified_files": [
     {
       "path": "package.json",
-      "sizeBytes": 914
+      "sizeBytes": 981
     },
     {
       "path": "netlify.toml",
@@ -105,7 +106,7 @@
     },
     {
       "path": "database.rules.json",
-      "sizeBytes": 900
+      "sizeBytes": 1967
     },
     {
       "path": "src/lib/ruleBook.js",

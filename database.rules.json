@@ -1,37 +1,63 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true,
     "superAdmin": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'",
       ".indexOn": ["name"]
     },
     "login": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'",
       ".indexOn": ["username", "name"]
     },
-    "leads": {
-      ".indexOn": ["timestamp", "booking_status", "urgency_level", "tenant_id"]
-    },
-    "user_cookies": {
-      ".indexOn": ["updatedAt", "isArchived", "anonId", "tenant_id"]
+    "settings": {
+      ".read": true,
+      ".write": "auth != null && auth.token.role === 'superadmin'"
     },
     "tenants": {
+      ".read": true,
+      ".write": "auth != null && auth.token.role === 'superadmin'",
       "$tenant_id": {
+        "users": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && auth.token.role === 'superadmin'",
+          ".indexOn": ["username", "name"]
+        },
         "leads": {
+          ".read": true,
+          ".write": true,
           ".indexOn": ["timestamp", "booking_status", "urgency_level"]
         },
         "user_cookies": {
+          ".read": true,
+          ".write": true,
           ".indexOn": ["updatedAt", "isArchived", "anonId"]
-        },
-        "users": {
-          ".indexOn": ["username", "name"]
         }
       }
     },
+    "system_security": {
+      ".read": false,
+      ".write": false
+    },
+    "leads": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["timestamp", "booking_status", "urgency_level", "tenant_id"]
+    },
+    "user_cookies": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["updatedAt", "isArchived", "anonId", "tenant_id"]
+    },
     "system_logs": {
       "structured_events": {
+        ".read": "auth != null && auth.token.role === 'superadmin'",
+        ".write": true,
         ".indexOn": ["timestamp", "service", "level", "tenant_id"]
       },
       "activity_events": {
+        ".read": "auth != null && auth.token.role === 'superadmin'",
+        ".write": true,
         ".indexOn": ["timestamp"]
       }
     }

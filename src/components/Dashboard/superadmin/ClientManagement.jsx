@@ -166,9 +166,15 @@ export default function ClientManagement() {
     setActionLoading(true);
     try {
       const currentAdminName = localStorage.getItem("currentSuperAdmin") || "admin";
+      const token = localStorage.getItem("cd_session_token");
       const response = await fetch("/api/superadmin/verify-pin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+          ...(token ? { "x-cd-session": token } : {}),
+        },
+        credentials: "include",
         body: JSON.stringify({
           username: currentAdminName,
           pin: pinToVerify,
@@ -178,13 +184,16 @@ export default function ClientManagement() {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        if (data.token) {
+          localStorage.setItem("cd_session_token", data.token);
+        }
         executeSecuredAction(pinModal.action);
         setPinModal({ isOpen: false, action: null, error: "" });
         setPinInput("");
       } else {
         setPinModal((prev) => ({
           ...prev,
-          error: data.error || "Invalid PIN. Access denied.",
+          error: data.error || "Invalid Secondary Verification PIN or Code. Access denied.",
         }));
         setPinInput("");
       }
@@ -192,7 +201,7 @@ export default function ClientManagement() {
       console.error("PIN check error:", error);
       setPinModal((prev) => ({
         ...prev,
-        error: "Network error checking PIN.",
+        error: "Network error checking verification PIN.",
       }));
       setPinInput("");
     } finally {
@@ -240,19 +249,27 @@ export default function ClientManagement() {
   const saveUsersToFirebase = async (client, updatedUsersArray) => {
     try {
       setActionLoading(true);
-      if (!client || client.id === "primary_client") {
-        const firebaseFormattedArray = [null, ...updatedUsersArray];
-        await set(ref(db, "login"), firebaseFormattedArray);
-      } else {
-        const usersObj = {};
-        updatedUsersArray.forEach((u, i) => {
-          usersObj[i + 1] = u;
-        });
-        await set(ref(db, `tenants/${client.id}/users`), usersObj);
+      const token = localStorage.getItem("cd_session_token");
+      const res = await fetch("/api/superadmin/tenants", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+          ...(token ? { "x-cd-session": token } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          tenantId: client ? client.id : "primary_client",
+          userUpdates: updatedUsersArray,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update users");
       }
     } catch (error) {
       console.error("Error saving users:", error);
-      alert("Failed to save changes to the database.");
+      alert("Failed to save changes to the database: " + error.message);
     } finally {
       setActionLoading(false);
     }
@@ -517,8 +534,26 @@ export default function ClientManagement() {
         },
       };
 
-      // Write tenant record directly into Firebase RTDB
-      await set(ref(db, `tenants/${cleanTenantId}`), tenantPayload);
+      // Write tenant record securely via server API (CD02)
+      const token = localStorage.getItem("cd_session_token");
+      const createRes = await fetch("/api/superadmin/tenants", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+          ...(token ? { "x-cd-session": token } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          tenantId: cleanTenantId,
+          tenantPayload,
+        }),
+      });
+
+      if (!createRes.ok) {
+        const err = await createRes.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to create tenant");
+      }
 
       // Record SOC2-style Audit Trail
       recordAuditTrail(pulseLogger, "client_created", {
@@ -1507,10 +1542,10 @@ export default function ClientManagement() {
                 </svg>
               </div>
               <h3 className="text-xl font-black text-[var(--foreground)]">
-                Security Authorization
+                Secondary PIN Verification
               </h3>
               <p className="text-[var(--foreground-muted)] text-xs mt-2 mb-6">
-                Please enter your Super Admin PIN to authorize this sensitive action.
+                Please enter your Super Admin Secondary Verification PIN or TOTP code to authorize this sensitive action.
               </p>
 
               <form onSubmit={handlePinSubmit} className="w-full">

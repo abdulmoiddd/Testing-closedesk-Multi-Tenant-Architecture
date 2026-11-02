@@ -64,56 +64,38 @@ export default function PasswordChange({ onNavigate }) {
     setIsSaving(true);
 
     try {
-      // 2. Fetch the 'login' array from Firebase
-      const loginRef = ref(db, "login");
-      const snapshot = await get(loginRef);
-
-      if (!snapshot.exists()) {
-        showToast("Database error: Login records not found.", "error");
-        setIsSaving(false);
-        return;
-      }
-
-      const usersArray = snapshot.val();
-      let targetIndex = -1;
-      let targetUserData = null;
-
-      // 3. Find the specific user in the array
-      for (let i = 0; i < usersArray.length; i++) {
-        if (usersArray[i] && usersArray[i].name === currentUser) {
-          targetIndex = i;
-          targetUserData = usersArray[i];
-          break;
-        }
-      }
-
-      if (targetIndex === -1) {
-        showToast(`User '${currentUser}' not found in database.`, "error");
-        setIsSaving(false);
-        return;
-      }
-
-      // 4. Verify the current password matches what is in the database
-      if (targetUserData.password !== passwords.current) {
-        showToast("Your current password is incorrect.", "error");
-        setIsSaving(false);
-        return;
-      }
-
-      // 5. Update the specific user's password at their exact array index
-      const specificUserRef = ref(db, `login/${targetIndex}`);
-      await update(specificUserRef, {
-        password: passwords.new,
+      // Server-side password update & session rotation (CD02)
+      const token = localStorage.getItem("cd_session_token");
+      const response = await fetch("/api/user/password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-requested-with": "XMLHttpRequest",
+          ...(token ? { "x-cd-session": token } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.new,
+          confirmPassword: passwords.confirm,
+        }),
       });
 
-      // 6. Success Feedback & Reset
-      showToast("Password updated successfully!", "success");
-      setPasswords({ current: "", new: "", confirm: "" });
+      const data = await response.json();
 
-      // Auto redirect back to profile after success
-      setTimeout(() => {
-        if (onNavigate) onNavigate("business_profile");
-      }, 1500);
+      if (response.ok && data.success) {
+        if (data.token) {
+          localStorage.setItem("cd_session_token", data.token);
+        }
+        showToast("Password updated successfully!", "success");
+        setPasswords({ current: "", new: "", confirm: "" });
+
+        setTimeout(() => {
+          if (onNavigate) onNavigate("business_profile");
+        }, 1500);
+      } else {
+        showToast(data.error || "Failed to update password.", "error");
+      }
     } catch (error) {
       console.error("Password update error:", error);
       showToast(

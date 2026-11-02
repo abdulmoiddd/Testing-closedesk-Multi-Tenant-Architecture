@@ -74,7 +74,11 @@ export default function LoginScreen({
       try {
         const res = await fetch("/api/login", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-requested-with": "XMLHttpRequest",
+          },
+          credentials: "include",
           body: JSON.stringify({
             username: cleanUsername,
             password: cleanPassword,
@@ -86,6 +90,9 @@ export default function LoginScreen({
           if (data && data.success) {
             isSuccess = true;
             resolvedTenantId = data.tenant_id || "default";
+            if (data.token) {
+              localStorage.setItem("cd_session_token", data.token);
+            }
           }
         }
       } catch (apiErr) {

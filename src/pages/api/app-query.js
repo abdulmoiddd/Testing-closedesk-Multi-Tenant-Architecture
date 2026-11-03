@@ -2,6 +2,9 @@
 import { db } from "../../lib/firebase";
 import { ref, get } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
+import { extractSession } from "../../lib/authSession";
+import { redactSensitiveSecrets } from "../../lib/sanitizer";
+import { safeDbGet } from "../../lib/safeDb";
 
 // The handler now receives (req, res, apiLogger) securely from the wrapper
 async function handler(req, res, apiLogger) {
@@ -10,13 +13,12 @@ async function handler(req, res, apiLogger) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { role, userId, targetClientId, searchTerm } = req.body;
-
-  // 🚨 SECURITY GATE 1: Block Anonymous/Walk-in users completely
-  if (!userId || userId === "anonymous" || userId.trim() === "") {
-    apiLogger.warn("security_audit", "anonymous_access_blocked", {
+  // 🚨 SECURITY GATE 1: Authenticated Session Verification
+  const session = req.session || (await extractSession(req));
+  if (!session) {
+    apiLogger.warn("security_audit", "unauthenticated_log_query_blocked", {
       context: {
-        message: "Anonymous visitor attempted to hit the logs query API.",
+        message: "Unauthenticated request attempted to hit the logs query API.",
       },
     });
     return res
@@ -24,37 +26,69 @@ async function handler(req, res, apiLogger) {
       .json({ error: "Unauthorized. Authentication required." });
   }
 
-  // 🚨 SECURITY GATE 2: Role Validation
-  const validRoles = ["SUPERADMIN", "DEVELOPER", "QA", "SUPPORT", "CLIENT"];
-  if (!role || !validRoles.includes(role)) {
-    apiLogger.warn("security_audit", "unauthorized_role_attempt", {
-      context: {
-        user_id: userId,
-        message: `Attempted access with invalid role: ${role}`,
-      },
-    });
+  let { role, userId, targetClientId, searchTerm } = req.body || {};
+
+  // Map authenticated session to effective identity and role
+  let effectiveRole = "CLIENT";
+  let effectiveUserId = session.sub;
+
+  if (session.role === "superadmin") {
+    effectiveRole = role && ["SUPERADMIN", "DEVELOPER", "QA", "SUPPORT", "CLIENT"].includes(String(role).toUpperCase())
+      ? String(role).toUpperCase()
+      : "SUPERADMIN";
+  } else if (session.role === "tenant_operator") {
+    effectiveRole = "CLIENT";
+    const sessionTenant = session.tenantId || "default";
+
+    // 🚨 SECURITY GATE 2: Tenant Isolation Cross-Query Prevention
+    if (targetClientId && targetClientId !== sessionTenant) {
+      apiLogger.critical("security_audit", "cross_tenant_access_blocked", {
+        context: {
+          user_id: session.sub,
+          message: `Operator bound to ${sessionTenant} attempted to view logs for tenant ${targetClientId}`,
+        },
+      });
+      return res.status(403).json({
+        error: `Cross-tenant access forbidden. Operator session is bound to tenant '${sessionTenant}', cannot query logs for '${targetClientId}'.`,
+      });
+    }
+
+    targetClientId = sessionTenant;
+  } else {
     return res.status(403).json({ error: "Unauthorized or invalid role" });
   }
 
-  // 1. Fetch raw logs securely on the server
-  const logsRef = ref(db, "system_logs/structured_events");
-  const snapshot = await get(logsRef);
-  let rawLogs = snapshot.exists() ? Object.values(snapshot.val()) : [];
+  role = effectiveRole;
+  userId = effectiveUserId;
 
-  const legacyRef = ref(db, "system_logs/activity_events");
-  const legacySnap = await get(legacyRef);
-  if (legacySnap.exists()) {
-    const data = legacySnap.val();
-    Object.keys(data).forEach((key) => {
-      const node = data[key];
-      if (node.log_id || node.timestamp) {
-        rawLogs.push({ id: key, ...node });
-      } else {
-        Object.keys(node).forEach((eventId) =>
-          rawLogs.push({ id: eventId, session_id: key, ...node[eventId] }),
-        );
-      }
-    });
+  // 1. Fetch raw logs securely on the server
+  let rawLogs = [];
+  try {
+    const logsRef = ref(db, "system_logs/structured_events");
+    const snapshot = await safeDbGet(logsRef, 600);
+    rawLogs = snapshot && snapshot.exists() ? Object.values(snapshot.val()) : [];
+  } catch (e) {
+    // offline fallback
+  }
+
+  try {
+    const legacyRef = ref(db, "system_logs/activity_events");
+    const legacySnap = await safeDbGet(legacyRef, 600);
+    if (legacySnap && legacySnap.exists()) {
+      const data = legacySnap.val();
+      Object.keys(data).forEach((key) => {
+        const node = data[key];
+        if (node.log_id || node.timestamp) {
+          rawLogs.push({ id: key, ...node });
+        } else {
+          Object.keys(node).forEach((eventId) =>
+            rawLogs.push({ id: eventId, session_id: key, ...node[eventId] }),
+          );
+        }
+      });
+    }
+  } catch (e) {
+    // offline fallback
   }
 
   // 🔥 NEW: Capture the absolute total number of logs in the database before slicing
@@ -114,6 +148,9 @@ async function handler(req, res, apiLogger) {
       }
     }
   }
+
+  // 🚨 SECURITY GATE 5: Redact all sensitive credentials from returned logs
+  filteredLogs = redactSensitiveSecrets(filteredLogs);
 
   // 🔥 Return the array of logs AND the total count.
   // The middleware automatically calculates the latency and logs a `request_completed` event with status 200!

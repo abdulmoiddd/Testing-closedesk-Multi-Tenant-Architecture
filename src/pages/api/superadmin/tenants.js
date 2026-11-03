@@ -5,6 +5,7 @@ import { db } from "../../../lib/firebase";
 import { recordAuditTrail } from "../../../lib/auditTracer";
 import { withSessionGuard } from "../../../lib/authSession";
 import { hashPassword } from "../../../lib/authCrypto";
+import { redactSensitiveSecrets } from "../../../lib/sanitizer";
 import {
   safeDbGet,
   safeDbSet,
@@ -27,7 +28,8 @@ async function handler(req, res, apiLogger) {
         status: "success",
       });
 
-      return res.status(200).json({ success: true, tenants });
+      const safeTenants = redactSensitiveSecrets(tenants);
+      return res.status(200).json({ success: true, tenants: safeTenants });
     } catch (err) {
       apiLogger.warn("Database fallback for tenants fetch:", err.message);
       // Return empty tenants map if database times out in offline/test environment

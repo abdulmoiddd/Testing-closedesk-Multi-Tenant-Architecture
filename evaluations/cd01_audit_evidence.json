@@ -1,9 +1,9 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-03T13:03:15.385Z",
+  "generated_at": "2026-11-03T15:39:28.598Z",
   "git": {
-    "headCommit": "eaddb880e477d9873a758784dac4d7d4958e65a6",
-    "branch": "refactor/rename-components-to-closedesk"
+    "headCommit": "18a580dbecfec881c2502586232c1b5a766ef46b",
+    "branch": "feat/cd03-tenant-isolation-secret-protection"
   },
   "runtime": {
     "node": "v26.8.2",
@@ -20,14 +20,15 @@
         "lint": "eslint .",
         "test:ai": "node scripts/run_evaluations.js",
         "audit:cd01": "node scripts/cd01_baseline_audit.js",
-        "test:cd02": "node scripts/cd02_security_acceptance_suite.js"
+        "test:cd02": "node scripts/cd02_security_acceptance_suite.js",
+        "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js"
       }
     }
   },
   "policy_hashes": {
     "ruleBook": "8125aa618e7c4871d8f5fb62d4c1f9510dcc66c01f49b63fc44588cf8c5f57ee",
     "visionRuleBook": "09bccc15b48f40efda925497b1d8ca5f84a01947ce9bbdfae17a2a5804c71a19",
-    "databaseRules": "73c9895e6969771bf8c3c337221e1fa43309ecb438d764dee1f0b3bb1f58887c"
+    "databaseRules": "2603d6dfc2bdecf30a449aed429197b1eb41b3cd3d281fdc0082f2195a8560e9"
   },
   "evaluation_artifact": {
     "rawReportPath": "evaluations/report_v2.1.0.json",
@@ -90,7 +91,7 @@
   "verified_files": [
     {
       "path": "package.json",
-      "sizeBytes": 981
+      "sizeBytes": 1015
     },
     {
       "path": "netlify.toml",
@@ -106,7 +107,7 @@
     },
     {
       "path": "database.rules.json",
-      "sizeBytes": 1967
+      "sizeBytes": 4155
     },
     {
       "path": "src/lib/ruleBook.js",
@@ -134,7 +135,7 @@
     },
     {
       "path": "src/pages/api/app-query.js",
-      "sizeBytes": 4593
+      "sizeBytes": 5815
     },
     {
       "path": "src/pages/api/openai-token.js",
@@ -170,7 +171,7 @@
     },
     {
       "path": "src/pages/api/leads.js",
-      "sizeBytes": 7930
+      "sizeBytes": 8830
     },
     {
       "path": "src/pages/api/cron/retention-cleanup.js",
@@ -210,7 +211,7 @@
     },
     {
       "path": "functions/index.js",
-      "sizeBytes": 23119
+      "sizeBytes": 24471
     },
     {
       "path": "docs/VOICE_PRIVACY_POLICY.md",

@@ -1,4 +1,4 @@
-// src/components/Dashboard/Settings/notification-settings.jsx
+// src/Closedesk/Dashboard/Settings/notification-settings.jsx
 "use client";
 
 import { useState, useEffect } from "react";

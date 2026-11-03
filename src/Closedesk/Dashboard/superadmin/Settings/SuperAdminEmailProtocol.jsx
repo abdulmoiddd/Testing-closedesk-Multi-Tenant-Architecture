@@ -1,4 +1,4 @@
-// src/components/Dashboard/superadmin/Settings/SuperAdminEmailProtocol.jsx
+// src/Closedesk/Dashboard/superadmin/Settings/SuperAdminEmailProtocol.jsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";

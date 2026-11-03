@@ -1,4 +1,4 @@
-// src/components/Dashboard/TerminalScreen.jsx
+// src/Closedesk/Dashboard/TerminalScreen.jsx
 "use client";
 
 import { useState, useEffect } from "react";

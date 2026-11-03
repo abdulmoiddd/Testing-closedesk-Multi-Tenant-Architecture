@@ -1,4 +1,4 @@
-// src/components/Dashboard/superadmin/ClientManagement.jsx
+// src/Closedesk/Dashboard/superadmin/ClientManagement.jsx
 "use client";
 
 import React, { useState, useEffect } from "react";

@@ -1,4 +1,4 @@
-// src/components/Dashboard/LoginScreen.jsx
+// src/Closedesk/Dashboard/LoginScreen.jsx
 "use client";
 
 import { useState } from "react";

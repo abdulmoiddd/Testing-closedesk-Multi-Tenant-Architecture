@@ -1,4 +1,4 @@
-// src/components/GlobalActivityTracker.jsx
+// src/Closedesk/GlobalActivityTracker.jsx
 "use client";
 
 import { useEffect } from "react";

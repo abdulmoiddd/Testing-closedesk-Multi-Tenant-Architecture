@@ -1,4 +1,4 @@
-// src/components/ThemeProvider.jsx
+// src/Closedesk/ThemeProvider.jsx
 "use client";
 
 import { useEffect, useState } from "react";

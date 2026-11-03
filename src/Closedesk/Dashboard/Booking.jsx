@@ -1,4 +1,4 @@
-// src/components/Dashboard/BookingsScreen.jsx
+// src/Closedesk/Dashboard/BookingsScreen.jsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";

@@ -1,4 +1,4 @@
-// src/components/Dashboard/HomeScreen.jsx
+// src/Closedesk/Dashboard/HomeScreen.jsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";

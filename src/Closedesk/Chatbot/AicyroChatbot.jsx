@@ -1,4 +1,4 @@
-// src/components/Chatbot/AicyroChatbot.jsx
+// src/Closedesk/Chatbot/AicyroChatbot.jsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";

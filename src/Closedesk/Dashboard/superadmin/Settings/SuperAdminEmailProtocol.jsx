@@ -59,6 +59,7 @@ export default function SuperAdminEmailProtocol() {
   const [savedService, setSavedService] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const popupRef = useRef(null);
   
   const [isSavingEmail, setIsSavingEmail] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -89,10 +90,25 @@ export default function SuperAdminEmailProtocol() {
       }
     });
 
-    const handleMessage = (event) => {
-      if (event.data?.type === "OAUTH_SUCCESS") {
+        const handleMessage = (event) => {
+      // 🚨 SECURITY: Strict origin and source window verification
+      if (typeof window !== "undefined" && event.origin !== window.location.origin) {
+        return;
+      }
+      if (popupRef.current && event.source && event.source !== popupRef.current) {
+        return;
+      }
+
+      const data = event.data;
+      if (data?.type === "CLOSEDESK_OAUTH_STATUS") {
+        if (data.status === "connected") {
+          showToast("Account connected successfully!");
+        } else {
+          showToast(data.error || "Account connection failed.", "error");
+        }
+      } else if (data?.type === "OAUTH_SUCCESS") {
         showToast("Account connected successfully!");
-      } else if (event.data?.type === "OAUTH_ERROR") {
+      } else if (data?.type === "OAUTH_ERROR") {
         showToast("Account connection failed or was cancelled.", "error");
       }
     };
@@ -228,7 +244,7 @@ export default function SuperAdminEmailProtocol() {
     const height = 700;
     const left = window.screen.width / 2 - width / 2;
     const top = window.screen.height / 2 - height / 2;
-    window.open(
+    popupRef.current = window.open(
       `/api/auth/${provider}/login`,
       "OAuthLoginPopup",
       `width=${width},height=${height},top=${top},left=${left}`

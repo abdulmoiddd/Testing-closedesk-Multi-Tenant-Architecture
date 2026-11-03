@@ -3,7 +3,7 @@
 > **Multi-Tenant Headless Multimodal AI Front-Desk & Real-Time Operational Dispatch Control Plane**  
 > *Production Version: v2.1.0 | Runtime: Next.js 16 (Pages Router) & Node.js >= 20.x*
 
-CloseDesk (branded as **Aicyro**) is a high-performance, decoupled multi-tenant platform designed for field service and enterprise organizations. It bridges conversational client acquisition with real-time operational CRM triage, live dispatch scheduling, and multi-tenant management.
+CloseDesk (branded publicly as **Aicyro**) is a high-performance, decoupled multi-tenant platform designed for field service and enterprise organizations. It bridges conversational client acquisition with real-time operational CRM triage, live dispatch scheduling, and multi-tenant management.
 
 ---
 
@@ -11,7 +11,7 @@ CloseDesk (branded as **Aicyro**) is a high-performance, decoupled multi-tenant 
 
 CloseDesk decouples conversational client acquisition from backend intelligence, database persistence, and CRM dispatch operations:
 
-```
+```text
 +---------------------------------------------------------------------------------------------------+
 |                                  CLIENT CONSUMPTION LAYER (ANY HOST)                              |
 |                                                                                                   |
@@ -32,7 +32,12 @@ CloseDesk decouples conversational client acquisition from backend intelligence,
 |   ├── Universal Tracing Pipeline: withApiLogger(handler, componentName)                           |
 |   │     ├── Transaction Propagation (x-correlation-id, x-session-id, x-tenant-id)                |
 |   │     └── Unhandled Exception Trapping & PII / Secret Sanitization                              |
-|   ├── Security Middleware & Key Sanitizer: sanitizeDatabaseKey() against NoSQL injection          |
+|   ├── Privileged Access & Session Security Gate (CD02):                                           |
+|   │     ├── Server-Side RBAC & Signed HMAC-SHA256 Sessions (/lib/authSession.js)                |
+|   │     ├── Step-Up Secondary Factor Authorization (/lib/totp.js: RFC 6238, PIN, Recovery)     |
+|   │     ├── Cold-Start Persistent Sliding-Window Throttling (/lib/persistentRateLimiter.js)       |
+|   │     └── Salted Scrypt Cryptographic Password Verification & Upgrades (/lib/authCrypto.js)    |
+|   ├── Security Middleware & Key Sanitizer: sanitizeFirebaseKey() against NoSQL traversal          |
 |   └── Multimodal Endpoints:                                                                       |
 |         ├── Voice Session Ephemeral Minting: /api/openai-token                                    |
 |         ├── Text Conversational Engine: /api/chat (GPT-4o-mini JSON mode)                         |
@@ -49,9 +54,14 @@ CloseDesk decouples conversational client acquisition from backend intelligence,
 |   ├── Isolated Tenant Tree: /tenants/{tenantId}/                                                  |
 |   │     ├── /settings           (Branding, System Prompts, Business Hours, Tiers)                 |
 |   │     ├── /conversations      (Live Sessions, Transcripts, Customer Payloads)                   |
-|   │     ├── /bookings           (Appointments, Service Types, OAuth Sync Status)                 |
+|   │     ├── /bookings           (Appointments, Service Types, Status Overrides)                   |
 |   │     ├── /cookies            (Consent Tokens, Geolocation, Device Fingerprints)                |
-|   │     └── /analytics          (Conversion Rates, Session Metrics, Channel Volume)               |
+|   │     └── /leads              (Inbound Qualified Leads, Urgent Emergency Flags)                 |
+|   ├── Global Infrastructure Roots:                                                                |
+|   │     ├── /superadmins        (Platform Administrator Credentials & Secondary Factors)          |
+|   │     ├── /sessions           (Server-Side Revocable Active Sessions)                          |
+|   │     ├── /rate_limits        (Cold-Start Persistent Brute-Force Windows)                       |
+|   │     └── /system_logs        (Distributed Structured Observability Stream)                     |
 |   └── Cloud Functions (functions/index.js): Dynamic SMTP Mailer & Appointment Cron Dispatch       |
 +---------------------------------------------------------------------------------------------------+
 ```
@@ -61,37 +71,37 @@ CloseDesk decouples conversational client acquisition from backend intelligence,
 ## Key Features
 
 ### 1. Multimodal Front-Desk AI (`/embed/chatbot`)
-* **Realtime WebRTC Voice AI:** Sub-second conversational voice powered by OpenAI Realtime WebRTC with dynamic system instructions, Voice Activity Detection (VAD), and interruptions.
-* **Text Chat with Guardrails:** GPT-4o-mini structured JSON completions enforcing domain rulebooks, business hours, and automated handoffs.
-* **Multimodal Vision Diagnostics:** Users can capture or upload photos of issues (e.g., plumbing leaks, electrical panels, HVAC tags); the AI analyzes damage severity and repair scope before quoting.
+* **Realtime WebRTC Voice AI:** Sub-second conversational voice powered by OpenAI Realtime WebRTC with dynamic system instructions, Voice Activity Detection (VAD), and live interruptions.
+* **Text Chat with Guardrails:** GPT-4o-mini structured JSON completions enforcing domain rulebooks (`src/lib/ruleBook.js`), business hours, and automated handoffs.
+* **Multimodal Vision Diagnostics:** Users can capture or upload photos of issues (e.g., plumbing leaks, electrical panels, HVAC tags); the AI analyzes damage severity and repair scope before quoting (`src/lib/visionRuleBook.js`).
 * **Neural Speech Fallback:** High-fidelity speech generation with AWS Polly Neural voices.
-* **Privacy & Compliance Gate:** Explicit screen-lock consent modal enforcing GDPR/CCPA compliance before tracking or voice recording.
-* **Integrated Scheduling:** Frictionless booking flow with two-way calendar sync via Google Calendar and Microsoft Outlook OAuth.
+* **Privacy & Compliance Gate:** Explicit screen-lock consent modal enforcing GDPR/CCPA compliance before tracking or voice interaction (`src/Closedesk/Essential/CookieConsentBanner.jsx`).
+* **Integrated Scheduling:** Frictionless booking flow with calendar sync via Google Calendar and Microsoft Outlook OAuth.
 
 ### 2. Operational Dispatch CRM Cockpit (`/lg`)
 * **Live Cockpit & KPI Velocity:** Real-time metrics on incoming inquiries, conversion rate, booked pipeline value, and response latency.
 * **Terminal Screen:** Real-time triage monitor displaying active incoming inquiries, urgent issues, and one-click operator takeover.
 * **Conversations Browser:** Full chat histories, voice session recordings/transcripts, sentiment indicators, and lead metadata.
-* **Booking Manager:** Calendar and list view for customer appointments with status controls (Confirmed, Completed, Rescheduled, Cancelled).
+* **Booking Manager:** Calendar and list view for customer appointments with manual status override controls (`Confirmed`, `Completed`, `Reschedule`, `Cancel`).
 * **Visitor Intelligence & Cookie Map:** Interactive Google Maps visualization showing geographic distribution of site visitors, device details, and consent statuses.
 * **AI Business Insights:** Automated analytics and trend visualization powered by Recharts.
-* **Automated Daily & Weekly Reports:** Operational performance summaries and lead acquisition reports.
+* **Automated Daily & Weekly Reports:** Operational performance summaries and lead acquisition reports with CSV and PDF export.
 * **Granular Tenant Configuration:**
   * Business Profile (name, phone, address, operating hours, emergency rates).
   * Chatbot Settings (voice persona, temperature, auto-open delays, lead scoring thresholds).
-  * Appearance & Custom Theming (light/dark modes, custom accent colors, custom CSS).
-  * Notification Settings & Password Security.
+  * Appearance & Custom Theming (light/dark modes, custom accent colors, CSS variable sync).
+  * Notification Settings & Password Security with scrypt verification.
 
-### 3. SuperAdmin Control Plane
-* Secure administrative access via credentials and secondary PIN verification.
-* Multi-tenant provisioning: instant creation, suspension, and license tier assignment.
-* Platform-wide analytics, system theme management, and global SMTP email protocol configuration.
+### 3. SuperAdmin Control Plane & Privileged Security (CD02)
+* **Server-Side RBAC & Step-Up Auth:** Multi-factor gating requiring RFC 6238 TOTP, hashed secondary PIN, or emergency recovery codes before privileged platform mutations.
+* **Multi-Tenant Provisioning:** Instant tenant creation, password provisioning, suspension, and license tier assignment (`/api/superadmin/tenants`).
+* **Session Lifecycle:** Signed HMAC-SHA256 session cookies (`closedesk_session`) with server-side revocation in RTDB `/sessions/{sessionId}`.
+* **Persistent Rate Limiting:** Cold-start resilient sliding-window lockout in `/rate_limits/{clientKey}` (5 failed attempts, 15m window).
+* **Cryptographic Hardening:** Salted scrypt hashing (`scrypt:<salt>:<hash>`) with automatic legacy password upgrade detection.
 
-### 4. Enterprise Security & Resilience
-* **Strict Multi-Tenant Isolation:** Database keys and API queries are validated and scoped exclusively to authorized tenant IDs.
-* **Key Sanitization:** Centralized `sanitizeDatabaseKey` prevents NoSQL path injection and unauthorized traversal.
-* **PII & Secret Sanitization:** Universal logger scrubs credentials, tokens, phone numbers, and emails from operational logs.
-* **Resilient Retry Loops:** Built-in exponential backoff for external AI and database API requests.
+### 4. Verified Capability Baseline (CD01)
+* Zero unverified telephony claims across `src/` and `public/`.
+* Complete capability matrix mapping 9 core pilot capabilities to source code, APIs, database paths, and deterministic tests.
 
 ---
 
@@ -99,92 +109,167 @@ CloseDesk decouples conversational client acquisition from backend intelligence,
 
 | Layer | Technologies |
 |---|---|
-| **Framework & UI** | [Next.js 16.1.6](https://nextjs.org/) (Pages Router), [React 19](https://react.dev/), [Tailwind CSS 3.4](https://tailwindcss.com/), [Lucide React](https://lucide.dev/) |
-| **Data & Backend** | [Firebase Realtime Database](https://firebase.google.com/), [Firebase Cloud Functions](https://firebase.google.com/docs/functions) (Node 20) |
+| **Framework & UI** | [Next.js 16.1.6](https://nextjs.org/) (Pages Router, Turbopack), [React 19](https://react.dev/), [Tailwind CSS 3.4](https://tailwindcss.com/), [Lucide React](https://lucide.dev/) |
+| **Component Architecture** | Modular UI components organized under `src/Closedesk/` (`Chatbot`, `Dashboard`, `Settings`, `superadmin`, `Essential`) |
+| **Data & Backend** | [Firebase Realtime Database](https://firebase.google.com/), [Firebase Cloud Functions](https://firebase.google.com/docs/functions) (Node 20), [Firebase Storage](https://firebase.google.com/) |
 | **Artificial Intelligence** | [OpenAI Realtime API](https://platform.openai.com/) (WebRTC Voice), GPT-4o-mini (Chat & Vision), [AWS Polly](https://aws.amazon.com/polly/) (Neural TTS) |
+| **Security & Auth** | Node.js `crypto` (Scrypt & HMAC-SHA256), RFC 6238 TOTP, CSRF Protection, SameSite Strict HttpOnly Cookies |
 | **Mapping & Charts** | [@vis.gl/react-google-maps](https://visgl.github.io/react-google-maps/), [Recharts 3](https://recharts.org/) |
 | **Calendar Integrations** | Google Calendar API OAuth 2.0, Microsoft Graph API OAuth 2.0 |
-| **Testing & QA** | Puppeteer Core, Custom VAD Tuning & AI Evaluation Harnesses |
+| **Testing & Auditing** | Deterministic CD01 Baseline Audit, CD02 Security Acceptance Suite, synthetic AI evaluation harnesses |
 
 ---
 
 ## Directory Structure
 
 ```text
-├── functions/                    # Firebase Cloud Functions (v1, Node 20)
-│   ├── index.js                  # Dynamic SMTP mailer & appointment reminder crons
-│   └── package.json              # Function runtime dependencies
+├── docs/                                  # Canonical specifications, security audits & runbooks
+│   ├── CD01_CAPABILITY_AND_EVIDENCE_BASELINE.md # Verified 9-capability matrix & scheduler audit
+│   ├── CD02_PRIVILEGED_ACCESS_AND_SESSIONS.md   # Server-side RBAC, Step-Up auth & session architecture
+│   ├── SUPERADMIN_RECOVERY_RUNBOOK.md     # Emergency break-glass & secret recovery procedures
+│   ├── LOGGING_SCHEMA.md                  # Canonical structured logging schema and PII redaction rules
+│   ├── VOICE_PRIVACY_POLICY.md            # Raw audio privacy & ephemeral memory retention policy
+│   ├── VOICE_PRODUCTION_READINESS_SIGNOFF.md # Voice latency thresholds & readiness sign-off
+│   └── VOICE_QA_TEST_SUITE.md             # Realtime voice tool calling test procedures
 │
-├── public/                       # Static assets & client SDK
-│   ├── avatars/                  # Chatbot avatar icons (SVG)
-│   ├── widget.js                 # Universal portable embed script
-│   ├── e2e-report.html           # Public E2E QA report
-│   └── robots.txt                # Crawler directives
+├── evaluations/                           # Audit evidence & benchmark execution results
+│   ├── cd01_audit_evidence.json           # Machine-readable CD01 capability evidence
+│   ├── cd02_security_evidence.json        # Deterministic CD02 security acceptance evidence
+│   └── report_v2.1.0.json                 # Synthetic dialogue benchmarks
 │
-├── scripts/                      # Testing, tuning, and evaluation harnesses
-│   ├── industry_regression_suite.js # API regression test across home-service verticals
-│   ├── qa-simulator.js           # End-to-end chat and voice session simulator
-│   ├── run_evaluations.js        # Synthetic evaluation suite (npm run test:ai)
-│   ├── vad_tuning_harness.js     # Voice Activity Detection calibration
-│   └── voice_qa_harness.js       # Audio generation & pronunciation verification
+├── functions/                             # Firebase Cloud Functions (v1, Node 20 runtime)
+│   ├── index.js                           # Dynamic SMTP mailer & appointment reminder crons
+│   └── package.json                       # Function runtime dependencies
+│
+├── public/                                # Static assets & universal client SDK
+│   ├── avatars/                           # Vector avatar icons
+│   ├── widget.js                          # Universal embeddable client loader
+│   ├── e2e-report.html                    # Static E2E test report
+│   └── robots.txt                         # Search crawler indexing directives
+│
+├── scripts/                               # Testing, tuning, and evaluation harnesses
+│   ├── cd01_baseline_audit.js             # CD01 deterministic capability audit runner (npm run audit:cd01)
+│   ├── cd02_security_acceptance_suite.js  # CD02 security acceptance test runner (npm run test:cd02)
+│   ├── e2e_master_suite.js                # Full platform end-to-end integration suite
+│   ├── esm_loader.mjs                     # Custom ESM loader for node test execution
+│   ├── generate_e2e_page.js               # E2E report HTML generation script
+│   ├── generate_visual_dashboard.js       # Visual audit dashboard builder
+│   ├── industry_regression_suite.js       # Multi-vertical prompt regression suite
+│   ├── qa-simulator.js                    # End-to-end chat and voice session simulator
+│   ├── run_evaluations.js                 # Synthetic dialogue benchmark runner (npm run test:ai)
+│   ├── vad_tuning_harness.js              # Voice Activity Detection calibration
+│   └── voice_qa_harness.js                # Voice audio generation and pronunciation checks
 │
 ├── src/
-│   ├── Closedesk/
-│   │   ├── Chatbot/              # Customer-facing embeddable front-desk
-│   │   │   └── AicyroChatbot.jsx
-│   │   ├── Dashboard/            # Pulse CRM Cockpit screens (/lg)
-│   │   │   ├── Booking.jsx       # Appointments management
-│   │   │   ├── Conversations.jsx # Chat & voice transcripts
-│   │   │   ├── CookieDataDisplay.jsx # Visitor cookies & device telemetry
-│   │   │   ├── HomeScreen.jsx    # KPI cockpit & velocity
-│   │   │   ├── Insight.jsx       # AI conversion analytics
-│   │   │   ├── LiveNotifications.jsx # Real-time dispatch alerts
-│   │   │   ├── LoginScreen.jsx   # Tenant authentication screen
-│   │   │   ├── Report.jsx        # Scheduled performance reports
-│   │   │   ├── TerminalScreen.jsx # Live triage terminal
-│   │   │   ├── cookie/           # Google Maps & visitor grid widgets
-│   │   │   ├── Settings/         # Business profile, theme, notifications, security
-│   │   │   └── superadmin/       # Multi-tenant management & provisioning
-│   │   ├── Essential/            # Cookie consent banner
-│   │   └── GlobalActivityTracker.jsx # Client runtime error telemetry
+│   ├── Closedesk/                         # Modular UI component hierarchy (formerly src/components)
+│   │   ├── Chatbot/                       # Embeddable multimodal AI front-desk
+│   │   │   └── AicyroChatbot.jsx          # Voice WebRTC, Chat, and Vision upload interface
+│   │   ├── Dashboard/                     # Pulse CRM Cockpit views (/lg)
+│   │   │   ├── Booking.jsx                # Appointments management & status overrides
+│   │   │   ├── Conversations.jsx          # Chat and voice transcript viewer
+│   │   │   ├── CookieDataDisplay.jsx      # Visitor hardware profile & telemetry viewer
+│   │   │   ├── HomeScreen.jsx             # Executive KPI cockpit & lead velocity
+│   │   │   ├── Insight.jsx                # Recharts lead intelligence & conversion analytics
+│   │   │   ├── LiveNotifications.jsx      # Real-time lead alert feed with audio chime
+│   │   │   ├── LoginScreen.jsx            # Tenant operator authentication screen
+│   │   │   ├── Report.jsx                 # Operations reporting and data export (CSV/PDF)
+│   │   │   ├── TerminalScreen.jsx         # Live lead triage terminal & emergency response
+│   │   │   ├── cookie/                    # Visitor mapping widgets
+│   │   │   │   ├── CookieGrid.jsx         # Telemetry data grid
+│   │   │   │   └── CookieMap.jsx          # Google Maps visitor cluster map
+│   │   │   ├── Settings/                  # Tenant settings
+│   │   │   │   ├── apearance.jsx          # Brand colors, dark mode, CSS variable bindings
+│   │   │   │   ├── BusinessProfile.jsx    # Hours, emergency phone numbers, business info
+│   │   │   │   ├── Chatbotsetting.jsx     # Persona prompt, voice selection, qualification
+│   │   │   │   ├── notification-settings.jsx # Alert routing & SMTP preferences
+│   │   │   │   └── PasswordChange.jsx     # Scrypt credential rotation with session re-auth
+│   │   │   └── superadmin/                # SuperAdmin control plane
+│   │   │       ├── ClientManagement.jsx   # Multi-tenant onboarding & license management
+│   │   │       ├── SuperAdminDashboard.jsx # Superadmin navigation shell
+│   │   │       ├── superadminlogin.jsx    # Superadmin authentication portal
+│   │   │       └── Settings/              # Global superadmin protocols
+│   │   │           ├── SuperAdminAppearance.jsx    # Global theming controls
+│   │   │           └── SuperAdminEmailProtocol.jsx # Global SMTP/OAuth relays
+│   │   ├── Essential/                     # Core consent & compliance components
+│   │   │   └── CookieConsentBanner.jsx    # GDPR/CCPA cookie & telemetry consent gate
+│   │   ├── GlobalActivityTracker.jsx      # Global client error & navigation telemetry
+│   │   └── ThemeProvider.jsx              # Theme context binding RTDB branding to CSS vars
 │   │
-│   ├── lib/                      # Core backend libraries & utilities
-│   │   ├── activityTracker.js    # Telemetry logging helper
-│   │   ├── aiTracer.js           # OpenAI execution telemetry
-│   │   ├── alertManager.js       # Real-time incident alert publisher
-│   │   ├── apiMiddleware.js      # Universal API logger & performance wrapper
-│   │   ├── auditTracer.js        # Security audit trail tracer
-│   │   ├── cookiePersonalization.js # Lead personalization engine
-│   │   ├── dbTracer.js           # Database query latency tracer
-│   │   ├── firebase.js           # Firebase Client SDK initialization
-│   │   ├── logger.js             # Structured logger with PII scrubbing
-│   │   ├── ruleBook.js           # Domain rules & conversation policies
-│   │   ├── sanitizer.js          # NoSQL key sanitizer
-│   │   ├── tenantResolver.js     # Tenant domain & slug resolver
-│   │   └── visionRuleBook.js     # Multimodal image analysis rules
+│   ├── lib/                               # Core backend libraries & security utilities (24 modules)
+│   │   ├── activityTracker.js             # Client telemetry logger
+│   │   ├── aiTracer.js                    # OpenAI completion tracer and safe JSON parser
+│   │   ├── alertManager.js                # Incident alert dispatcher
+│   │   ├── apiMiddleware.js               # Universal API wrapper (withApiLogger) with correlation IDs
+│   │   ├── auditTracer.js                 # Security audit trail recorder
+│   │   ├── authCrypto.js                  # Salted scrypt hashing & timingSafeStringEqual
+│   │   ├── authSession.js                 # Signed HMAC-SHA256 sessions & CSRF defense
+│   │   ├── cookiePersonalization.js       # Lead personalization and anonymous ID engine
+│   │   ├── dbTracer.js                    # Firebase RTDB query latency profiler
+│   │   ├── firebase.js                    # Firebase SDK singleton initialization
+│   │   ├── integrationTracer.js           # Resilient HTTP client with retry logic
+│   │   ├── logger.js                      # Structured logger with PII scrubbing
+│   │   ├── loggerPresets.js               # Component loggers (API, Website, AI, Voice, Pulse)
+│   │   ├── notificationHelper.js          # Email alert queue helper
+│   │   ├── persistentRateLimiter.js       # Cold-start persistent rate limiting in RTDB
+│   │   ├── ragTracer.js                   # RAG execution telemetry tracer
+│   │   ├── retryTracer.js                 # Exponential backoff retry tracer
+│   │   ├── ruleBook.js                    # Master conversational rules (v2.14.0)
+│   │   ├── safeDb.js                      # Safe database operations with timeout fallback
+│   │   ├── sanitizer.js                   # NoSQL key sanitizer
+│   │   ├── tenantResolver.js              # Tenant hostname & query resolver
+│   │   ├── totp.js                        # RFC 6238 TOTP & recovery code engine
+│   │   ├── tracer.js                      # Distributed transaction tracer (UUID v4)
+│   │   └── visionRuleBook.js              # Multimodal image defect rules (v1.1.0)
 │   │
-│   ├── pages/
-│   │   ├── api/                  # Next.js Serverless API routes
-│   │   │   ├── auth/             # Google & Microsoft OAuth endpoints
-│   │   │   ├── chat.js           # Conversational AI endpoint
-│   │   │   ├── analyze-image.js  # Multimodal Vision analysis
-│   │   │   ├── openai-token.js   # WebRTC Realtime Voice token minting
-│   │   │   ├── tts.js            # AWS Polly Neural TTS endpoint
-│   │   │   ├── leads.js          # Lead capture & scoring
-│   │   │   ├── insights.js       # Analytical aggregations
-│   │   │   └── superadmin/       # Platform administration & PIN verification
+│   ├── pages/                             # Next.js Pages Router entries (9 pages + 25 APIs)
+│   │   ├── 404.jsx                        # Custom branded 404 page
+│   │   ├── e2e-report.jsx                 # Interactive QA test results page
+│   │   ├── index.jsx                      # Public marketing landing portal
+│   │   ├── layout.jsx                     # Persistent layout wrapper
+│   │   ├── lg.jsx                         # Pulse Tenant & SuperAdmin operational portal
+│   │   ├── logs.jsx                       # Observability & audit log viewer
+│   │   ├── _app.jsx                       # Application shell & global providers
+│   │   ├── _document.jsx                  # Custom HTML document with theme injection
 │   │   ├── embed/
-│   │   │   └── chatbot.jsx       # Standalone embed route loaded by iframe
-│   │   ├── index.jsx             # Public marketing / landing portal
-│   │   ├── lg.jsx                # Pulse Tenant & SuperAdmin CRM cockpit
-│   │   ├── logs.jsx              # System operational log viewer
-│   │   └── e2e-report.jsx        # Interactive QA dashboard page
+│   │   │   └── chatbot.jsx                # Standalone iframe embed route
+│   │   └── api/                           # Serverless backend microservice routes (25 endpoints)
+│   │       ├── analytics.js               # Traffic & visitor event ingestion
+│   │       ├── analyze-image.js           # GPT-4o-mini Vision defect analysis
+│   │       ├── app-query.js               # RBAC-gated system log queries
+│   │       ├── app-state.js               # Log event transmission receiver
+│   │       ├── chat.js                    # Conversational AI completions
+│   │       ├── cookie-consent.js          # Visitor consent token persistence
+│   │       ├── generate-email.js          # Outbound email webhook dispatcher
+│   │       ├── insights.js                # Conversational analytics aggregation
+│   │       ├── leads.js                   # Lead qualification & deduplication
+│   │       ├── login.js                   # Scrypt-authenticated tenant login
+│   │       ├── logout.js                  # Server-side session invalidation
+│   │       ├── openai-token.js            # Ephemeral WebRTC token minting
+│   │       ├── sync-voice.js              # Voice telemetry, tools & transcripts
+│   │       ├── tts.js                     # AWS Polly Neural TTS fallback
+│   │       ├── auth/
+│   │       │   ├── google/                # Google Calendar OAuth (login & callback)
+│   │       │   └── microsoft/             # Microsoft 365 OAuth (login & callback)
+│   │       ├── cron/
+│   │       │   └── retention-cleanup.js   # Ephemeral transcript & log retention pruning
+│   │       ├── superadmin/
+│   │       │   ├── login.js               # SuperAdmin authentication gate
+│   │       │   ├── logout.js              # SuperAdmin session termination
+│   │       │   ├── settings.js            # Step-up protected global email settings
+│   │       │   ├── tenants.js             # Step-up protected tenant CRUD operations
+│   │       │   └── verify-pin.js          # Step-up secondary factor verification (TOTP/PIN)
+│   │       └── user/
+│   │           └── password.js            # Scrypt password change with session rotation
+│   │
 │   └── styles/
-│       └── globals.css           # Tailwind design tokens and animations
+│       └── globals.css                    # Tailwind design tokens, layers, and theme vars
 │
-├── database.rules.json           # Firebase Realtime Database security rules & indexes
-├── netlify.toml                  # Edge CORS headers and build configuration
-└── next.config.js                # Next.js application runtime configuration
+├── database.rules.json                    # Firebase RTDB security rules, indexes & permissions
+├── jsconfig.json                          # Path aliases: @/* -> ./src/*, @/components/* -> ./src/Closedesk/*
+├── netlify.toml                           # Edge CORS headers, build settings, Node 20 runtime
+├── next.config.js                         # Next.js compiler settings & API CORS configuration
+├── package.json                           # Root dependencies and operational scripts
+└── tailwind.config.js                     # Tailwind CSS content scan paths (pages + Closedesk)
 ```
 
 ---
@@ -194,8 +279,8 @@ CloseDesk decouples conversational client acquisition from backend intelligence,
 ### Prerequisites
 * **Node.js**: `>= 20.0.0`
 * **npm**: `>= 10.0.0`
-* **Firebase Project**: With Realtime Database enabled.
-* **OpenAI API Key**: With access to GPT-4o-mini and Realtime APIs.
+* **Firebase Project**: Realtime Database & Storage enabled.
+* **OpenAI API Key**: Access to GPT-4o-mini and Realtime APIs.
 
 ### 1. Clone & Install
 ```bash
@@ -205,7 +290,7 @@ npm install
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env.local` file in the project root:
+Create `.env.local` in the project root:
 
 ```env
 # Base Application URL
@@ -227,20 +312,21 @@ OPENAI_API_KEY=sk-proj-your_openai_api_key
 # Google Maps Platform (Visitor Map Display)
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 
+# Session Signing & Security (CD02)
+SESSION_SECRET=your_32_byte_session_signing_secret_here
+
 # AWS Polly Neural TTS (Optional Fallback)
 CUSTOM_AWS_REGION=us-east-1
 CUSTOM_AWS_ACCESS_KEY_ID=your_aws_access_key
 CUSTOM_AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 
-# Google Calendar OAuth (Optional)
+# Calendar Integrations (Optional)
 GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your_google_client_secret
-
-# Microsoft 365 OAuth (Optional)
 MICROSOFT_CLIENT_ID=your_microsoft_client_id
 MICROSOFT_CLIENT_SECRET=your_microsoft_client_secret
 
-# Webhooks & Scheduled Cleanup
+# Webhooks & Maintenance
 CRON_SECRET=your_secure_cron_secret
 MAKE_COM_EMAIL_WEBHOOK_URL=https://hook.make.com/your_webhook
 WEBHOOK_SECRET=your_webhook_secret
@@ -253,8 +339,9 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the application:
 * **Tenant & SuperAdmin Cockpit**: [http://localhost:3000/lg](http://localhost:3000/lg)
-* **Embedded Chatbot Sandbox**: [http://localhost:3000/embed/chatbot?tenant=demo](http://localhost:3000/embed/chatbot?tenant=demo)
+* **Embedded Chatbot Sandbox**: [http://localhost:3000/embed/chatbot?tenant=default](http://localhost:3000/embed/chatbot?tenant=default)
 * **Operational Logs**: [http://localhost:3000/logs](http://localhost:3000/logs)
+* **E2E Test Report**: [http://localhost:3000/e2e-report](http://localhost:3000/e2e-report)
 
 ---
 
@@ -262,19 +349,22 @@ Open [http://localhost:3000](http://localhost:3000) to view the application:
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Starts the Next.js development server with hot module reloading. |
-| `npm run build` | Compiles an optimized production build. |
+| `npm run dev` | Starts Next.js development server with Turbopack. |
+| `npm run build` | Compiles optimized Next.js production build. |
 | `npm start` | Runs the compiled production server. |
 | `npm run lint` | Analyzes code quality using ESLint. |
-| `npm run test:ai` | Executes the synthetic AI evaluation and safety harness. |
+| `npm run audit:cd01` | Runs deterministic CD01 baseline audit (matrix verification, policy hashing, claim scan). |
+| `npm run test:cd02` | Runs CD02 security acceptance suite (RBAC, step-up auth, scrypt, rate limiter, TOTP). |
+| `npm run test:ai` | Executes synthetic AI evaluation and safety harness. |
 | `node scripts/qa-simulator.js` | Runs end-to-end simulated chat and voice sessions. |
 | `node scripts/industry_regression_suite.js` | Runs multi-vertical regression suites across business rules. |
+| `node scripts/e2e_master_suite.js` | Runs master end-to-end platform acceptance suite. |
 
 ---
 
 ## Embedding on Client Websites
 
-To embed the CloseDesk front-desk on any external website (WordPress, Webflow, Shopify, Squarespace, or custom static sites), add this single script tag right before the closing `</body>` tag:
+To embed the CloseDesk front-desk on any external website (WordPress, Webflow, Shopify, Squarespace, or static HTML), add this single script tag right before the closing `</body>` tag:
 
 ```html
 <script 
@@ -286,8 +376,8 @@ To embed the CloseDesk front-desk on any external website (WordPress, Webflow, S
 
 ### How the Widget Works:
 1. **Lightweight Loader**: Loads asynchronously without blocking the host page.
-2. **Strict Privacy**: Displays the consent modal before activating cookies or telemetry.
-3. **Isolated Iframe**: Injects a transparent, zero-conflict sandboxed iframe hosting `/embed/chatbot`.
+2. **Strict Privacy**: Displays the consent modal before activating cookies or telemetry (`src/Closedesk/Essential/CookieConsentBanner.jsx`).
+3. **Isolated Iframe**: Injects a transparent, zero-conflict sandboxed iframe hosting `/embed/chatbot?tenant={tenantId}&anonId={uuid}`.
 4. **Adaptive Resizing**: Automatically handles expandable chat window geometry and mobile screen-docking via cross-domain `postMessage`.
 
 ---
@@ -300,7 +390,7 @@ To embed the CloseDesk front-desk on any external website (WordPress, Webflow, S
    * **Build Command:** `npm run build`
    * **Publish Directory:** `.next`
 3. Ensure all environment variables from `.env.local` are added to the Netlify site settings.
-4. Headers and edge CORS rules are pre-configured in [`netlify.toml`](file:///d:/Software%20House%2001/Closedesk-ready%20deploy/netlify.toml).
+4. Edge headers and CORS rules are pre-configured in [`netlify.toml`](file:///d:/Software%20House%2001/Closedesk-ready%20to%20deploy/netlify.toml).
 
 ### Firebase Realtime Database & Cloud Functions
 1. Deploy database security rules and index definitions:
@@ -317,10 +407,13 @@ To embed the CloseDesk front-desk on any external website (WordPress, Webflow, S
 
 ## Security & Compliance
 
-* **Tenant Isolation:** Enforced at both the database rule level ([`database.rules.json`](file:///d:/Software%20House%2001/Closedesk-ready%20deploy/database.rules.json)) and API middleware layer ([`tenantResolver.js`](file:///d:/Software%20House%2001/Closedesk-ready%20deploy/src/lib/tenantResolver.js)).
-* **NoSQL Injection Defense:** Centralized key sanitization ([`sanitizer.js`](file:///d:/Software%20House%2001/Closedesk-ready%20deploy/src/lib/sanitizer.js)) scrubs malicious characters before database writes.
+* **Server-Side RBAC & Step-Up Auth:** Destructive administrative actions (tenant provisioning, email protocol reconfiguration, password changes) require server-side session authentication with secondary factor verification (TOTP / Secondary PIN / Emergency Recovery Codes).
+* **Cryptographic Passwords:** Passwords hashed with salted scrypt (`scrypt:<salt>:<hash>`) with timing-safe comparison to prevent timing attacks.
+* **Cold-Start Persistent Throttling:** Brute-force protection stored in Firebase RTDB `/rate_limits/{clientKey}` persists across serverless cold starts.
+* **Tenant Isolation:** Enforced at both the database rule level ([`database.rules.json`](file:///d:/Software%20House%2001/Closedesk-ready%20to%20deploy/database.rules.json)) and API middleware layer ([`tenantResolver.js`](file:///d:/Software%20House%2001/Closedesk-ready%20to%20deploy/src/lib/tenantResolver.js)).
+* **NoSQL Injection Defense:** Centralized key sanitization ([`sanitizer.js`](file:///d:/Software%20House%2001/Closedesk-ready%20to%20deploy/src/lib/sanitizer.js)) scrubs malicious characters before database writes.
 * **Privacy Compliance:** Voice sessions and visitor location tracking require explicit user opt-in through the consent banner.
-* **Auditing:** Complete operational logs with structured correlation IDs and automatic PII masking ([`logger.js`](file:///d:/Software%20House%2001/Closedesk-ready%20deploy/src/lib/logger.js)).
+* **Auditing:** Complete operational logs with structured correlation IDs and automatic PII masking ([`logger.js`](file:///d:/Software%20House%2001/Closedesk-ready%20to%20deploy/src/lib/logger.js)).
 
 ---
 

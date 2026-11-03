@@ -1,7 +1,7 @@
 {
   "ticket": "CD03",
   "title": "Tenant Isolation and Secret Protection Baseline Evidence",
-  "timestamp": "2026-11-03T16:42:05.052Z",
+  "timestamp": "2026-11-03T18:38:21.395Z",
   "summary": {
     "total_tests": 32,
     "passed": 32,
@@ -25,7 +25,7 @@
         "statusCode": 200,
         "tenantId": "tenant_a"
       },
-      "timestamp": "2026-11-03T16:41:52.590Z"
+      "timestamp": "2026-11-03T18:10:40.110Z"
     },
     {
       "test_id": "AC1.2",
@@ -38,7 +38,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-03T16:41:53.193Z"
+      "timestamp": "2026-11-03T18:10:40.719Z"
     },
     {
       "test_id": "AC1.3",
@@ -51,7 +51,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-03T16:41:53.795Z"
+      "timestamp": "2026-11-03T18:10:41.329Z"
     },
     {
       "test_id": "AC1.4",
@@ -64,7 +64,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-03T16:41:54.398Z"
+      "timestamp": "2026-11-03T18:10:41.947Z"
     },
     {
       "test_id": "AC1.5",
@@ -77,7 +77,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-03T16:41:55.007Z"
+      "timestamp": "2026-11-03T18:10:42.558Z"
     },
     {
       "test_id": "AC1.6",
@@ -90,7 +90,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-03T16:41:55.619Z"
+      "timestamp": "2026-11-03T18:10:43.168Z"
     },
     {
       "test_id": "AC1.7",
@@ -103,7 +103,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', cannot query logs for 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-03T16:41:56.243Z"
+      "timestamp": "2026-11-03T18:10:43.781Z"
     },
     {
       "test_id": "AC1.8",
@@ -114,7 +114,7 @@
         "statusCode": 200,
         "logsCount": 0
       },
-      "timestamp": "2026-11-03T16:41:58.063Z"
+      "timestamp": "2026-11-03T18:10:45.604Z"
     },
     {
       "test_id": "AC2.1",
@@ -127,7 +127,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-03T16:41:58.064Z"
+      "timestamp": "2026-11-03T18:10:45.605Z"
     },
     {
       "test_id": "AC2.2",
@@ -140,7 +140,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-03T16:41:58.065Z"
+      "timestamp": "2026-11-03T18:10:45.605Z"
     },
     {
       "test_id": "AC2.3",
@@ -153,7 +153,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-03T16:41:58.065Z"
+      "timestamp": "2026-11-03T18:10:45.605Z"
     },
     {
       "test_id": "AC2.4",
@@ -166,7 +166,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-03T16:41:58.065Z"
+      "timestamp": "2026-11-03T18:10:45.606Z"
     },
     {
       "test_id": "AC2.5",
@@ -179,7 +179,7 @@
           "error": "Unauthorized. Authentication required."
         }
       },
-      "timestamp": "2026-11-03T16:41:58.066Z"
+      "timestamp": "2026-11-03T18:10:45.607Z"
     },
     {
       "test_id": "AC3.1",
@@ -189,7 +189,7 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-03T16:41:59.274Z"
+      "timestamp": "2026-11-03T18:10:46.820Z"
     },
     {
       "test_id": "AC3.2",
@@ -199,7 +199,7 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-03T16:42:00.480Z"
+      "timestamp": "2026-11-03T18:10:48.031Z"
     },
     {
       "test_id": "AC3.3",
@@ -210,7 +210,7 @@
         "statusCode": 200,
         "logsCount": 0
       },
-      "timestamp": "2026-11-03T16:42:02.293Z"
+      "timestamp": "2026-11-03T18:38:16.944Z"
     },
     {
       "test_id": "AC4.1",
@@ -224,7 +224,7 @@
           "success": true
         }
       },
-      "timestamp": "2026-11-03T16:42:03.505Z"
+      "timestamp": "2026-11-03T18:38:18.419Z"
     },
     {
       "test_id": "AC4.2",
@@ -238,7 +238,7 @@
         "fromOrigin": "brightstar",
         "fallback": "default"
       },
-      "timestamp": "2026-11-03T16:42:03.505Z"
+      "timestamp": "2026-11-03T18:38:18.419Z"
     },
     {
       "test_id": "AC4.3",
@@ -250,7 +250,7 @@
         "traversalAttempt2": "tenant_aleadssecrets",
         "traversalAttempt3": "tenantid"
       },
-      "timestamp": "2026-11-03T16:42:03.505Z"
+      "timestamp": "2026-11-03T18:38:18.419Z"
     },
     {
       "test_id": "AC5.1",
@@ -260,7 +260,7 @@
       "evidence": {
         "hasFirestoreSyntax": false
       },
-      "timestamp": "2026-11-03T16:42:03.505Z"
+      "timestamp": "2026-11-03T18:38:18.420Z"
     },
     {
       "test_id": "AC5.2",
@@ -270,7 +270,7 @@
       "evidence": {
         "rootRead": false
       },
-      "timestamp": "2026-11-03T16:42:03.505Z"
+      "timestamp": "2026-11-03T18:38:18.420Z"
     },
     {
       "test_id": "AC5.3",
@@ -280,7 +280,7 @@
       "evidence": {
         "parentTenantsRead": false
       },
-      "timestamp": "2026-11-03T16:42:03.505Z"
+      "timestamp": "2026-11-03T18:38:18.420Z"
     },
     {
       "test_id": "AC5.4",
@@ -290,7 +290,7 @@
       "evidence": {
         "emailConfigRead": "auth != null && auth.token.role === 'superadmin'"
       },
-      "timestamp": "2026-11-03T16:42:03.506Z"
+      "timestamp": "2026-11-03T18:38:18.420Z"
     },
     {
       "test_id": "AC5.5",
@@ -303,7 +303,7 @@
           ".write": false
         }
       },
-      "timestamp": "2026-11-03T16:42:03.506Z"
+      "timestamp": "2026-11-03T18:38:18.421Z"
     },
     {
       "test_id": "AC5.6",
@@ -313,7 +313,7 @@
       "evidence": {
         "parentSettingsRead": false
       },
-      "timestamp": "2026-11-03T16:42:03.506Z"
+      "timestamp": "2026-11-03T18:38:18.421Z"
     },
     {
       "test_id": "AC6.1",
@@ -328,7 +328,7 @@
           "refreshToken": "[REDACTED]"
         }
       },
-      "timestamp": "2026-11-03T16:42:03.507Z"
+      "timestamp": "2026-11-03T18:38:18.421Z"
     },
     {
       "test_id": "AC6.2",
@@ -338,18 +338,18 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-03T16:42:04.916Z"
+      "timestamp": "2026-11-03T18:38:19.832Z"
     },
     {
       "test_id": "AC6.3",
       "name": "Source code audit: Zero hardcoded private keys or synthetic canaries in application bundles",
       "status": "PASS",
-      "details": "Scanned 93 files in src/ and public/ without secret leaks.",
+      "details": "Scanned 94 files in src/ and public/ without secret leaks.",
       "evidence": {
-        "filesScanned": 93,
+        "filesScanned": 94,
         "leaks": []
       },
-      "timestamp": "2026-11-03T16:42:05.052Z"
+      "timestamp": "2026-11-03T18:38:21.393Z"
     },
     {
       "test_id": "AC7.1",
@@ -359,7 +359,7 @@
       "evidence": {
         "blockedCorrectly": true
       },
-      "timestamp": "2026-11-03T16:42:05.052Z"
+      "timestamp": "2026-11-03T18:38:21.394Z"
     },
     {
       "test_id": "AC7.2",
@@ -371,7 +371,7 @@
         "usedFallback": true,
         "provider": "platform_global"
       },
-      "timestamp": "2026-11-03T16:42:05.052Z"
+      "timestamp": "2026-11-03T18:38:21.394Z"
     },
     {
       "test_id": "AC7.3",
@@ -383,7 +383,7 @@
         "usedFallback": false,
         "provider": "custom_tenant"
       },
-      "timestamp": "2026-11-03T16:42:05.052Z"
+      "timestamp": "2026-11-03T18:38:21.394Z"
     },
     {
       "test_id": "AC7.4",
@@ -393,7 +393,7 @@
       "evidence": {
         "hasFallbackCheck": true
       },
-      "timestamp": "2026-11-03T16:42:05.052Z"
+      "timestamp": "2026-11-03T18:38:21.395Z"
     }
   ]
 }

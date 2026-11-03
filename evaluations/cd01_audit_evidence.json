@@ -1,9 +1,9 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-03T16:42:33.204Z",
+  "generated_at": "2026-11-03T18:39:27.560Z",
   "git": {
-    "headCommit": "976352b873f56dab8ae213e8a6a24d5a13e48777",
-    "branch": "feat/cd04-oauth-account-linking"
+    "headCommit": "6da8781737a63a74a3e81db44d473de3022be583",
+    "branch": "feat/cd05-public-endpoint-controls-budgets"
   },
   "runtime": {
     "node": "v26.8.2",
@@ -22,7 +22,8 @@
         "audit:cd01": "node scripts/cd01_baseline_audit.js",
         "test:cd02": "node scripts/cd02_security_acceptance_suite.js",
         "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js",
-        "test:cd04": "node scripts/cd04_oauth_linking_suite.js"
+        "test:cd04": "node scripts/cd04_oauth_linking_suite.js",
+        "test:cd05": "node scripts/cd05_public_controls_and_budgets_suite.js"
       }
     }
   },
@@ -92,7 +93,7 @@
   "verified_files": [
     {
       "path": "package.json",
-      "sizeBytes": 1076
+      "sizeBytes": 1151
     },
     {
       "path": "netlify.toml",
@@ -132,7 +133,7 @@
     },
     {
       "path": "src/pages/api/chat.js",
-      "sizeBytes": 17481
+      "sizeBytes": 19669
     },
     {
       "path": "src/pages/api/app-query.js",
@@ -140,15 +141,15 @@
     },
     {
       "path": "src/pages/api/openai-token.js",
-      "sizeBytes": 9919
+      "sizeBytes": 11498
     },
     {
       "path": "src/pages/api/tts.js",
-      "sizeBytes": 1764
+      "sizeBytes": 3743
     },
     {
       "path": "src/pages/api/sync-voice.js",
-      "sizeBytes": 9638
+      "sizeBytes": 10038
     },
     {
       "path": "src/Closedesk/Dashboard/Booking.jsx",
@@ -172,7 +173,7 @@
     },
     {
       "path": "src/pages/api/leads.js",
-      "sizeBytes": 8830
+      "sizeBytes": 10700
     },
     {
       "path": "src/pages/api/cron/retention-cleanup.js",
@@ -184,11 +185,11 @@
     },
     {
       "path": "src/pages/api/analyze-image.js",
-      "sizeBytes": 4062
+      "sizeBytes": 6333
     },
     {
       "path": "src/Closedesk/Dashboard/Report.jsx",
-      "sizeBytes": 32815
+      "sizeBytes": 32962
     },
     {
       "path": "src/Closedesk/Dashboard/LiveNotifications.jsx",
@@ -208,11 +209,11 @@
     },
     {
       "path": "src/pages/api/generate-email.js",
-      "sizeBytes": 1995
+      "sizeBytes": 2979
     },
     {
       "path": "functions/index.js",
-      "sizeBytes": 24832
+      "sizeBytes": 24939
     },
     {
       "path": "docs/VOICE_PRIVACY_POLICY.md",

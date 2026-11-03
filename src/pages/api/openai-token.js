@@ -4,6 +4,20 @@ import { withApiLogger } from "../../lib/apiMiddleware";
 import { resolveTenantId } from "../../lib/tenantResolver";
 import { db } from "../../lib/firebase";
 import { ref, get } from "firebase/database";
+import { recordAuthoritativeAiTrace } from "../../lib/aiTracer";
+import {
+  validateRequestBodySize,
+  acquireConcurrencySlot,
+  checkAndReserveBudget,
+} from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '16kb',
+    },
+  },
+};
 
 // --- SECURITY: Rate Limiting ---
 const rateLimitMap = new Map();
@@ -25,11 +39,27 @@ function generateHash(str) {
 
 async function handler(req, res, apiLogger) {
   if (req.method !== "POST")
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed", code: "METHOD_NOT_ALLOWED" });
+
+  // 1. Enforce 16KB body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 16384)) return;
 
   try {
     const tenantId = resolveTenantId(req);
     const isTenant = tenantId && tenantId !== "default";
+
+    // 2. Concurrency Check (returns 429)
+    const concurrency = acquireConcurrencySlot(tenantId, 5);
+    if (!concurrency.allowed) {
+      return res.status(429).json({ error: concurrency.error, code: "CONCURRENCY_LIMIT_EXCEEDED", tenantId });
+    }
+
+    // 3. Budget Check & Reservation (returns 429)
+    const budget = checkAndReserveBudget(tenantId, 500);
+    if (!budget.allowed) {
+      concurrency.release();
+      return res.status(429).json({ error: budget.error, code: budget.code, tenantId });
+    }
 
     // 🚨 SECURITY GATE: Verify tenant validity
     if (isTenant) {
@@ -265,11 +295,31 @@ async function handler(req, res, apiLogger) {
 
     const data = await response.json();
     if (!response.ok)
-      return res.status(response.status).json({ error: data.error?.message });
+      {
+        budget.commit(0);
+        concurrency.release();
+        return res.status(response.status).json({ error: data.error?.message });
+      }
+
+    budget.commit(500);
+    concurrency.release();
+
+    recordAuthoritativeAiTrace({
+      provider: "openai-realtime",
+      model: "gpt-4o-realtime-preview",
+      tenantId,
+      sessionId: session_id,
+      operation: "voice_token",
+      usage: { total_tokens: "unknown", prompt_tokens: "unknown", completion_tokens: "unknown" },
+      status: "completed",
+      estimatedCostUsd: "unknown",
+    });
 
     res.status(200).json({ ...data, versions: sessionVersions });
   } catch (error) {
     apiLogger.error("Token Generation Failure:", error);
+    if (typeof budget !== 'undefined' && budget?.commit) budget.commit(0);
+    if (typeof concurrency !== 'undefined' && concurrency?.release) concurrency.release();
     res.status(500).json({ error: "Failed to generate session token" });
   }
 }

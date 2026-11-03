@@ -2,6 +2,16 @@
 import { db } from "../../lib/firebase";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { ref, get, update, set, push } from "firebase/database";
+import { validateRequestBodySize } from "../../lib/publicEndpointGuard";
+import { sanitizeUntrustedTelemetry } from "../../lib/sanitizer";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '32kb',
+    },
+  },
+};
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidWebsite = (url) => /^[^\s]+\.[^\s]+$/.test(url);
@@ -9,7 +19,10 @@ const isValidWebsite = (url) => /^[^\s]+\.[^\s]+$/.test(url);
 const isValidSessionId = (id) => /^lead_\d+_[a-z0-9]{5,10}$/i.test(id);
 
 async function handler(req, res, apiLogger) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed", code: "METHOD_NOT_ALLOWED" });
+
+  // 1. Enforce 32KB body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 32768)) return;
 
   const {
     session_id,
@@ -33,7 +46,7 @@ async function handler(req, res, apiLogger) {
     try {
       await push(ref(db, `voice_telemetry/${session_id}`), {
         timestamp: new Date().toISOString(),
-        ...telemetry_data,
+        ...sanitizeUntrustedTelemetry(telemetry_data || {}),
       });
 
       apiLogger.info("voice_telemetry", "turn_metrics_recorded", {

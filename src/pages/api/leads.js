@@ -6,8 +6,20 @@ import { ref, update, get } from "firebase/database";
 import { traceAiExecution } from "../../lib/aiTracer"; // 🔥 Integrates Ticket 5 Tracer for the abandoned summaries
 import { executeDbWithTrace } from "../../lib/dbTracer";
 import { resolveTenantId, resolveAuthenticatedTenantId } from "../../lib/tenantResolver";
-import { sanitizeFirebaseKey, sanitizeFirebasePayload, redactSensitiveSecrets } from "../../lib/sanitizer";
+import { sanitizeFirebaseKey, sanitizeFirebasePayload, redactSensitiveSecrets, stripCrlf, escapeHtml } from "../../lib/sanitizer";
 import { safeDbGet, safeDbUpdate } from "../../lib/safeDb";
+import {
+  validateRequestBodySize,
+  checkLeadSubmissionIdempotency,
+} from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '32kb',
+    },
+  },
+};
 
 
 async function handler(req, res, apiLogger) {
@@ -55,11 +67,46 @@ async function handler(req, res, apiLogger) {
   // POST REQUEST: SAVE LEAD FROM CHATBOT
   // ==========================================
   if (req.method === "POST") {
+    // 1. Enforce 32KB request body size cap (returns 413)
+    if (!validateRequestBodySize(req, res, 32768)) return;
+
     if (!req.body || typeof req.body !== "object" || Object.keys(req.body).length === 0) {
       apiLogger.warn("lead_lifecycle", "lead_validation_failed", {
         context: { reason: "Payload is empty or malformed" }
       });
-      return res.status(400).json({ error: "Invalid payload format" });
+      return res.status(400).json({ error: "Invalid payload format", code: "INVALID_PAYLOAD" });
+    }
+
+    const tenantId = resolveTenantId(req) || req.body?.tenant_id || "default";
+
+    // 2. Anti-Spam Lead Idempotency & Rate Cap Check
+    const clientIp = (req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
+    const sessionOrIp = req.body.anonId || req.body.session_id || clientIp;
+    const idempotency = checkLeadSubmissionIdempotency(req.body, tenantId, sessionOrIp, 60000);
+    if (!idempotency.allowed) {
+      if (idempotency.isDuplicate) {
+        apiLogger.info("lead_lifecycle", "lead_idempotent_duplicate_deduplicated", {
+          context: { tenantId, leadHash: idempotency.leadHash }
+        });
+        return res.status(200).json({
+          id: req.body.firebaseId || `lead_${Date.now()}`,
+          success: true,
+          message: "Duplicate lead submission deduplicated",
+          deduplicated: true,
+        });
+      }
+      if (idempotency.isRateLimited) {
+        return res.status(429).json({
+          error: idempotency.reason || "Lead submission rate limit exceeded.",
+          code: "RATE_LIMIT_EXCEEDED",
+        });
+      }
+    }
+
+    // 3. Strip any hostile arbitrary email recipient fields
+    const FORBIDDEN_RECIPIENT_KEYS = ["to", "cc", "bcc", "recipient", "receiverEmail", "receiver_email", "mail_to"];
+    for (const k of FORBIDDEN_RECIPIENT_KEYS) {
+      delete req.body[k];
     }
 
     // 🚨 SECURITY: Deep sanitize payload and keys to prevent NoSQL path traversal injection
@@ -153,6 +200,10 @@ async function handler(req, res, apiLogger) {
             prompt_version: "abandoned_summary_v1",
             conversation_state: "abandoned_chat",
             detected_intent: "summarize",
+            provider: "openai",
+            tenantId,
+            sessionId: session_id,
+            operation: "abandoned_summary",
           });
 
           data.conversation_summary = completion.choices[0].message.content.trim();

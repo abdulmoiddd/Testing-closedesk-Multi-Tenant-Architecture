@@ -1,9 +1,9 @@
 {
   "ticket": "CD02",
   "title": "Privileged Access and Sessions",
-  "timestamp": "2026-11-03T16:42:11.951Z",
-  "gitCommit": "976352b873f56dab8ae213e8a6a24d5a13e48777",
-  "gitBranch": "feat/cd04-oauth-account-linking",
+  "timestamp": "2026-11-03T18:38:40.106Z",
+  "gitCommit": "6da8781737a63a74a3e81db44d473de3022be583",
+  "gitBranch": "feat/cd05-public-endpoint-controls-budgets",
   "nodeVersion": "v26.8.2",
   "results": [
     {
@@ -102,7 +102,7 @@
       "description": "hashPassword generates format 'scrypt:<salt>:<hash>' with 16-byte random salt",
       "status": "PASS",
       "details": {
-        "format": "scrypt:a9e807a60e1637f4207d886...",
+        "format": "scrypt:d0cb9deb9b1c667b97e257f...",
         "saltLength": 32,
         "hashLength": 128
       }
@@ -210,7 +210,7 @@
       "description": "generateTotp / verifyTotp generates and validates 6-digit RFC 6238 code",
       "status": "PASS",
       "details": {
-        "code": "239507",
+        "code": "507013",
         "secretLength": 32
       }
     },

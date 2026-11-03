@@ -87,3 +87,113 @@ export function redactSensitiveSecrets(data, options = {}) {
   return data;
 }
 
+/**
+ * Escapes HTML characters in a string to prevent XSS injection.
+ *
+ * @param {string|any} str
+ * @returns {string} Safe HTML string
+ */
+export function escapeHtml(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+export const sanitizeHtml = escapeHtml;
+
+/**
+ * Strips carriage returns and newlines from strings destined for email headers
+ * (Subject, To, From, etc.) to strictly prevent CRLF / header injection attacks.
+ *
+ * @param {string|any} str
+ * @returns {string} Sanitized header string
+ */
+export function sanitizeEmailHeader(str) {
+  if (str === null || str === undefined) return "";
+  return String(str).replace(/[\r\n]+/g, " ").trim();
+}
+
+export const stripCrlf = sanitizeEmailHeader;
+
+/**
+ * Sanitizes a cell value for CSV export to strictly prevent CSV Formula Injection
+ * (CWE-1236 / DDE Injection). If a string starts with `=`, `+`, `-`, `@`, `\t`, or `\r`
+ * (including with leading whitespace), it is prefixed with a single quote `'` and wrapped in quotes.
+ * Inner double quotes are escaped as `""` per RFC 4180.
+ *
+ * @param {any} val
+ * @returns {string} Safe CSV cell
+ */
+export function sanitizeCsvCell(val) {
+  if (val === null || val === undefined) return '""';
+  let str = String(val);
+
+  // If the cell begins with formula or command execution triggers, prefix with single quote (')
+  if (/^[\s]*[=+\-@\t\r]/.test(str)) {
+    str = "'" + str;
+  }
+
+  // Escape inner double quotes per RFC 4180
+  const escaped = str.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+/**
+ * Formats an array of cell values into an RFC 4180 compliant CSV row
+ * with formula injection protection applied to every cell.
+ *
+ * @param {Array<any>} cells
+ * @returns {string} CSV line
+ */
+export function formatCsvRow(cells) {
+  if (!Array.isArray(cells)) return "";
+  return cells.map(sanitizeCsvCell).join(",");
+}
+
+/**
+ * Strips privileged authority claims and audit forgery fields from untrusted public telemetry payloads.
+ * Server-stamps the record with authoritative anonymous visitor attributes.
+ *
+ * @param {object} payload - Untrusted client-supplied JSON
+ * @returns {object} Cleaned telemetry payload
+ */
+export function sanitizeUntrustedTelemetry(payload) {
+  if (!payload || typeof payload !== "object") return {};
+
+  const FORBIDDEN_CLIENT_KEYS = new Set([
+    "actor",
+    "role",
+    "isSuperAdmin",
+    "issuperadmin",
+    "auditOutcome",
+    "auditoutcome",
+    "outcome",
+    "permissions",
+    "claims",
+    "authenticated",
+    "verified",
+    "userId",
+    "userid",
+  ]);
+
+  const clean = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (FORBIDDEN_CLIENT_KEYS.has(key)) {
+      continue; // Quarantine / strip client-supplied privilege claims
+    }
+    clean[key] = value;
+  }
+
+  // Authoritatively stamp from server perspective
+  clean.actor = "anonymous_visitor";
+  clean.role = "public";
+  clean.source = "untrusted_client";
+  clean.verified_by_server = false;
+
+  return clean;
+}
+

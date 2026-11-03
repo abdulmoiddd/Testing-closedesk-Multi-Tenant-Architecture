@@ -25,7 +25,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: "class",
-  content: ["./src/pages/**/*.{js,jsx}", "./src/components/**/*.{js,jsx}"],
+  content: ["./src/pages/**/*.{js,jsx}", "./src/Closedesk/**/*.{js,jsx}", "./src/components/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
@@ -59,7 +59,7 @@ module.exports = {
 // /** @type {import('tailwindcss').Config} */
 // module.exports = {
 //   darkMode: "class",
-//   content: ["./src/pages/**/*.{js,jsx}", "./src/components/**/*.{js,jsx}"],
+//   content: ["./src/pages/**/*.{js,jsx}", "./src/Closedesk/**/*.{js,jsx}", "./src/components/**/*.{js,jsx}"],
 //   theme: {
 //     extend: {
 //       colors: {

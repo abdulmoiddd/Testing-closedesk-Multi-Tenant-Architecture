@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-import AicyroChatbot from "@/components/Chatbot/AicyroChatbot";
+import AicyroChatbot from "@/Closedesk/Chatbot/AicyroChatbot";
 
 export default function EmbeddedChatbotPage() {
   const router = useRouter();

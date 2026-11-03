@@ -341,24 +341,24 @@ The Pulse Dashboard is transformed into a **Multi-Tenant SaaS Operations Center*
 ```
 
 ### 6.1 SuperAdmin: Multi-Tenant Provisioning Workflow
-Located in [src/components/Dashboard/superadmin/](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/superadmin/):
+Located in [src/Closedesk/Dashboard/superadmin/](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/superadmin/):
 1. **Tenant Onboarding Wizard:**
    * Enter `tenant_id`, Company Name, and Primary Admin Email.
    * Select Industry Pack (`hvac_v2`, `plumbing_v2`, etc.).
    * Configure Whitelisted Domains (e.g. `clientwebsite.com`).
    * System generates public embedding snippet and cryptographically securely hashes initial tenant admin credentials.
 2. **Global Communication Protocols:**
-   * [SuperAdminEmailProtocol.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/superadmin/Settings/SuperAdminEmailProtocol.jsx) manages shared outbound relays (Microsoft 365 OAuth2, Google Workspace, AWS SES, SendGrid).
+   * [SuperAdminEmailProtocol.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/superadmin/Settings/SuperAdminEmailProtocol.jsx) manages shared outbound relays (Microsoft 365 OAuth2, Google Workspace, AWS SES, SendGrid).
 
 ### 6.2 Tenant Admin: Isolated Operations Cockpit
 When a tenant logs in at `app.closedesk.ai/lg`, their authenticated session binds `tenant_id` to all view components:
-* **Inbound Triage ([TerminalScreen.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/TerminalScreen.jsx)):**  
+* **Inbound Triage ([TerminalScreen.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/TerminalScreen.jsx)):**  
   Listens exclusively to `/tenants/{tenant_id}/leads`. Real-time WebSocket triggers flash urgent leads in red, trigger audio chimes, and allow 1-click callback phone dialer actions.
-* **Appointments & Dispatch ([Booking.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Booking.jsx)):**  
+* **Appointments & Dispatch ([Booking.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Booking.jsx)):**  
   Listens exclusively to `/tenants/{tenant_id}/bookings`. Dispatchers confirm, reschedule, or reassign field appointments.
-* **Conversations & Transcripts ([Conversations.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Conversations.jsx)):**  
+* **Conversations & Transcripts ([Conversations.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Conversations.jsx)):**  
   Subscribes to `/tenants/{tenant_id}/transcripts`. Allows listening to voice session replays, viewing vision inspection photos, and reviewing tool call history.
-* **Branding & Voice Profile ([apearance.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/apearance.jsx)):**  
+* **Branding & Voice Profile ([apearance.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Settings/apearance.jsx)):**  
   Tenants adjust their public widget accent color, upload custom avatar logos, and select voice personas (Alloy, Echo, Shimmer, Coral, Ash). Changes immediately propagate to their external embedded widget via Firebase WebSockets.
 
 ---

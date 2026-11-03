@@ -1,4 +1,4 @@
-// src/components/Dashboard/Settings/Chatbotsetting.jsx
+// src/Closedesk/Dashboard/Settings/Chatbotsetting.jsx
 "use client";
 
 import { useState, useEffect } from "react";

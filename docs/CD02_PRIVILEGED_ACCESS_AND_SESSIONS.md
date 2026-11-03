@@ -145,11 +145,11 @@ All passwords and PINs are protected using Node's native `crypto.scryptSync`:
 - `database.rules.json`: Removed root `.read: true, .write: true`. Locked down `superAdmin`, `login`, `settings`, `tenants`, and `system_security` nodes to authenticated Super Admin or server SDK writes only.
 
 ### 4.4 Frontend Components Updated
-- `src/components/Dashboard/superadmin/ClientManagement.jsx`: Updated to invoke `/api/superadmin/tenants` for tenant creation, user updates, and profile edits. Integrated session headers, cookies, and Secondary PIN Verification labelling.
-- `src/components/Dashboard/superadmin/Settings/SuperAdminEmailProtocol.jsx`: Updated to invoke `/api/superadmin/settings` instead of direct Firebase client writes.
-- `src/components/Dashboard/Settings/PasswordChange.jsx`: Updated to call `/api/user/password` with session rotation.
-- `src/components/Dashboard/superadmin/superadminlogin.jsx`: Updated to include credentials and store session token.
-- `src/components/Dashboard/LoginScreen.jsx`: Updated to include credentials and store session token.
+- `src/Closedesk/Dashboard/superadmin/ClientManagement.jsx`: Updated to invoke `/api/superadmin/tenants` for tenant creation, user updates, and profile edits. Integrated session headers, cookies, and Secondary PIN Verification labelling.
+- `src/Closedesk/Dashboard/superadmin/Settings/SuperAdminEmailProtocol.jsx`: Updated to invoke `/api/superadmin/settings` instead of direct Firebase client writes.
+- `src/Closedesk/Dashboard/Settings/PasswordChange.jsx`: Updated to call `/api/user/password` with session rotation.
+- `src/Closedesk/Dashboard/superadmin/superadminlogin.jsx`: Updated to include credentials and store session token.
+- `src/Closedesk/Dashboard/LoginScreen.jsx`: Updated to include credentials and store session token.
 - `src/pages/lg.jsx`: Updated logout handler to notify `/api/superadmin/logout` or `/api/logout`.
 
 ---

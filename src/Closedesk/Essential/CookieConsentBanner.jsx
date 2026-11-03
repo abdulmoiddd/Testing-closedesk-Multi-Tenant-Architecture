@@ -1,4 +1,4 @@
-// src/components/Essential/CookieConsentBanner.jsx
+// src/Closedesk/Essential/CookieConsentBanner.jsx
 import React, { useState, useEffect } from "react";
 import { ref, set } from "firebase/database";
 import { db } from "../../lib/firebase";

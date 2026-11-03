@@ -90,10 +90,10 @@ Works with **WordPress, Webflow, Shopify, Squarespace, Wix, or static HTML**.
 ### Method B: Native React Component (New Next.js / React App)
 If you are building a new React or Next.js website and want to embed CloseDesk directly into the component tree:
 
-1. Copy [src/components/Chatbot/AicyroChatbot.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Chatbot/AicyroChatbot.jsx) into your new project.
+1. Copy [src/Closedesk/Chatbot/AicyroChatbot.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Chatbot/AicyroChatbot.jsx) into your new project.
 2. Mount the component anywhere in your layout:
    ```jsx
-   import AicyroChatbot from "@/components/Chatbot/AicyroChatbot";
+   import AicyroChatbot from "@/Closedesk/Chatbot/AicyroChatbot";
 
    export default function AppLayout({ children }) {
      return (
@@ -147,12 +147,12 @@ The Pulse Dashboard ([src/pages/lg.jsx](file:///d:/Software%20House%2001/CloseDe
 #### 1. Tenant Authentication Flow:
 * Client dispatchers log in with their assigned username and password via `LoginScreen.jsx`.
 * [/api/login](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/pages/api/login.js) validates credentials against `tenants/{tenant_id}/users` (or root `login`).
-* Upon success, the session stores the tenant identifier. All dashboard modules ([TerminalScreen.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/TerminalScreen.jsx), [Booking.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Booking.jsx), [Conversations.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Conversations.jsx)) subscribe exclusively to `/tenants/{tenant_id}/...`.
+* Upon success, the session stores the tenant identifier. All dashboard modules ([TerminalScreen.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/TerminalScreen.jsx), [Booking.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Booking.jsx), [Conversations.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Conversations.jsx)) subscribe exclusively to `/tenants/{tenant_id}/...`.
 
 #### 2. Master Super Admin Flow:
 * The platform administrator clicks **Super Admin Portal** on `/lg`.
 * Authenticates via `superadminlogin.jsx`.
-* Opens [ClientManagement.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/superadmin/ClientManagement.jsx) to:
+* Opens [ClientManagement.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/superadmin/ClientManagement.jsx) to:
   * Create new client tenants (e.g. `apex_plumbing`).
   * Assign the Industry Pack (`plumbing_v2`).
   * Issue initial admin credentials.
@@ -165,7 +165,7 @@ The Pulse Dashboard ([src/pages/lg.jsx](file:///d:/Software%20House%2001/CloseDe
 If you want to replace the current public marketing pages with a completely new website design:
 
 ### Step 1: Replace or Delete Marketing Components
-* The marketing components live cleanly under `src/components/Home/` and `src/components/Essential/`.
+* The marketing components live cleanly under `src/Closedesk/Home/` and `src/Closedesk/Essential/`.
 * You can safely replace [src/pages/index.jsx](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/pages/index.jsx) with your new landing page layout.
 * If your new marketing site is hosted elsewhere (e.g., WordPress, Webflow, Webflow Cloud), you can configure [next.config.js](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/next.config.js) to redirect root `/` to the external marketing site while keeping `/lg`, `/embed/*`, and `/api/*` active:
   ```javascript

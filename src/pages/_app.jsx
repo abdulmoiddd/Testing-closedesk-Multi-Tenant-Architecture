@@ -3,8 +3,8 @@ import React, { useEffect } from "react";
 import { useRouter } from "next/router";
 import "@/styles/globals.css";
 import RootLayout from "./layout";
-import ThemeProvider from "../components/ThemeProvider";
-import GlobalActivityTracker from "../components/GlobalActivityTracker";
+import ThemeProvider from "../Closedesk/ThemeProvider";
+import GlobalActivityTracker from "../Closedesk/GlobalActivityTracker";
 import { trackVisit } from "../lib/activityTracker";
 
 // Import tracing utility

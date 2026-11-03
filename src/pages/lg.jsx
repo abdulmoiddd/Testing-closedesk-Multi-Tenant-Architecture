@@ -5,25 +5,25 @@ import { useState, useEffect, useRef } from "react";
 import { db } from "../lib/firebase";
 import { ref, onValue, get } from "firebase/database";
 
-import LoginScreen from "../components/Dashboard/LoginScreen";
-import SuperAdminLoginScreen from "../components/Dashboard/superadmin/superadminlogin";
-import SuperAdminDashboard from "../components/Dashboard/superadmin/SuperAdminDashboard";
+import LoginScreen from "../Closedesk/Dashboard/LoginScreen";
+import SuperAdminLoginScreen from "../Closedesk/Dashboard/superadmin/superadminlogin";
+import SuperAdminDashboard from "../Closedesk/Dashboard/superadmin/SuperAdminDashboard";
 
-import HomeScreen from "../components/Dashboard/HomeScreen";
-import TerminalScreen from "../components/Dashboard/TerminalScreen";
-import BookingsScreen from "../components/Dashboard/Booking";
-import Insight from "@/components/Dashboard/Insight";
-import Conversations from "../components/Dashboard/Conversations";
-import Report from "../components/Dashboard/Report";
+import HomeScreen from "../Closedesk/Dashboard/HomeScreen";
+import TerminalScreen from "../Closedesk/Dashboard/TerminalScreen";
+import BookingsScreen from "../Closedesk/Dashboard/Booking";
+import Insight from "@/Closedesk/Dashboard/Insight";
+import Conversations from "../Closedesk/Dashboard/Conversations";
+import Report from "../Closedesk/Dashboard/Report";
 
-import PasswordChange from "../components/Dashboard/Settings/PasswordChange";
-import BusinessProfile from "../components/Dashboard/Settings/BusinessProfile";
-import ChatbotSettings from "../components/Dashboard/Settings/Chatbotsetting";
-import NotificationSettings from "../components/Dashboard/Settings/notification-settings";
-import Apearance from "../components/Dashboard/Settings/apearance";
+import PasswordChange from "../Closedesk/Dashboard/Settings/PasswordChange";
+import BusinessProfile from "../Closedesk/Dashboard/Settings/BusinessProfile";
+import ChatbotSettings from "../Closedesk/Dashboard/Settings/Chatbotsetting";
+import NotificationSettings from "../Closedesk/Dashboard/Settings/notification-settings";
+import Apearance from "../Closedesk/Dashboard/Settings/apearance";
 
-import LiveNotifications from "../components/Dashboard/LiveNotifications";
-import CookieDataDisplay from "../components/Dashboard/CookieDataDisplay";
+import LiveNotifications from "../Closedesk/Dashboard/LiveNotifications";
+import CookieDataDisplay from "../Closedesk/Dashboard/CookieDataDisplay";
 
 // Implement the new Website Logger
 import { createWebsiteLogger } from "../lib/loggerPresets";

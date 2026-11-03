@@ -9,6 +9,19 @@ import { executeRagWithTrace } from "../../lib/ragTracer";
 
 import { traceAiExecution, safeParseAiResponse } from "../../lib/aiTracer";
 import { withRetryTrace } from "../../lib/retryTracer"; // 🔥 TICKET 12: Added Retry Tracer
+import {
+  validateRequestBodySize,
+  acquireConcurrencySlot,
+  checkAndReserveBudget,
+} from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '32kb',
+    },
+  },
+};
 
 function generateHash(str) {
   let hash = 5381;
@@ -106,12 +119,23 @@ async function logAnalyticsEvent(session_id, channel, state, temperature, intent
 }
 
 async function handler(req, res, apiLogger) {
-  if (req.method !== "POST") return res.status(405).json({ reply: "Method not allowed." });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed.", code: "METHOD_NOT_ALLOWED" });
+
+  // 1. Enforce 32KB request body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 32768)) return;
+
+  // 2. Validate JSON structure (returns 400)
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    return res.status(400).json({ error: "Invalid JSON payload structure.", code: "INVALID_PAYLOAD" });
+  }
 
   let sessionIdForErrorLog = "unknown";
   let channelForErrorLog = "web_widget";
   let errorCategory = "general_backend_failure";
   let sessionVersions = { policy: POLICY_VERSION, config_snapshot: "unknown", knowledge: "unknown" };
+  let activeConcurrency = null;
+  let activeBudget = null;
+  let actualTokensRecorded = null;
 
   try {
     const {
@@ -125,8 +149,28 @@ async function handler(req, res, apiLogger) {
     if (session_id) sessionIdForErrorLog = session_id;
     if (channel) channelForErrorLog = channel;
 
-    if (!session_id) return res.status(400).json({ reply: "Session ID required." });
-    if (!messages || !Array.isArray(messages)) return res.status(400).json({ reply: "Conversation history required." });
+    if (!session_id || typeof session_id !== "string") {
+      return res.status(400).json({ error: "Session ID required as a string.", code: "INVALID_PAYLOAD" });
+    }
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "Conversation history required as an array.", code: "INVALID_PAYLOAD" });
+    }
+
+    const tenantId = resolveTenantId(req) || "default";
+
+    // 3. In-flight Concurrency Check (returns 429)
+    activeConcurrency = acquireConcurrencySlot(tenantId, 10);
+    if (!activeConcurrency.allowed) {
+      return res.status(429).json({ error: activeConcurrency.error, code: "CONCURRENCY_LIMIT_EXCEEDED", tenantId });
+    }
+
+    // 4. Budget Quota Check & Reservation (returns 429)
+    activeBudget = checkAndReserveBudget(tenantId, 500);
+    if (!activeBudget.allowed) {
+      activeConcurrency.release();
+      activeConcurrency = null;
+      return res.status(429).json({ error: activeBudget.error, code: activeBudget.code, tenantId });
+    }
 
     const isFirstMessage = messages.length === 1;
 
@@ -233,7 +277,7 @@ async function handler(req, res, apiLogger) {
       validatedData = await withRetryTrace(
         apiLogger, 
         "LLM_Execution_And_Parsing", 
-        { maxAttempts: 2, delayMs: 1000 }, 
+        { maxAttempts: 2, delayMs: 1000, tenantId, estimatedRetryTokens: 500 }, 
         async (attempt) => {
           
           const llmPromise = openai.chat.completions.create({
@@ -245,7 +289,15 @@ async function handler(req, res, apiLogger) {
           });
 
           // Triggers Ticket 5 (AI Trace) inside Ticket 12 (Retry Trace)
-          const completion = await traceAiExecution(apiLogger, llmPromise, aiContext);
+          const completion = await traceAiExecution(apiLogger, llmPromise, {
+            ...aiContext,
+            provider: "openai",
+            tenantId,
+            sessionId: session_id,
+            operation: "chat",
+            retryCount: attempt - 1,
+          });
+          actualTokensRecorded = completion?.usage?.total_tokens;
           const rawContent = completion.choices[0].message.content;
           const aiResponse = safeParseAiResponse(apiLogger, rawContent, aiContext);
           
@@ -338,6 +390,15 @@ async function handler(req, res, apiLogger) {
       throw dbErr;
     }
 
+    if (activeBudget) {
+      activeBudget.commit(actualTokensRecorded);
+      activeBudget = null;
+    }
+    if (activeConcurrency) {
+      activeConcurrency.release();
+      activeConcurrency = null;
+    }
+
     return res.status(200).json({
       ...validatedData,
       context_patch: backendPayload.context_patch,
@@ -354,6 +415,15 @@ async function handler(req, res, apiLogger) {
       fallbackReply = "I had trouble saving your last request due to a database delay. Could you please confirm that one more time?";
     } else if (errorCategory === "schema_failure") {
       fallbackReply = "My system had a minor processing hiccup. Could you rephrase that slightly?";
+    }
+
+    if (activeBudget) {
+      activeBudget.commit(actualTokensRecorded);
+      activeBudget = null;
+    }
+    if (activeConcurrency) {
+      activeConcurrency.release();
+      activeConcurrency = null;
     }
 
     return res.status(200).json({

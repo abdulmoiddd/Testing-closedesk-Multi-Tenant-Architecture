@@ -10,7 +10,9 @@
     "test:ai": "node scripts/run_evaluations.js",
     "audit:cd01": "node scripts/cd01_baseline_audit.js",
     "test:cd02": "node scripts/cd02_security_acceptance_suite.js",
-    "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js"
+    "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js",
+    "test:cd04": "node scripts/cd04_oauth_linking_suite.js",
+    "test:cd05": "node scripts/cd05_public_controls_and_budgets_suite.js"
   },
   "engines": {
     "node": ">=20"

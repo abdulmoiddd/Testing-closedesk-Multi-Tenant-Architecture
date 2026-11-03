@@ -1,9 +1,9 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-03T15:39:28.598Z",
+  "generated_at": "2026-11-03T18:39:27.560Z",
   "git": {
-    "headCommit": "18a580dbecfec881c2502586232c1b5a766ef46b",
-    "branch": "feat/cd03-tenant-isolation-secret-protection"
+    "headCommit": "6da8781737a63a74a3e81db44d473de3022be583",
+    "branch": "feat/cd05-public-endpoint-controls-budgets"
   },
   "runtime": {
     "node": "v26.8.2",
@@ -21,7 +21,9 @@
         "test:ai": "node scripts/run_evaluations.js",
         "audit:cd01": "node scripts/cd01_baseline_audit.js",
         "test:cd02": "node scripts/cd02_security_acceptance_suite.js",
-        "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js"
+        "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js",
+        "test:cd04": "node scripts/cd04_oauth_linking_suite.js",
+        "test:cd05": "node scripts/cd05_public_controls_and_budgets_suite.js"
       }
     }
   },
@@ -91,7 +93,7 @@
   "verified_files": [
     {
       "path": "package.json",
-      "sizeBytes": 1015
+      "sizeBytes": 1151
     },
     {
       "path": "netlify.toml",
@@ -131,7 +133,7 @@
     },
     {
       "path": "src/pages/api/chat.js",
-      "sizeBytes": 17481
+      "sizeBytes": 19669
     },
     {
       "path": "src/pages/api/app-query.js",
@@ -139,15 +141,15 @@
     },
     {
       "path": "src/pages/api/openai-token.js",
-      "sizeBytes": 9919
+      "sizeBytes": 11498
     },
     {
       "path": "src/pages/api/tts.js",
-      "sizeBytes": 1764
+      "sizeBytes": 3743
     },
     {
       "path": "src/pages/api/sync-voice.js",
-      "sizeBytes": 9638
+      "sizeBytes": 10038
     },
     {
       "path": "src/Closedesk/Dashboard/Booking.jsx",
@@ -155,23 +157,23 @@
     },
     {
       "path": "src/pages/api/auth/google/login.js",
-      "sizeBytes": 693
+      "sizeBytes": 2188
     },
     {
       "path": "src/pages/api/auth/google/callback.js",
-      "sizeBytes": 2448
+      "sizeBytes": 4451
     },
     {
       "path": "src/pages/api/auth/microsoft/login.js",
-      "sizeBytes": 748
+      "sizeBytes": 2209
     },
     {
       "path": "src/pages/api/auth/microsoft/callback.js",
-      "sizeBytes": 2734
+      "sizeBytes": 4258
     },
     {
       "path": "src/pages/api/leads.js",
-      "sizeBytes": 8830
+      "sizeBytes": 10700
     },
     {
       "path": "src/pages/api/cron/retention-cleanup.js",
@@ -183,11 +185,11 @@
     },
     {
       "path": "src/pages/api/analyze-image.js",
-      "sizeBytes": 4062
+      "sizeBytes": 6333
     },
     {
       "path": "src/Closedesk/Dashboard/Report.jsx",
-      "sizeBytes": 32815
+      "sizeBytes": 32962
     },
     {
       "path": "src/Closedesk/Dashboard/LiveNotifications.jsx",
@@ -207,11 +209,11 @@
     },
     {
       "path": "src/pages/api/generate-email.js",
-      "sizeBytes": 1995
+      "sizeBytes": 2979
     },
     {
       "path": "functions/index.js",
-      "sizeBytes": 24471
+      "sizeBytes": 24939
     },
     {
       "path": "docs/VOICE_PRIVACY_POLICY.md",

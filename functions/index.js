@@ -54,6 +54,13 @@ async function getDynamicTransporter(tenantId = "default") {
     config = snap.val() || {};
   }
   
+  // 3. Check for revoked or disconnected OAuth status
+  if (config.status === "revoked" || config.status === "disconnected") {
+    const err = new Error(`OAuthCredentialsRevoked: The connected ${config.provider || "OAuth"} credentials have been revoked or disconnected. Reconnection required.`);
+    err.code = "OAUTH_CREDENTIALS_REVOKED";
+    throw err;
+  }
+
   const userEmail = config.smtpEmail || process.env.GMAIL_EMAIL;
   const userPass = config.smtpPassword || process.env.GMAIL_PASSWORD;
   const senderName = config.senderName || "CloseDesk";
@@ -284,13 +291,13 @@ exports.sendEmailAlert = functions.database
       await transporter.sendMail({
         from: `"${senderName}" <${userEmail}>`,
         to: receiverEmail,
-        subject: title,
+        subject: String(title || "New Lead Notification").replace(/[\r\n]+/g, " ").trim(),
         html: htmlContent,
       });
 
       if (data.visitor_email_config && data.visitor_email_config.visitorEmail) {
         const vConf = data.visitor_email_config;
-        const finalSubject = vConf.subject || "Your Demo is Confirmed!";
+        const finalSubject = String(vConf.subject || "Your Demo is Confirmed!").replace(/[\r\n]+/g, " ").trim();
         const finalBody =
           vConf.body ||
           `Hi ${vConf.name || "there"},\n\nYour meeting is confirmed. We look forward to speaking with you!\n\nBest,\nThe Team`;

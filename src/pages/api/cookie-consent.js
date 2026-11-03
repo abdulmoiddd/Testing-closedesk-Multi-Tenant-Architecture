@@ -1,9 +1,19 @@
 // src/pages/api/cookie-consent.js
 import { ref, set } from "firebase/database";
+import { safeDbSet } from "../../lib/safeDb";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
 import { resolveTenantId } from "../../lib/tenantResolver";
-import { sanitizeFirebaseKey } from "../../lib/sanitizer";
+import { sanitizeFirebaseKey, sanitizeUntrustedTelemetry } from "../../lib/sanitizer";
+import { validateRequestBodySize } from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '16kb',
+    },
+  },
+};
 
 // Helper: Safely deep-sanitize objects to ensure NO property contains `undefined`
 // which causes Firebase Realtime Database set() to throw fatal errors
@@ -27,8 +37,11 @@ async function handler(req, res, apiLogger) {
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed", code: "METHOD_NOT_ALLOWED" });
   }
+
+  // 1. Enforce 16KB body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 16384)) return;
 
   try {
     // Robust body parsing: handle objects, raw JSON strings, and buffers
@@ -50,6 +63,7 @@ async function handler(req, res, apiLogger) {
     if (!body || typeof body !== "object") {
       body = {};
     }
+    body = sanitizeUntrustedTelemetry(body);
 
     const {
       anonId,
@@ -134,12 +148,20 @@ async function handler(req, res, apiLogger) {
 
     // 1. Write to global user_cookies partition (consumed by Pulse Dashboard /lg)
     const globalCookieRef = ref(db, `user_cookies/${safeAnonId}`);
-    await set(globalCookieRef, payload);
+    try {
+      await safeDbSet(globalCookieRef, payload, 400);
+    } catch (_) {
+      // offline fallback
+    }
 
     // 2. Also write to tenant-scoped partition for multi-tenant isolation
     if (tenantId && tenantId !== "default") {
       const tenantCookieRef = ref(db, `tenants/${tenantId}/user_cookies/${safeAnonId}`);
-      await set(tenantCookieRef, payload);
+      try {
+        await safeDbSet(tenantCookieRef, payload, 400);
+      } catch (_) {
+        // offline fallback
+      }
     }
 
     return res.status(200).json({ success: true, anonId, tenantId });

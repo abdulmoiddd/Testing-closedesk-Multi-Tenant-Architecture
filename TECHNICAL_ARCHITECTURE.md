@@ -155,7 +155,7 @@ CloseDesk-Aicyro-GIT/
 │   └── voice_qa_harness.js                 # Acoustic pronunciation QA audio generator
 ├── src/                                    # Application source root
 │   ├── assets/                             # Webpack-bundled brand assets
-│   ├── components/                         # Modular UI component hierarchy
+│   ├── Closedesk/                          # Modular UI component hierarchy
 │   │   ├── Chatbot/
 │   │   │   └── AicyroChatbot.jsx           # Multimodal AI front-desk (Voice WebRTC, Chat, Vision upload)
 │   │   ├── Dashboard/                      # Pulse Operations & Administrative UI (/lg)

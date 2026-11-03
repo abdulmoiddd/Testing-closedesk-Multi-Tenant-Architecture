@@ -64,7 +64,7 @@ Closedesk-ready to deploy/
 │   └── voice_qa_harness.js                 # [Active] OpenAI TTS audio generator for pronunciation QA
 │
 ├── src/                                    # Application source code
-│   ├── components/                         # UI Components
+│   ├── Closedesk/                          # UI Components
 │   │   ├── GlobalActivityTracker.jsx       # [Active] Global telemetry listener catching unhandled errors
 │   │   ├── ThemeProvider.jsx               # [Active] Dynamic theme context provider (public vs. dashboard)
 │   │   │
@@ -346,7 +346,7 @@ firebase-root/
 
 ---
 
-### 3.4 Multimodal Conversational AI Front-Desk (`src/components/Chatbot/AicyroChatbot.jsx`)
+### 3.4 Multimodal Conversational AI Front-Desk (`src/Closedesk/Chatbot/AicyroChatbot.jsx`)
 The flagship conversational interface combining four distinct interaction modalities:
 
 ```mermaid
@@ -396,7 +396,7 @@ The enterprise administrative cockpit partitioned into two secure roles:
 - **AI Intelligence (`Insight.jsx`):** OpenAI-powered conversational analytics visualizing conversion rates, peak lead hours, and pipeline value with Recharts.
 - **Tenant Settings (`Settings/*`):** Modular configuration for AI persona, voice selection with AWS Polly preview, business profiles, and alert routing.
 
-#### Master SuperAdmin Suite (`src/components/Dashboard/superadmin/`):
+#### Master SuperAdmin Suite (`src/Closedesk/Dashboard/superadmin/`):
 - **Client Management (`ClientManagement.jsx`):** Provisions new tenant organizations, generates tenant API keys, audits client databases, and manages tenant suspension/deletion.
 - **Email Protocol Dispatcher (`SuperAdminEmailProtocol.jsx`):** Configures outgoing mail infrastructure across multiple providers:
   - Google Workspace (OAuth2 token exchange)
@@ -433,7 +433,7 @@ A production-grade telemetry pipeline built for strict reliability and complianc
 - **Core Functionality:** Defines edge build commands, Node 20 environment variable, and global CORS header permissions for `/api/*` and `/widget.js` (`Access-Control-Allow-Origin: *`, `x-tenant-id`, `x-correlation-id`).
 
 #### [tailwind.config.js](file:///d:/Software%20House%2001/Closedesk-ready%20to%20deploy/tailwind.config.js)
-- **Core Functionality:** Controls utility-first styling, class-based dark mode (`darkMode: "class"`), custom CSS color variable mappings (`var(--primary)`, `var(--background)`), and scan paths across `src/pages` and `src/components`.
+- **Core Functionality:** Controls utility-first styling, class-based dark mode (`darkMode: "class"`), custom CSS color variable mappings (`var(--primary)`, `var(--background)`), and scan paths across `src/pages` and `src/Closedesk`.
 
 #### [database.rules.json](file:///d:/Software%20House%2001/Closedesk-ready%20to%20deploy/database.rules.json)
 - **Core Functionality:** Firebase Realtime Database security rules schema.

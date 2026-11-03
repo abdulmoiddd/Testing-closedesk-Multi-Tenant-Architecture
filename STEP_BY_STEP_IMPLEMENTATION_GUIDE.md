@@ -135,7 +135,7 @@ Before embedding the chatbot on a client's website, register the client in your 
 ### Step-by-Step Client Setup:
 1. Navigate to your live dashboard: `https://YOUR_DOMAIN.vercel.app/lg`.
 2. Click **Super Admin Login** at the bottom of the card.
-3. In the **Client Management** tab ([`ClientManagement.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/superadmin/ClientManagement.jsx)), click **+ Add New Client**.
+3. In the **Client Management** tab ([`ClientManagement.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/superadmin/ClientManagement.jsx)), click **+ Add New Client**.
 4. Fill in the interactive wizard:
    * **Business Name:** `Apex Emergency Plumbing` *(The system auto-suggests the slug `apex_emergency_plumbing`)*
    * **Tenant Identifier (Slug):** `apex_plumbing` *(Lowercase alphanumeric, hyphens, and underscores)*
@@ -242,12 +242,12 @@ Add this snippet directly before the closing `</body>` tag of your HTML file:
 ### Option 4E: Modern Next.js or React Website
 If you are building a custom React or Next.js website and want to render the widget directly as a React component:
 
-1. Copy the component folder [`src/components/Chatbot/`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Chatbot/) into your new Next.js project.
+1. Copy the component folder [`src/Closedesk/Chatbot/`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Chatbot/) into your new Next.js project.
 2. In your `pages/_app.jsx` or layout file, mount the component with your `tenantId`:
    ```jsx
    // pages/_app.jsx or app/layout.jsx
    import "@/styles/globals.css";
-   import AicyroChatbot from "@/components/Chatbot/AicyroChatbot";
+   import AicyroChatbot from "@/Closedesk/Chatbot/AicyroChatbot";
 
    export default function MyApp({ Component, pageProps }) {
      return (
@@ -293,25 +293,25 @@ Now hand off the operational dashboard to the business owner or dispatcher:
 ### Seamless Multi-Tenant Login:
 * The client goes to `https://YOUR_DOMAIN.vercel.app/lg`.
 * They enter their username (`apex_admin`) and password (`Apex2026!`) on the **standard login screen**.
-* CloseDesk's multi-tenant authentication engine ([`LoginScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/LoginScreen.jsx) & [`login.js`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/pages/api/login.js)) automatically recognizes their tenant (`apex_plumbing`), binds their session, and customizes the dashboard with their company name and theme colors.
+* CloseDesk's multi-tenant authentication engine ([`LoginScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/LoginScreen.jsx) & [`login.js`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/pages/api/login.js)) automatically recognizes their tenant (`apex_plumbing`), binds their session, and customizes the dashboard with their company name and theme colors.
 
 ### What the Client Can Do in `/lg`:
-1. **Home KPI Cockpit ([`HomeScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/HomeScreen.jsx)):**  
+1. **Home KPI Cockpit ([`HomeScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/HomeScreen.jsx)):**  
    Shows real-time analytics from **their website**:
    * **Total Website Visitors:** Automatically tracked from their external site.
    * **Chatbot Opens:** Counts every time a visitor expands the widget.
    * **Conversations Started:** Tracks every dialogue and WebRTC voice call.
    * **Estimated Closed Pipeline & Conversion Rate.**
-2. **Live Lead Triage ([`TerminalScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/TerminalScreen.jsx)):**  
+2. **Live Lead Triage ([`TerminalScreen.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/TerminalScreen.jsx)):**  
    Whenever a visitor speaks to the bot or requests an emergency service, it appears on the contractor's screen with an audible sound chime and a flashing red **EMERGENCY** badge. The dispatcher clicks **Call Customer** to instantly dial them.
-3. **Review Voice Recordings & Photos ([`Conversations.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Conversations.jsx)):**  
+3. **Review Voice Recordings & Photos ([`Conversations.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Conversations.jsx)):**  
    The contractor can review full text transcripts, listen to voice audio, and view defect photos uploaded by the homeowner.
-4. **Visitor Hardware & Map ([`CookieDataDisplay.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/CookieDataDisplay.jsx)):**  
+4. **Visitor Hardware & Map ([`CookieDataDisplay.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/CookieDataDisplay.jsx)):**  
    View visitor device types (iOS, Android, PC), IP geolocation markers, and cluster maps scoped exclusively to their website traffic.
-5. **Customize Their AI Front-Desk ([`Settings/`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/)):**  
-   * Set business hours and emergency on-call numbers ([`BusinessProfile.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/BusinessProfile.jsx)).
-   * Choose their AI voice persona (Alloy, Echo, Shimmer, Coral, Ash) and test it live ([`Chatbotsetting.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/Chatbotsetting.jsx)).
-   * Adjust the brand accent color ([`apearance.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/components/Dashboard/Settings/apearance.jsx)).
+5. **Customize Their AI Front-Desk ([`Settings/`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Settings/)):**  
+   * Set business hours and emergency on-call numbers ([`BusinessProfile.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Settings/BusinessProfile.jsx)).
+   * Choose their AI voice persona (Alloy, Echo, Shimmer, Coral, Ash) and test it live ([`Chatbotsetting.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Settings/Chatbotsetting.jsx)).
+   * Adjust the brand accent color ([`apearance.jsx`](file:///d:/Software%20House%2001/CloseDesk-Aicyro-GIT/src/Closedesk/Dashboard/Settings/apearance.jsx)).
 
 ---
 

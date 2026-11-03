@@ -129,7 +129,7 @@ CloseDesk decouples conversational client acquisition from backend intelligence,
 │   └── voice_qa_harness.js       # Audio generation & pronunciation verification
 │
 ├── src/
-│   ├── components/
+│   ├── Closedesk/
 │   │   ├── Chatbot/              # Customer-facing embeddable front-desk
 │   │   │   └── AicyroChatbot.jsx
 │   │   ├── Dashboard/            # Pulse CRM Cockpit screens (/lg)

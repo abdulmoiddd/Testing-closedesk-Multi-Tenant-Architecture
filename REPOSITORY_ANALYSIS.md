@@ -104,7 +104,7 @@ CloseDesk-Aicyro-GIT/
     ├── styles/globals.css, globals copy.css
     ├── lib/                        (18 modules)
     ├── pages/                      (routes + API)
-    └── components/                 (UI)
+    └── Closedesk/                  (UI)
 ```
 
 ### `src/pages/`
@@ -133,7 +133,7 @@ toolTracer.js, dbTracer.js, retryTracer.js, integrationTracer.js
 auditTracer.js, activityTracker.js, notificationHelper.js
 ```
 
-### `src/components/`
+### `src/Closedesk/`
 
 ```text
 ThemeProvider.jsx, ThemeToggle.jsx, GlobalActivityTracker.jsx
@@ -327,7 +327,7 @@ pages (index, legal, audit, lg, logs, 404)
 | `package.json`       | Scripts: `dev`, `build`, `start`, `lint`, `test:ai`                |
 | `next.config.js`     | `{ reactStrictMode: true }` only                                   |
 | `jsconfig.json`      | `@/` alias                                                         |
-| `tailwind.config.js` | `darkMode: "class"`; CSS-variable tokens; scans pages + components |
+| `tailwind.config.js` | `darkMode: "class"`; CSS-variable tokens; scans pages + Closedesk |
 | `postcss.config.js`  | Tailwind + Autoprefixer                                            |
 | `eslint.config.mjs`  | Flat config wrapping `next/core-web-vitals`                        |
 | `.eslintrc.json`     | Legacy ESLint config (alongside flat)                              |
@@ -545,7 +545,7 @@ Legacy blocks still imported by `index.jsx` but commented out in the return: Spe
 
 1. `src/lib/ruleBook.js` — text/voice product policy
 2. `src/lib/visionRuleBook.js` + `src/pages/api/analyze-image.js` + vision path in `AicyroChatbot.jsx`
-3. `src/pages/api/chat.js` + `src/components/Chatbot/AicyroChatbot.jsx`
+3. `src/pages/api/chat.js` + `src/Closedesk/Chatbot/AicyroChatbot.jsx`
 4. `src/pages/api/openai-token.js` + `sync-voice.js`
 5. `src/lib/logger.js` + `apiMiddleware.js` + `docs/LOGGING_SCHEMA.md`
 6. `functions/index.js` + `notificationHelper.js` + `notification-settings.jsx`

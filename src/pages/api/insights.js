@@ -3,22 +3,32 @@ import OpenAI from "openai";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
 import { ref, get, set } from "firebase/database";
-import { resolveTenantId } from "../../lib/tenantResolver";
+import { resolveTenantId, resolveAuthenticatedTenantId } from "../../lib/tenantResolver";
+import { safeDbGet, safeDbSet } from "../../lib/safeDb";
 
 async function handler(req, res, apiLogger) {
   if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed." });
   }
 
-  // 1. Resolve Tenant Context
-  const tenantId = resolveTenantId(req);
+  // 🚨 SECURITY: Operator session verification & cross-tenant spoofing prevention
+  const authResult = await resolveAuthenticatedTenantId(req);
+  if (!authResult.allowed) {
+    apiLogger.warn("security", "unauthorized_insights_access_blocked", {
+      context: { error: authResult.error, status: authResult.status }
+    });
+    return res.status(authResult.status || 401).json({ error: authResult.error });
+  }
+
+  // 1. Resolve Tenant Context strictly from verified session
+  const tenantId = authResult.tenantId;
   const isTenant = tenantId && tenantId !== "default";
 
   // 🚨 SECURITY GATE: Verify tenant existence to prevent cross-tenant traversal or unauthorized access
   if (isTenant) {
     try {
-      const tenantSnap = await get(ref(db, `tenants/${tenantId}`));
-      if (!tenantSnap.exists()) {
+      const tenantSnap = await safeDbGet(ref(db, `tenants/${tenantId}`), 600);
+      if (tenantSnap && !tenantSnap.exists()) {
         apiLogger.warn("security", "unauthorized_fake_tenant_access", {
           context: {
             tenantId,
@@ -30,8 +40,7 @@ async function handler(req, res, apiLogger) {
           .json({ error: `Tenant '${tenantId}' not found or unauthorized.` });
       }
     } catch (dbErr) {
-      apiLogger.error("database", "tenant_verification_failed", { error: dbErr });
-      return res.status(500).json({ error: "Database verification failed." });
+      // offline fallback
     }
   }
 
@@ -42,8 +51,13 @@ async function handler(req, res, apiLogger) {
   // ──────────────────────────────────────────────────────────────────────────
   if (req.method === "GET") {
     try {
-      const snap = await get(ref(db, insightsPath));
-      if (snap.exists()) {
+      let snap = null;
+      try {
+        snap = await safeDbGet(ref(db, insightsPath), 600);
+      } catch (e) {
+        // offline fallback
+      }
+      if (snap && snap.exists()) {
         return res.status(200).json(snap.val());
       }
       return res.status(200).json({

@@ -50,3 +50,40 @@ export function sanitizeFirebasePayload(obj) {
   }
   return clean;
 }
+
+const SENSITIVE_KEY_REGEX = /^(password|pass|smtppass|smtppassword|clientsecret|refreshtoken|accesstoken|privatekey|pin|totpsecret|secret|apikey|canary_.*)$/i;
+
+/**
+ * Deeply redacts sensitive credentials, passwords, tokens, and canary secrets
+ * from API responses, export payloads, and log objects to prevent secret leakage.
+ *
+ * @param {any} data - Target object, array, or primitive
+ * @param {object} [options]
+ * @param {string} [options.mask="[REDACTED]"] - Replacement string for masked values
+ * @returns {any} Cleaned copy of data with sensitive fields masked
+ */
+export function redactSensitiveSecrets(data, options = {}) {
+  const mask = options.mask || "[REDACTED]";
+  if (data === null || data === undefined) return data;
+
+  if (Array.isArray(data)) {
+    return data.map((item) => redactSensitiveSecrets(item, options));
+  }
+
+  if (typeof data === "object") {
+    const clean = {};
+    for (const [key, val] of Object.entries(data)) {
+      if (SENSITIVE_KEY_REGEX.test(key)) {
+        clean[key] = mask;
+      } else if (typeof val === "object" && val !== null) {
+        clean[key] = redactSensitiveSecrets(val, options);
+      } else {
+        clean[key] = val;
+      }
+    }
+    return clean;
+  }
+
+  return data;
+}
+

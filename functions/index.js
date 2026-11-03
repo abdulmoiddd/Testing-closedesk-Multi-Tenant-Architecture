@@ -15,35 +15,67 @@ const db = admin.database();
  * Fetches SMTP credentials from the Realtime Database configured in the Dashboard UI.
  * Supports Microsoft OAuth2, Google OAuth2, Custom SMTP, and App Passwords.
  */
-async function getDynamicTransporter() {
-  const snap = await db.ref("settings/email_config").once("value");
-  const config = snap.val() || {};
+async function getDynamicTransporter(tenantId = "default") {
+  const cleanTenantId = tenantId ? String(tenantId).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") : "default";
+
+  let config = null;
+  let usedFallback = false;
+
+  // 1. Strict Multi-Tenant SMTP Routing & Global Fallback Authorization
+  if (cleanTenantId && cleanTenantId !== "default") {
+    const tenantSnap = await db.ref(`tenants/${cleanTenantId}`).once("value");
+    if (tenantSnap.exists()) {
+      const tenantVal = tenantSnap.val() || {};
+      const tenantEmailConfig = tenantVal.email_config || tenantVal.config?.email_config;
+
+      // Custom Tenant SMTP configuration
+      if (tenantEmailConfig && (tenantEmailConfig.smtpHost || tenantEmailConfig.refreshToken || tenantEmailConfig.smtpPassword)) {
+        config = tenantEmailConfig;
+      } else {
+        // Fallback check: Tenant must explicitly have allowGlobalSenderFallback: true
+        const allowFallback = tenantVal.allowGlobalSenderFallback === true || tenantVal.config?.allowGlobalSenderFallback === true;
+        if (!allowFallback) {
+          const err = new Error(`UnauthorizedGlobalSenderFallback: Tenant '${cleanTenantId}' lacks custom SMTP and is not authorized to use platform global SMTP fallback (allowGlobalSenderFallback: false).`);
+          err.code = "GLOBAL_FALLBACK_UNAUTHORIZED";
+          throw err;
+        }
+        usedFallback = true;
+      }
+    } else {
+      const err = new Error(`UnauthorizedGlobalSenderFallback: Tenant '${cleanTenantId}' not found and cannot use platform sender.`);
+      err.code = "TENANT_NOT_FOUND";
+      throw err;
+    }
+  }
+
+  // 2. Load platform global email config when authorized or default
+  if (!config) {
+    const snap = await db.ref("settings/email_config").once("value");
+    config = snap.val() || {};
+  }
   
   const userEmail = config.smtpEmail || process.env.GMAIL_EMAIL;
   const userPass = config.smtpPassword || process.env.GMAIL_PASSWORD;
-  const senderName = config.senderName || "Aicyro Pulse";
+  const senderName = config.senderName || "CloseDesk";
   const provider = config.provider || "gmail";
 
   let transportConfig;
 
   if (provider === "microsoft" && config.refreshToken) {
-    // 🔐 Microsoft Modern Auth (OAuth2)
     transportConfig = {
-      host: "smtp-mail.outlook.com", // Explicitly use the Outlook.com SMTP server
+      host: "smtp-mail.outlook.com",
       port: 587,
-      secure: false, // Must be false for STARTTLS on port 587
+      secure: false,
       auth: {
         type: "OAuth2",
         user: userEmail,
         clientId: config.clientId || process.env.MICROSOFT_CLIENT_ID,
         clientSecret: config.clientSecret || process.env.MICROSOFT_CLIENT_SECRET,
         refreshToken: config.refreshToken,
-        // 🔥 CRITICAL: Force Nodemailer to use Microsoft's token endpoint instead of Google's
         accessUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token", 
       },
     };
   } else if (provider === "google_oauth" || (provider !== "microsoft" && config.refreshToken)) {
-    // 🔐 Google Modern Auth (OAuth2)
     transportConfig = {
       service: "gmail",
       auth: {
@@ -55,7 +87,6 @@ async function getDynamicTransporter() {
       },
     };
   } else if (provider === "custom" && config.smtpHost) {
-    // 🏢 Custom Company SMTP
     const port = parseInt(config.smtpPort) || 465;
     transportConfig = {
       host: config.smtpHost,
@@ -67,7 +98,6 @@ async function getDynamicTransporter() {
       },
     };
   } else {
-    // ✉️ Google Basic / App Password fallback
     transportConfig = {
       service: "gmail",
       auth: {
@@ -79,13 +109,11 @@ async function getDynamicTransporter() {
 
   const transporter = nodemailer.createTransport(transportConfig);
 
-  return { transporter, userEmail, senderName };
+  return { transporter, userEmail, senderName, usedFallback };
 }
 
+exports.getDynamicTransporter = getDynamicTransporter;
 
-// ============================================================================
-// SVG LOGO (Optimized for Email Clients - Injected directly into HTML)
-// ============================================================================
 const COMPANY_LOGO_SVG = `<?xml version="1.0" encoding="utf-8"?>
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
      viewBox="0 0 1920 537.19" style="height: 48px; width: auto; display: block; margin: 0 auto; enable-background:new 0 0 1920 537.19;" xml:space="preserve">
@@ -250,7 +278,8 @@ exports.sendEmailAlert = functions.database
     }
 
     try {
-      const { transporter, userEmail, senderName } = await getDynamicTransporter();
+      const targetTenant = data.tenant_id || (data.lead_data && (data.lead_data.tenant_id || data.lead_data.tenantId)) || "default";
+      const { transporter, userEmail, senderName } = await getDynamicTransporter(targetTenant);
 
       await transporter.sendMail({
         from: `"${senderName}" <${userEmail}>`,
@@ -344,7 +373,8 @@ exports.sendEmailAlert = functions.database
         alert_id: context.params.alertId,
         timestamp: admin.database.ServerValue.TIMESTAMP,
       });
-      return snapshot.ref.update({ status: "error", error: error.message });
+      const isFallbackDenied = error.code === "GLOBAL_FALLBACK_UNAUTHORIZED";
+      return snapshot.ref.update({ status: isFallbackDenied ? "rejected_fallback_unauthorized" : "error", error: error.message });
     }
   });
 

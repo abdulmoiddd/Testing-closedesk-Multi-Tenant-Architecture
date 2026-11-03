@@ -5,6 +5,7 @@ import { db } from "../../../lib/firebase";
 import { recordAuditTrail } from "../../../lib/auditTracer";
 import { withSessionGuard } from "../../../lib/authSession";
 import { safeDbGet, safeDbSet, safeDbUpdate } from "../../../lib/safeDb";
+import { redactSensitiveSecrets } from "../../../lib/sanitizer";
 
 async function handler(req, res, apiLogger) {
   const session = req.session;
@@ -26,7 +27,8 @@ async function handler(req, res, apiLogger) {
         // offline fallback
       }
 
-      return res.status(200).json({ success: true, section, data });
+      const safeData = redactSensitiveSecrets(data);
+      return res.status(200).json({ success: true, section, data: safeData });
     } catch (err) {
       apiLogger.error("Failed to read settings:", err);
       return res.status(500).json({ error: "Failed to read settings" });
@@ -42,8 +44,14 @@ async function handler(req, res, apiLogger) {
 
     try {
       if (section === "email_config") {
+        // Do not overwrite existing secrets with masked placeholders
+        const updatePayload = { ...payload };
+        if (updatePayload.smtpPassword === "[REDACTED]") delete updatePayload.smtpPassword;
+        if (updatePayload.clientSecret === "[REDACTED]") delete updatePayload.clientSecret;
+        if (updatePayload.refreshToken === "[REDACTED]") delete updatePayload.refreshToken;
+
         try {
-          await safeDbUpdate(ref(db, "settings/email_config"), payload, 600);
+          await safeDbUpdate(ref(db, "settings/email_config"), updatePayload, 600);
         } catch (e) {
           // offline fallback
         }

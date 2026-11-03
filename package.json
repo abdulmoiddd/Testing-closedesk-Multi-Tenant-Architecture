@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test:ai": "node scripts/run_evaluations.js",
     "audit:cd01": "node scripts/cd01_baseline_audit.js",
-    "test:cd02": "node scripts/cd02_security_acceptance_suite.js"
+    "test:cd02": "node scripts/cd02_security_acceptance_suite.js",
+    "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js"
   },
   "engines": {
     "node": ">=20"

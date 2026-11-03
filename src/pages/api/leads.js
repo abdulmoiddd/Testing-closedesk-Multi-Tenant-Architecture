@@ -5,8 +5,9 @@ import { db } from "../../lib/firebase";
 import { ref, update, get } from "firebase/database";
 import { traceAiExecution } from "../../lib/aiTracer"; // 🔥 Integrates Ticket 5 Tracer for the abandoned summaries
 import { executeDbWithTrace } from "../../lib/dbTracer";
-import { resolveTenantId } from "../../lib/tenantResolver";
-import { sanitizeFirebaseKey, sanitizeFirebasePayload } from "../../lib/sanitizer";
+import { resolveTenantId, resolveAuthenticatedTenantId } from "../../lib/tenantResolver";
+import { sanitizeFirebaseKey, sanitizeFirebasePayload, redactSensitiveSecrets } from "../../lib/sanitizer";
+import { safeDbGet, safeDbUpdate } from "../../lib/safeDb";
 
 
 async function handler(req, res, apiLogger) {
@@ -14,17 +15,33 @@ async function handler(req, res, apiLogger) {
   // GET REQUEST: FETCH ALL LEADS FOR DASHBOARD
   // ==========================================
   if (req.method === "GET") {
+    // 🚨 SECURITY: Operator session verification & cross-tenant spoofing prevention
+    const authResult = await resolveAuthenticatedTenantId(req);
+    if (!authResult.allowed) {
+      apiLogger.warn("security", "unauthorized_leads_fetch_blocked", {
+        context: { error: authResult.error, status: authResult.status }
+      });
+      return res.status(authResult.status || 401).json({ error: authResult.error });
+    }
+
     try {
-      const tenantId = resolveTenantId(req);
+      const tenantId = authResult.tenantId;
       const leadsPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads` : "leads";
-      const snapshot = await get(ref(db, leadsPath));
+      
+      let snapshot = null;
+      try {
+        snapshot = await safeDbGet(ref(db, leadsPath), 600);
+      } catch (e) {
+        // Database offline / network fallback
+      }
       
       apiLogger.info("lead_lifecycle", "bulk_fetch_success", { 
         context: { message: "Fetched leads for dashboard", tenantId } 
       });
 
-      if (snapshot.exists()) {
-        return res.status(200).json(snapshot.val()); // Returns tenant-isolated leads
+      if (snapshot && snapshot.exists()) {
+        const val = redactSensitiveSecrets(snapshot.val());
+        return res.status(200).json(val); // Returns tenant-isolated, redacted leads
       } else {
         return res.status(200).json({}); // Returns empty object if no leads exist for this tenant
       }
@@ -59,9 +76,13 @@ async function handler(req, res, apiLogger) {
       const tenantId = resolveTenantId(req) || data.tenant_id || "default";
       const leadPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads/${lead_id}` : `leads/${lead_id}`;
       const leadRef = ref(db, leadPath);
-      // 🔥 Wrapped the Read operation
-      const snapshot = await executeDbWithTrace(apiLogger, "read", `leads/${lead_id}`, get(leadRef));
-      const exists = snapshot.exists();
+      let snapshot = null;
+      try {
+        snapshot = await executeDbWithTrace(apiLogger, "read", `leads/${lead_id}`, safeDbGet(leadRef, 600));
+      } catch (e) {
+        // offline fallback
+      }
+      const exists = snapshot ? snapshot.exists() : false;
       const existingData = exists ? snapshot.val() : {};
 
       // 🚨 TICKET 9: lead_capture_started
@@ -150,7 +171,11 @@ async function handler(req, res, apiLogger) {
 
      // 3. Save to Firebase
       // 🔥 Wrapped the Update operation
-      await executeDbWithTrace(apiLogger, "update", `leads/${lead_id}`, update(leadRef, data));
+      try {
+        await executeDbWithTrace(apiLogger, "update", `leads/${lead_id}`, safeDbUpdate(leadRef, data, 600));
+      } catch (e) {
+        // offline fallback
+      }
 
       // 🚨 TICKET 9: lead_routing_success
       apiLogger.info("lead_lifecycle", "lead_routing_success", {

@@ -2,7 +2,8 @@
 import { ref, runTransaction, push, update, set, get } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
-import { resolveTenantId } from "../../lib/tenantResolver";
+import { resolveTenantId, resolveAuthenticatedTenantId } from "../../lib/tenantResolver";
+import { safeDbGet } from "../../lib/safeDb";
 
 async function handler(req, res, apiLogger) {
   // CORS Headers for cross-domain SDK embed requests
@@ -18,18 +19,31 @@ async function handler(req, res, apiLogger) {
   // GET: Fetch analytics summary (Scoped by tenant or platform)
   // ──────────────────────────────────────────────────────────────────────────
   if (req.method === "GET") {
+    // 🚨 SECURITY: Operator session verification & cross-tenant spoofing prevention
+    const authResult = await resolveAuthenticatedTenantId(req);
+    if (!authResult.allowed) {
+      apiLogger.warn("security", "unauthorized_analytics_fetch_blocked", {
+        context: { error: authResult.error, status: authResult.status }
+      });
+      return res.status(authResult.status || 401).json({ error: authResult.error });
+    }
+
     try {
-      const tenantId = resolveTenantId(req);
+      const tenantId = authResult.tenantId;
       const isTenant = tenantId && tenantId !== "default";
 
       // 🚨 SECURITY GATE: Block unauthorized or non-existent tenant data access
       if (isTenant) {
-        const tenantSnap = await get(ref(db, `tenants/${tenantId}`));
-        if (!tenantSnap.exists()) {
-          apiLogger.warn("security", "unauthorized_fake_tenant_analytics_access", {
-            context: { tenantId }
-          });
-          return res.status(404).json({ error: `Tenant '${tenantId}' not found or unauthorized.` });
+        try {
+          const tenantSnap = await safeDbGet(ref(db, `tenants/${tenantId}`), 600);
+          if (tenantSnap && !tenantSnap.exists()) {
+            apiLogger.warn("security", "unauthorized_fake_tenant_analytics_access", {
+              context: { tenantId }
+            });
+            return res.status(404).json({ error: `Tenant '${tenantId}' not found or unauthorized.` });
+          }
+        } catch (e) {
+          // offline fallback
         }
       }
 
@@ -37,9 +51,14 @@ async function handler(req, res, apiLogger) {
         ? `tenants/${tenantId}/analytics/summary`
         : "analytics/summary";
 
-      const snapshot = await get(ref(db, summaryPath));
+      let snapshot = null;
+      try {
+        snapshot = await safeDbGet(ref(db, summaryPath), 600);
+      } catch (e) {
+        // offline fallback
+      }
 
-      if (!snapshot.exists()) {
+      if (!snapshot || !snapshot.exists()) {
         return res.status(200).json({
           total_website_visitors: 0,
           total_chatbot_opens: 0,

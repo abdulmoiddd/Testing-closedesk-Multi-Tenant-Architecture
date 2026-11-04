@@ -376,7 +376,22 @@ exports.sendEmailAlert = functions.database
         timestamp: admin.database.ServerValue.TIMESTAMP,
       });
       const isFallbackDenied = error.code === "GLOBAL_FALLBACK_UNAUTHORIZED";
-      return snapshot.ref.update({ status: isFallbackDenied ? "rejected_fallback_unauthorized" : "error", error: error.message });
+      const isTimeout =
+        error.code === "ETIMEDOUT" ||
+        error.code === "ESOCKETTIMEDOUT" ||
+        (error.message && error.message.toLowerCase().includes("timeout"));
+      const finalStatus = isFallbackDenied
+        ? "rejected_fallback_unauthorized"
+        : isTimeout
+          ? "unknown"
+          : "error";
+
+      return snapshot.ref.update({
+        status: finalStatus,
+        error: error.message,
+        is_ambiguous: isTimeout,
+        failed_at: admin.database.ServerValue.TIMESTAMP,
+      });
     }
   });
 

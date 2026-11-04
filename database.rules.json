@@ -75,6 +75,18 @@
           ".read": "auth != null && auth.token.role === 'superadmin'",
           ".write": "auth != null && auth.token.role === 'superadmin'"
         },
+        "idempotency_locks": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
+        },
+        "voice_nonces": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
+        },
+        "prospects": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
+        },
         "secrets": {
           ".read": false,
           ".write": false
@@ -112,6 +124,18 @@
       ".write": "auth != null && auth.token.role === 'superadmin'"
     },
     "scheduled_reminders": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'"
+    },
+    "idempotency_locks": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'"
+    },
+    "voice_nonces": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'"
+    },
+    "prospects": {
       ".read": "auth != null && auth.token.role === 'superadmin'",
       ".write": "auth != null && auth.token.role === 'superadmin'"
     }

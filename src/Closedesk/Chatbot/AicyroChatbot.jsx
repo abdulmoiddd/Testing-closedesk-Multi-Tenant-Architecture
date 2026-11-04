@@ -979,9 +979,9 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
         queueEmailAlert("Meeting Booked! 📅", `${data.name || "A visitor"} confirmed a meeting for ${timeText}.`, data, "end", { visitorEmail: data.email, subject: emailSubject, body: emailBody });
       }
 
-      submitLead({ ...data, booking_status: "Meeting Booked", requested_action: "Meeting Booked", generated_subject: emailSubject, generated_body: emailBody, conversation_ended_at: new Date().toISOString() });
+      const confirmedLead = await submitLead({ ...data, booking_status: "Meeting Booked", requested_action: "Meeting Booked", generated_subject: emailSubject, generated_body: emailBody, conversation_ended_at: new Date().toISOString() });
       setIsProcessing(false);
-      addBotMessage(`✅ Contact Confirmed! | Your demo is officially booked for ${timeText}. We have securely saved your details and sent a calendar invite to ${data.email || "your email"}.`, [{ label: "Close Chat", value: "close" }], true);
+      addBotMessage(`✅ Contact Confirmed! | Your demo is officially booked for ${timeText}. We have securely saved your details (Ref: ${confirmedLead?.lead_id || "Confirmed"}) and sent a calendar invite to ${data.email || "your email"}.`, [{ label: "Close Chat", value: "close" }], true);
     
     } catch (dbError) {
       // Only throw a fatal Booking Error if the actual database submission fails
@@ -1000,21 +1000,42 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
 
     try {
       const currentTranscript = messagesRef.current.map((m) => `[${m.role.toUpperCase()}]: ${m.text || m.content || "Interaction"}`).join("\n");
+      const operationKey = data.operation_key || `op_lead_${firebaseDbId || getOrCreateAnonId() || txId}_${data.booking_status || "update"}`;
       const payload = {
         source: "Website AI Front Desk", source_page: typeof window !== "undefined" ? window.location.href : "Unknown",
         anonId: getOrCreateAnonId() || "unknown", deviceName: getReadableDeviceName(), full_conversation_transcript: currentTranscript,
         conversation_started_at: sessionStartTime, last_interaction_at: new Date().toISOString(), ...(!firebaseDbId && { timestamp: new Date().toISOString() }),
-        firebaseId: firebaseDbId, ...data,
+        firebaseId: firebaseDbId, operation_key: operationKey, ...data,
       };
       const sanitizedPayload = Object.fromEntries(Object.entries(payload).map(([k, v]) => [k, v === undefined || v === null ? "" : v]));
 
-      const res = await fetchWithTrace("/api/leads", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify(sanitizedPayload), keepalive: true }, txId);
-      if (!res.ok) throw new Error(`Server status: ${res.status}`);
-      
-      uiLogger.info("ai_tool", "tool_call_success", { context: { tool_name: "submit_lead", tool_call_id: txId, result_status: "success" }, duration_ms: Date.now() - startTime });
+      const res = await fetchWithTrace("/api/leads", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": tenantId,
+          "x-idempotency-key": operationKey,
+        },
+        body: JSON.stringify(sanitizedPayload),
+        keepalive: true,
+      }, txId);
+
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(resData.error || `Server status: ${res.status}`);
+      }
+
+      if (resData.id && !firebaseDbId) {
+        setFirebaseDbId(resData.id);
+        firebaseDbIdRef.current = resData.id;
+      }
+
+      uiLogger.info("ai_tool", "tool_call_success", { context: { tool_name: "submit_lead", tool_call_id: txId, result_status: "success", lead_id: resData.id }, duration_ms: Date.now() - startTime });
+      return { success: true, lead_id: resData.id, ...resData };
     } catch (err) {
       uiLogger.error("ai_tool", "tool_call_failed", { error: err, context: { tool_name: "submit_lead", tool_call_id: txId, result_status: "failed" }, duration_ms: Date.now() - startTime });
       uiLogger.error("lead_capture", "submission_failed", { error: err, correlation: { correlation_id: txId } });
+      throw err;
     }
   }
 

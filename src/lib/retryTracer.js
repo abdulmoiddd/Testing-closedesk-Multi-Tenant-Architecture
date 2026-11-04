@@ -1,81 +1,169 @@
 // src/lib/retryTracer.js
 
 /**
- * Wraps any promise/async function to automatically retry on failure 
- * and log the exact attempt lifecycle (Ticket 12).
+ * Enhanced Retry Tracer (CD06 / Ticket 12)
  * 
- * @param {Object} apiLogger - The scoped logger from the API middleware
- * @param {string} operationName - Name of the process (e.g., "LLM_Execution_And_Parsing")
- * @param {Object} options - { maxAttempts: 3, delayMs: 1000 }
- * @param {Function} operationFn - The async function to execute. Receives `attemptNumber` as an argument.
+ * Supports:
+ * - Tracking operation state (pending, retrying, recovered, failed, unknown)
+ * - Capturing operation keys and payload hashes for audit tracing
+ * - Automatic redaction of sensitive credentials (OAuth tokens, SMTP passwords)
+ * - Optional reconciliation hook before retrying external ambiguous operations
+ * 
+ * @param {Object} apiLogger - Scoped logger from API middleware
+ * @param {string} operationName - Name of the process
+ * @param {Object} options - { maxAttempts, delayMs, operationKey, payloadHash, tenantId, reconcileFn }
+ * @param {Function} operationFn - Async function (attemptNumber) => Promise
  */
-export async function withRetryTrace(apiLogger, operationName, options, operationFn) {
-    const maxAttempts = options.maxAttempts || 3;
-    const baseDelayMs = options.delayMs || 1000;
-    let attempt = 1;
-  
-    while (attempt <= maxAttempts) {
-      const startTime = Date.now();
-      
-      try {
-        const result = await operationFn(attempt);
-        
-        // If it succeeded but required retries, log the recovery so it's not invisible
-        if (attempt > 1) {
-          apiLogger.info("retry_lifecycle", "operation_retry_success", {
-            context: { 
-              operation_name: operationName, 
-              attempt_number: attempt, 
-              max_attempts: maxAttempts,
-              final_status: "recovered"
-            },
-            duration_ms: Date.now() - startTime
+export async function withRetryTrace(apiLogger, operationName, options = {}, operationFn) {
+  const maxAttempts = options.maxAttempts || 3;
+  const baseDelayMs = options.delayMs || 1000;
+  const operationKey = options.operationKey || null;
+  const payloadHash = options.payloadHash || null;
+  const tenantId = options.tenantId || "default";
+  const reconcileFn = typeof options.reconcileFn === "function" ? options.reconcileFn : null;
+
+  let attempt = 1;
+
+  while (attempt <= maxAttempts) {
+    const startTime = Date.now();
+
+    try {
+      // If retrying, check if reconciliation is required before repeating side-effect
+      if (attempt > 1 && reconcileFn) {
+        try {
+          const reconciliation = await reconcileFn(attempt);
+          if (reconciliation && reconciliation.alreadyExecuted) {
+            apiLogger.info("retry_lifecycle", "operation_reconciled_early", {
+              context: {
+                operation_name: operationName,
+                operation_key: operationKey,
+                tenant_id: tenantId,
+                attempt_number: attempt,
+                message: "Reconciliation detected external action already completed; skipping duplicate execution.",
+              },
+            });
+            return reconciliation.cachedResult;
+          }
+        } catch (reconcileErr) {
+          apiLogger.warn("retry_lifecycle", "reconciliation_failed", {
+            error: redactError(reconcileErr),
+            context: { operation_name: operationName, operation_key: operationKey },
           });
         }
-        
-        return result;
-  
-      } catch (error) {
-        const isFinal = attempt === maxAttempts;
-        const failureReason = error.message || "Unknown error";
-        const duration_ms = Date.now() - startTime;
-  
-        if (isFinal) {
-          // 🚨 TICKET 12: Final failure produces CRITICAL event
-          apiLogger.critical("retry_lifecycle", "operation_final_failure", {
-            error,
-            context: { 
-              operation_name: operationName, 
-              attempt_number: attempt, 
-              max_attempts: maxAttempts, 
-              failure_reason: failureReason,
-              final_status: "failed" 
-            },
-            duration_ms
-          });
-          throw error; // Throw to the main handler to return a 500
-          
-        } else {
-          // Calculate exponential backoff (1s, 2s, 4s...)
-          const nextRetryMs = baseDelayMs * Math.pow(2, attempt - 1); 
-          
-          // 🚨 TICKET 12: Developer can see original failure and all retry attempts
-          apiLogger.warn("retry_lifecycle", "operation_failed_retrying", {
-            error,
-            context: { 
-              operation_name: operationName, 
-              attempt_number: attempt, 
-              max_attempts: maxAttempts, 
-              failure_reason: failureReason,
-              next_retry: `${nextRetryMs}ms`,
-              final_status: "retrying" 
-            },
-            duration_ms
-          });
-  
-          await new Promise(res => setTimeout(res, nextRetryMs));
-          attempt++;
-        }
+      }
+
+      const result = await operationFn(attempt);
+
+      // Log recovery if it required multiple attempts
+      if (attempt > 1) {
+        apiLogger.info("retry_lifecycle", "operation_retry_success", {
+          context: {
+            operation_name: operationName,
+            operation_key: operationKey,
+            payload_hash: payloadHash,
+            tenant_id: tenantId,
+            attempt_number: attempt,
+            max_attempts: maxAttempts,
+            final_status: "recovered",
+          },
+          duration_ms: Date.now() - startTime,
+        });
+      }
+
+      return result;
+
+    } catch (error) {
+      const isFinal = attempt === maxAttempts;
+      const cleanError = redactError(error);
+      const duration_ms = Date.now() - startTime;
+
+      if (isFinal) {
+        const isAmbiguousTimeout = isTimeoutOrNetworkError(error);
+        const finalStatus = isAmbiguousTimeout ? "unknown" : "failed";
+
+        apiLogger.critical("retry_lifecycle", "operation_final_failure", {
+          error: cleanError,
+          context: {
+            operation_name: operationName,
+            operation_key: operationKey,
+            payload_hash: payloadHash,
+            tenant_id: tenantId,
+            attempt_number: attempt,
+            max_attempts: maxAttempts,
+            failure_reason: cleanError.message,
+            final_status: finalStatus,
+            is_ambiguous_external_state: isAmbiguousTimeout,
+          },
+          duration_ms,
+        });
+
+        error.isAmbiguousTimeout = isAmbiguousTimeout;
+        error.finalStatus = finalStatus;
+        throw error;
+
+      } else {
+        const nextRetryMs = baseDelayMs * Math.pow(2, attempt - 1);
+
+        apiLogger.warn("retry_lifecycle", "operation_failed_retrying", {
+          error: cleanError,
+          context: {
+            operation_name: operationName,
+            operation_key: operationKey,
+            payload_hash: payloadHash,
+            tenant_id: tenantId,
+            attempt_number: attempt,
+            max_attempts: maxAttempts,
+            failure_reason: cleanError.message,
+            next_retry: `${nextRetryMs}ms`,
+            final_status: "retrying",
+          },
+          duration_ms,
+        });
+
+        await new Promise((res) => setTimeout(res, nextRetryMs));
+        attempt++;
       }
     }
   }
+}
+
+/**
+ * Strips secrets, tokens, and authorization credentials from error objects.
+ */
+function redactError(err) {
+  if (!err) return new Error("Unknown error");
+  let message = typeof err.message === "string" ? err.message : String(err);
+
+  // Redact credentials pattern
+  message = message
+    .replace(/(bearer\s+)[a-zA-Z0-9_\-\.]+/gi, "$1[REDACTED]")
+    .replace(/(password["':\s=]+)[^&\s",]+/gi, "$1[REDACTED]")
+    .replace(/(secret["':\s=]+)[^&\s",]+/gi, "$1[REDACTED]")
+    .replace(/(key["':\s=]+)[a-zA-Z0-9_\-\.]{15,}/gi, "$1[REDACTED]");
+
+  const clean = new Error(message);
+  clean.name = err.name || "Error";
+  clean.code = err.code;
+  return clean;
+}
+
+/**
+ * Determines whether an error indicates an ambiguous timeout or network partition.
+ */
+function isTimeoutOrNetworkError(err) {
+  const msg = (err?.message || "").toLowerCase();
+  const code = (err?.code || "").toLowerCase();
+  return (
+    code.includes("timeout") ||
+    code.includes("timedout") ||
+    code.includes("etimedout") ||
+    code.includes("esockettimedout") ||
+    code.includes("econnreset") ||
+    code.includes("econnaborted") ||
+    msg.includes("timeout") ||
+    msg.includes("timed out") ||
+    msg.includes("timedout") ||
+    msg.includes("network error") ||
+    msg.includes("socket hang up")
+  );
+}

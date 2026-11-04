@@ -288,12 +288,16 @@ async function handler(req, res, apiLogger) {
       factual_summary: validatedData.factual_summary || existingProspect.factual_summary || null,
       context_patch: { contact_info: finalContact, business_context: finalBiz, booking_request: finalBooking },
       privacy_patch: finalPrivacyPatch,
+      tenant_id: resolveTenantId(req) || "default",
     };
 
     // --- ACTION & DATABASE PERSISTENCE BLOCK ---
     try {
+      const activeTenant = resolveTenantId(req) || "default";
+      const getScopedPath = (subPath) => (activeTenant && activeTenant !== "default" ? `tenants/${activeTenant}/${subPath}` : subPath);
+
       if (backendPayload.flags.length > 0) {
-        const actionRef = ref(db, `session_actions/${session_id}`);
+        const actionRef = ref(db, getScopedPath(`session_actions/${session_id}`));
         const existingActionsSnapshot = await get(actionRef);
         const existingActions = existingActionsSnapshot.exists() ? existingActionsSnapshot.val() : {};
 
@@ -318,7 +322,7 @@ async function handler(req, res, apiLogger) {
               validatedData.factual_summary = null;
               updates[flag].status = "completed";
 
-              await set(ref(db, `transcripts/${session_id}`), null);
+              await set(ref(db, getScopedPath(`transcripts/${session_id}`)), null);
             }
           }
           await update(actionRef, updates);
@@ -332,7 +336,7 @@ async function handler(req, res, apiLogger) {
         await logAnalyticsEvent(session_id, channel, validatedData.state, validatedData.lead_temperature, validatedData.intent_object, finalEvents, sessionVersions);
       }
 
-      await set(ref(db, `prospects/${session_id}`), backendPayload);
+      await set(ref(db, getScopedPath(`prospects/${session_id}`)), backendPayload);
     } catch (dbErr) {
       errorCategory = "firebase_action_failure";
       throw dbErr;

@@ -1,8 +1,8 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-04T18:07:35.636Z",
+  "generated_at": "2026-11-04T18:27:52.197Z",
   "git": {
-    "headCommit": "976352b873f56dab8ae213e8a6a24d5a13e48777",
+    "headCommit": "57d9dcfa12f89e195c56595deeb44722e05caf57",
     "branch": "feat/cd03-tenant-isolation-secret-protection"
   },
   "runtime": {
@@ -155,19 +155,19 @@
     },
     {
       "path": "src/pages/api/auth/google/login.js",
-      "sizeBytes": 1255
+      "sizeBytes": 1304
     },
     {
       "path": "src/pages/api/auth/google/callback.js",
-      "sizeBytes": 2885
+      "sizeBytes": 2621
     },
     {
       "path": "src/pages/api/auth/microsoft/login.js",
-      "sizeBytes": 1228
+      "sizeBytes": 1257
     },
     {
       "path": "src/pages/api/auth/microsoft/callback.js",
-      "sizeBytes": 3007
+      "sizeBytes": 2838
     },
     {
       "path": "src/pages/api/leads.js",

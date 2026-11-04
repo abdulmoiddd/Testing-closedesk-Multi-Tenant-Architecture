@@ -1,10 +1,10 @@
 {
   "ticket": "CD03",
   "title": "Tenant Isolation and Secret Protection Acceptance Evidence",
-  "timestamp": "2026-11-04T18:07:14.905Z",
+  "timestamp": "2026-11-04T18:29:12.885Z",
   "summary": {
-    "total_tests": 54,
-    "passed": 54,
+    "total_tests": 61,
+    "passed": 61,
     "failed": 0,
     "all_passed": true
   },
@@ -28,7 +28,7 @@
         "statusCode": 200,
         "tenantId": "tenant_a"
       },
-      "timestamp": "2026-11-04T18:06:54.946Z"
+      "timestamp": "2026-11-04T18:28:52.929Z"
     },
     {
       "test_id": "AC1.2",
@@ -41,7 +41,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-04T18:06:55.554Z"
+      "timestamp": "2026-11-04T18:28:53.533Z"
     },
     {
       "test_id": "AC1.3",
@@ -54,7 +54,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-04T18:06:56.163Z"
+      "timestamp": "2026-11-04T18:28:54.143Z"
     },
     {
       "test_id": "AC1.4",
@@ -67,7 +67,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-04T18:06:56.769Z"
+      "timestamp": "2026-11-04T18:28:54.750Z"
     },
     {
       "test_id": "AC1.5",
@@ -80,7 +80,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-04T18:06:57.378Z"
+      "timestamp": "2026-11-04T18:28:55.358Z"
     },
     {
       "test_id": "AC1.6",
@@ -93,7 +93,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-04T18:06:57.984Z"
+      "timestamp": "2026-11-04T18:28:55.963Z"
     },
     {
       "test_id": "AC1.7",
@@ -106,7 +106,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', cannot query logs for 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-04T18:06:58.593Z"
+      "timestamp": "2026-11-04T18:28:56.575Z"
     },
     {
       "test_id": "AC1.8",
@@ -117,7 +117,7 @@
         "statusCode": 200,
         "logsCount": 0
       },
-      "timestamp": "2026-11-04T18:07:00.416Z"
+      "timestamp": "2026-11-04T18:28:58.390Z"
     },
     {
       "test_id": "AC1.9",
@@ -130,7 +130,7 @@
           "error": "Cross-tenant access forbidden. Operator session is bound to tenant 'tenant_a', but requested tenant 'tenant_b'."
         }
       },
-      "timestamp": "2026-11-04T18:07:01.022Z"
+      "timestamp": "2026-11-04T18:28:58.993Z"
     },
     {
       "test_id": "AC1.10",
@@ -140,7 +140,22 @@
       "evidence": {
         "statusCode": 404
       },
-      "timestamp": "2026-11-04T18:07:02.847Z"
+      "timestamp": "2026-11-04T18:29:00.806Z"
+    },
+    {
+      "test_id": "AC1.11",
+      "name": "Atomic multi-path write defense: Path traversal sequences and slashes stripped from write payload",
+      "status": "PASS",
+      "details": "Sanitized keys: name, tenantstenant_bleadsinjected, superAdmininjected, tenant_id",
+      "evidence": {
+        "sanitizedKeys": [
+          "name",
+          "tenantstenant_bleadsinjected",
+          "superAdmininjected",
+          "tenant_id"
+        ]
+      },
+      "timestamp": "2026-11-04T18:29:00.806Z"
     },
     {
       "test_id": "AC2.1",
@@ -153,7 +168,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-04T18:07:02.847Z"
+      "timestamp": "2026-11-04T18:29:00.807Z"
     },
     {
       "test_id": "AC2.2",
@@ -166,7 +181,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-04T18:07:02.848Z"
+      "timestamp": "2026-11-04T18:29:00.808Z"
     },
     {
       "test_id": "AC2.3",
@@ -179,7 +194,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-04T18:07:02.848Z"
+      "timestamp": "2026-11-04T18:29:00.808Z"
     },
     {
       "test_id": "AC2.4",
@@ -192,7 +207,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-04T18:07:02.849Z"
+      "timestamp": "2026-11-04T18:29:00.808Z"
     },
     {
       "test_id": "AC2.5",
@@ -205,7 +220,7 @@
           "error": "Unauthorized. Authentication required."
         }
       },
-      "timestamp": "2026-11-04T18:07:02.850Z"
+      "timestamp": "2026-11-04T18:29:00.810Z"
     },
     {
       "test_id": "AC2.6",
@@ -218,7 +233,7 @@
           "error": "Authentication required. Active session missing or expired."
         }
       },
-      "timestamp": "2026-11-04T18:07:02.850Z"
+      "timestamp": "2026-11-04T18:29:00.810Z"
     },
     {
       "test_id": "AC2.7",
@@ -228,7 +243,7 @@
       "evidence": {
         "statusCode": 401
       },
-      "timestamp": "2026-11-04T18:07:02.850Z"
+      "timestamp": "2026-11-04T18:29:00.811Z"
     },
     {
       "test_id": "AC2.8",
@@ -238,7 +253,7 @@
       "evidence": {
         "statusCode": 401
       },
-      "timestamp": "2026-11-04T18:07:02.851Z"
+      "timestamp": "2026-11-04T18:29:00.811Z"
     },
     {
       "test_id": "AC2.9",
@@ -248,7 +263,7 @@
       "evidence": {
         "statusCode": 401
       },
-      "timestamp": "2026-11-04T18:07:02.851Z"
+      "timestamp": "2026-11-04T18:29:00.811Z"
     },
     {
       "test_id": "AC3.1",
@@ -258,7 +273,7 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-04T18:07:04.059Z"
+      "timestamp": "2026-11-04T18:29:02.015Z"
     },
     {
       "test_id": "AC3.2",
@@ -268,7 +283,7 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-04T18:07:05.266Z"
+      "timestamp": "2026-11-04T18:29:03.226Z"
     },
     {
       "test_id": "AC3.3",
@@ -279,7 +294,7 @@
         "statusCode": 200,
         "logsCount": 0
       },
-      "timestamp": "2026-11-04T18:07:07.090Z"
+      "timestamp": "2026-11-04T18:29:05.039Z"
     },
     {
       "test_id": "AC3.4",
@@ -289,7 +304,7 @@
       "evidence": {
         "statusCode": 403
       },
-      "timestamp": "2026-11-04T18:07:07.696Z"
+      "timestamp": "2026-11-04T18:29:05.647Z"
     },
     {
       "test_id": "AC4.1",
@@ -303,7 +318,7 @@
           "success": true
         }
       },
-      "timestamp": "2026-11-04T18:07:08.919Z"
+      "timestamp": "2026-11-04T18:29:06.858Z"
     },
     {
       "test_id": "AC4.2",
@@ -317,7 +332,7 @@
         "fromOrigin": "brightstar",
         "fallback": "default"
       },
-      "timestamp": "2026-11-04T18:07:08.919Z"
+      "timestamp": "2026-11-04T18:29:06.858Z"
     },
     {
       "test_id": "AC4.3",
@@ -329,7 +344,7 @@
         "traversalAttempt2": "tenant_aleadssecrets",
         "traversalAttempt3": "tenantid"
       },
-      "timestamp": "2026-11-04T18:07:08.919Z"
+      "timestamp": "2026-11-04T18:29:06.858Z"
     },
     {
       "test_id": "AC4.4",
@@ -344,7 +359,7 @@
           "tenantId": "tenant_a"
         }
       },
-      "timestamp": "2026-11-04T18:07:09.528Z"
+      "timestamp": "2026-11-04T18:29:07.466Z"
     },
     {
       "test_id": "AC4.5",
@@ -362,7 +377,7 @@
           "enabled"
         ]
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.278Z"
     },
     {
       "test_id": "AC5.1",
@@ -372,7 +387,7 @@
       "evidence": {
         "hasFirestoreSyntax": false
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.279Z"
     },
     {
       "test_id": "AC5.2",
@@ -382,7 +397,7 @@
       "evidence": {
         "rootRead": false
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.279Z"
     },
     {
       "test_id": "AC5.3",
@@ -392,7 +407,7 @@
       "evidence": {
         "rootWrite": false
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.279Z"
     },
     {
       "test_id": "AC5.4",
@@ -402,7 +417,7 @@
       "evidence": {
         "parentTenantsRead": false
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.279Z"
     },
     {
       "test_id": "AC5.5",
@@ -412,7 +427,7 @@
       "evidence": {
         "parentTenantsWrite": "auth != null && auth.token.role === 'superadmin'"
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.280Z"
     },
     {
       "test_id": "AC5.6",
@@ -423,7 +438,7 @@
         "emailConfigRead": "auth != null && auth.token.role === 'superadmin'",
         "emailConfigWrite": "auth != null && auth.token.role === 'superadmin'"
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.280Z"
     },
     {
       "test_id": "AC5.7",
@@ -436,7 +451,7 @@
           ".write": false
         }
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.280Z"
     },
     {
       "test_id": "AC5.8",
@@ -446,7 +461,7 @@
       "evidence": {
         "parentSettingsRead": false
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.280Z"
     },
     {
       "test_id": "AC5.9",
@@ -457,7 +472,7 @@
         "tenantLeadsWrite": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
         "tenantCookiesWrite": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.280Z"
     },
     {
       "test_id": "AC5.10",
@@ -469,7 +484,7 @@
         "remindersWrite": "auth != null && auth.token.role === 'superadmin'",
         "logsWrite": "auth != null && auth.token.role === 'superadmin'"
       },
-      "timestamp": "2026-11-04T18:07:10.334Z"
+      "timestamp": "2026-11-04T18:29:08.280Z"
     },
     {
       "test_id": "AC6.1",
@@ -484,7 +499,7 @@
           "refreshToken": "[REDACTED]"
         }
       },
-      "timestamp": "2026-11-04T18:07:10.335Z"
+      "timestamp": "2026-11-04T18:29:08.280Z"
     },
     {
       "test_id": "AC6.2",
@@ -494,7 +509,7 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-04T18:07:11.750Z"
+      "timestamp": "2026-11-04T18:29:09.689Z"
     },
     {
       "test_id": "AC6.3",
@@ -504,7 +519,7 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-04T18:07:12.964Z"
+      "timestamp": "2026-11-04T18:29:10.902Z"
     },
     {
       "test_id": "AC6.4",
@@ -515,7 +530,7 @@
         "filesScanned": 93,
         "leaks": []
       },
-      "timestamp": "2026-11-04T18:07:13.091Z"
+      "timestamp": "2026-11-04T18:29:11.058Z"
     },
     {
       "test_id": "AC6.5",
@@ -525,7 +540,7 @@
       "evidence": {
         "hasServiceAccount": false
       },
-      "timestamp": "2026-11-04T18:07:13.091Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC7.1",
@@ -535,7 +550,7 @@
       "evidence": {
         "blockedCorrectly": true
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC7.2",
@@ -547,7 +562,7 @@
         "usedFallback": true,
         "provider": "platform_global"
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC7.3",
@@ -559,7 +574,7 @@
         "usedFallback": false,
         "provider": "custom_tenant"
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC7.4",
@@ -569,7 +584,7 @@
       "evidence": {
         "hasFallbackCheck": true
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC7.5",
@@ -579,7 +594,7 @@
       "evidence": {
         "hasTenantInReminders": true
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC7.6",
@@ -589,7 +604,7 @@
       "evidence": {
         "hasPerTenantCronTransporter": true
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC8.1",
@@ -600,7 +615,7 @@
         "googleStatus": 401,
         "msStatus": 401
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.059Z"
     },
     {
       "test_id": "AC8.2",
@@ -611,7 +626,7 @@
         "googleCbStatus": 403,
         "msCbStatus": 403
       },
-      "timestamp": "2026-11-04T18:07:13.092Z"
+      "timestamp": "2026-11-04T18:29:11.060Z"
     },
     {
       "test_id": "AC8.3",
@@ -621,7 +636,77 @@
       "evidence": {
         "redirected": true
       },
-      "timestamp": "2026-11-04T18:07:13.694Z"
+      "timestamp": "2026-11-04T18:29:11.665Z"
+    },
+    {
+      "test_id": "AC8.4",
+      "name": "OAuth state single-use replay defense: Replay of consumed state token is blocked",
+      "status": "PASS",
+      "details": "First use valid=true, Second use valid=false (error: OAuth state token has already been consumed. Replay attack blocked.)",
+      "evidence": {
+        "firstUse": true,
+        "secondUse": false
+      },
+      "timestamp": "2026-11-04T18:29:11.665Z"
+    },
+    {
+      "test_id": "AC8.5",
+      "name": "OAuth state purpose validation: State issued for different purpose is rejected",
+      "status": "PASS",
+      "details": "Validation error: Invalid state purpose. Expected 'email_oauth_connect', got 'general_login'.",
+      "evidence": {
+        "valid": false,
+        "error": "Invalid state purpose. Expected 'email_oauth_connect', got 'general_login'."
+      },
+      "timestamp": "2026-11-04T18:29:11.665Z"
+    },
+    {
+      "test_id": "AC8.6",
+      "name": "OAuth state user binding validation: State token bound to different user is rejected",
+      "status": "PASS",
+      "details": "Validation error: OAuth state user binding mismatch. Issued for 'superadmin_alice', but callback received for 'superadmin_attacker'.",
+      "evidence": {
+        "valid": false,
+        "error": "OAuth state user binding mismatch. Issued for 'superadmin_alice', but callback received for 'superadmin_attacker'."
+      },
+      "timestamp": "2026-11-04T18:29:11.665Z"
+    },
+    {
+      "test_id": "AC8.7",
+      "name": "OAuth state expiry validation: Expired state token signature is rejected",
+      "status": "PASS",
+      "details": "Validation error: Session token expired",
+      "evidence": {
+        "valid": false,
+        "error": "Session token expired"
+      },
+      "timestamp": "2026-11-04T18:29:11.665Z"
+    },
+    {
+      "test_id": "AC8.8",
+      "name": "Google OAuth callback rejects consumed state token with 403 (Replay defense)",
+      "status": "PASS",
+      "details": "Got status 403 with error: Invalid or unauthorized OAuth state: OAuth state token has already been consumed. Replay attack blocked.",
+      "evidence": {
+        "statusCode": 403,
+        "body": {
+          "error": "Invalid or unauthorized OAuth state: OAuth state token has already been consumed. Replay attack blocked."
+        }
+      },
+      "timestamp": "2026-11-04T18:29:11.666Z"
+    },
+    {
+      "test_id": "AC8.9",
+      "name": "Microsoft OAuth callback rejects consumed state token with 403 (Replay defense)",
+      "status": "PASS",
+      "details": "Got status 403 with error: Invalid or unauthorized OAuth state: OAuth state token has already been consumed. Replay attack blocked.",
+      "evidence": {
+        "statusCode": 403,
+        "body": {
+          "error": "Invalid or unauthorized OAuth state: OAuth state token has already been consumed. Replay attack blocked."
+        }
+      },
+      "timestamp": "2026-11-04T18:29:11.666Z"
     },
     {
       "test_id": "AC9.1",
@@ -631,7 +716,7 @@
       "evidence": {
         "statusCode": 200
       },
-      "timestamp": "2026-11-04T18:07:14.904Z"
+      "timestamp": "2026-11-04T18:29:12.884Z"
     },
     {
       "test_id": "AC9.2",
@@ -643,7 +728,7 @@
         "reportHasFallback": true,
         "cookieHasFallback": true
       },
-      "timestamp": "2026-11-04T18:07:14.905Z"
+      "timestamp": "2026-11-04T18:29:12.885Z"
     }
   ]
 }

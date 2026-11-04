@@ -42,6 +42,11 @@ const {
   SESSION_COOKIE_NAME,
 } = await import("../src/lib/authSession.js");
 
+const {
+  generateOAuthState,
+  validateOAuthState,
+} = await import("../src/lib/oauthState.js");
+
 // Synthetic Canary Secrets (Strictly scoped within this test suite)
 const CANARY_SMTP_PASS_CD03 = "CANARY_SMTP_PASS_X8941_TOP_SECRET";
 const CANARY_OAUTH_REFRESH_CD03 = "CANARY_OAUTH_REFRESH_TOKEN_K2891";
@@ -398,6 +403,28 @@ async function runCd03Suite() {
     );
   } catch (err) {
     recordTest("AC1.10", "Operator password rotation bound to session", false, err.message);
+  }
+
+  // AC1.11: Atomic multi-path write attempting cross-tenant injection via REST / SDK payload
+  try {
+    const maliciousPayload = {
+      name: "Normal Lead",
+      "../../tenants/tenant_b/leads/injected": { name: "Tenant B Hijack" },
+      "../superAdmin/injected": { role: "superadmin" },
+      "tenant_id": "tenant_a"
+    };
+    const sanitized = sanitizeFirebasePayload(maliciousPayload);
+    const keys = Object.keys(sanitized);
+    const pass = !keys.some(k => k.includes("..") || k.includes("/") || k.includes("\\") || k.includes("[") || k.includes("]"));
+    recordTest(
+      "AC1.11",
+      "Atomic multi-path write defense: Path traversal sequences and slashes stripped from write payload",
+      pass,
+      `Sanitized keys: ${keys.join(", ")}`,
+      { sanitizedKeys: keys }
+    );
+  } catch (err) {
+    recordTest("AC1.11", "Multi-path write defense", false, err.message);
   }
 
   // ============================================================================
@@ -1297,6 +1324,132 @@ async function runCd03Suite() {
     );
   } catch (err) {
     recordTest("AC8.3", "SuperAdmin OAuth initiation with signed state", false, err.message);
+  }
+
+  // AC8.4: OAuth state single-use replay protection
+  try {
+    const replayState = generateOAuthState({ sub: "superadmin_primary", role: "superadmin" });
+    const firstUse = validateOAuthState(replayState);
+    const secondUse = validateOAuthState(replayState);
+
+    const pass = firstUse.valid === true && secondUse.valid === false && (secondUse.error || "").toLowerCase().includes("replay");
+    recordTest(
+      "AC8.4",
+      "OAuth state single-use replay defense: Replay of consumed state token is blocked",
+      pass,
+      `First use valid=${firstUse.valid}, Second use valid=${secondUse.valid} (error: ${secondUse.error})`,
+      { firstUse: firstUse.valid, secondUse: secondUse.valid }
+    );
+  } catch (err) {
+    recordTest("AC8.4", "OAuth state replay defense", false, err.message);
+  }
+
+  // AC8.5: OAuth state purpose validation
+  try {
+    const wrongPurposeToken = signSessionToken({
+      sub: "superadmin_primary",
+      role: "superadmin",
+      purpose: "general_login",
+      jti: crypto.randomUUID(),
+      expiresIn: 600,
+    });
+    const check = validateOAuthState(wrongPurposeToken, { expectedPurpose: "email_oauth_connect" });
+    const pass = check.valid === false && (check.error || "").includes("purpose");
+    recordTest(
+      "AC8.5",
+      "OAuth state purpose validation: State issued for different purpose is rejected",
+      pass,
+      `Validation error: ${check.error}`,
+      { valid: check.valid, error: check.error }
+    );
+  } catch (err) {
+    recordTest("AC8.5", "OAuth state purpose validation", false, err.message);
+  }
+
+  // AC8.6: OAuth state user binding validation
+  try {
+    const boundToken = generateOAuthState({ sub: "superadmin_alice", role: "superadmin" });
+    const check = validateOAuthState(boundToken, { expectedSub: "superadmin_attacker" });
+    const pass = check.valid === false && (check.error || "").includes("user binding mismatch");
+    recordTest(
+      "AC8.6",
+      "OAuth state user binding validation: State token bound to different user is rejected",
+      pass,
+      `Validation error: ${check.error}`,
+      { valid: check.valid, error: check.error }
+    );
+  } catch (err) {
+    recordTest("AC8.6", "OAuth state user binding validation", false, err.message);
+  }
+
+  // AC8.7: OAuth state expiry validation
+  try {
+    const expiredToken = signSessionToken({
+      sub: "superadmin_primary",
+      role: "superadmin",
+      purpose: "email_oauth_connect",
+      jti: crypto.randomUUID(),
+      expiresIn: -60,
+    });
+    const check = validateOAuthState(expiredToken);
+    const pass = check.valid === false;
+    recordTest(
+      "AC8.7",
+      "OAuth state expiry validation: Expired state token signature is rejected",
+      pass,
+      `Validation error: ${check.error}`,
+      { valid: check.valid, error: check.error }
+    );
+  } catch (err) {
+    recordTest("AC8.7", "OAuth state expiry validation", false, err.message);
+  }
+
+  // AC8.8: Google callback rejects replayed state token
+  try {
+    const freshState = generateOAuthState({ sub: "superadmin_primary", role: "superadmin" });
+    // Consume state once
+    validateOAuthState(freshState);
+
+    const { req, res } = createMockReqRes({
+      method: "GET",
+      url: `/api/auth/google/callback?code=test_code&state=${encodeURIComponent(freshState)}`,
+      query: { code: "test_code", state: freshState },
+    });
+    await googleCallbackHandler(req, res);
+    const pass = res.statusCode === 403 && (res.body?.error || "").toLowerCase().includes("replay");
+    recordTest(
+      "AC8.8",
+      "Google OAuth callback rejects consumed state token with 403 (Replay defense)",
+      pass,
+      `Got status ${res.statusCode} with error: ${res.body?.error}`,
+      { statusCode: res.statusCode, body: res.body }
+    );
+  } catch (err) {
+    recordTest("AC8.8", "Google OAuth callback replay rejection", false, err.message);
+  }
+
+  // AC8.9: Microsoft callback rejects replayed state token
+  try {
+    const freshStateMs = generateOAuthState({ sub: "superadmin_primary", role: "superadmin" });
+    // Consume state once
+    validateOAuthState(freshStateMs);
+
+    const { req, res } = createMockReqRes({
+      method: "GET",
+      url: `/api/auth/microsoft/callback?code=test_code&state=${encodeURIComponent(freshStateMs)}`,
+      query: { code: "test_code", state: freshStateMs },
+    });
+    await microsoftCallbackHandler(req, res);
+    const pass = res.statusCode === 403 && (res.body?.error || "").toLowerCase().includes("replay");
+    recordTest(
+      "AC8.9",
+      "Microsoft OAuth callback rejects consumed state token with 403 (Replay defense)",
+      pass,
+      `Got status ${res.statusCode} with error: ${res.body?.error}`,
+      { statusCode: res.statusCode, body: res.body }
+    );
+  } catch (err) {
+    recordTest("AC8.9", "Microsoft OAuth callback replay rejection", false, err.message);
   }
 
   // ============================================================================

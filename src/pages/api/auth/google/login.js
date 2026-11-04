@@ -1,5 +1,6 @@
 // src/pages/api/auth/google/login.js
-import { extractSession, signSessionToken } from "../../../../lib/authSession";
+import { extractSession } from "../../../../lib/authSession";
+import { generateOAuthState } from "../../../../lib/oauthState";
 
 export default async function handler(req, res) {
   const session = await extractSession(req);
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
   );
 
   // Signed cryptographic state prevents CSRF and unauthenticated email config hijacking
-  const state = signSessionToken({
+  const state = generateOAuthState({
     sub: session.sub,
     role: "superadmin",
     purpose: "email_oauth_connect",

@@ -1,94 +1,74 @@
 // src/pages/api/auth/microsoft/callback.js
 import { db } from "../../../../lib/firebase";
 import { ref, update } from "firebase/database";
-import { verifySessionToken } from "../../../../lib/authSession";
+import { extractSession } from "../../../../lib/authSession";
+import { validateOAuthState } from "../../../../lib/oauthState";
 
 export default async function handler(req, res) {
-  const { code, state, error } = req.query;
+  const { code, state, error, error_description } = req.query;
 
   if (error || !code) {
-    return res.redirect("/lg?status=microsoft_auth_failed");
+    console.error("Microsoft OAuth Query Error:", error, error_description);
+    return res.redirect(`/lg?status=microsoft_auth_failed&msg=${encodeURIComponent(error_description || error)}`);
   }
 
-  // Verify HMAC-signed cryptographic state token to prevent CSRF and unauthenticated email hijacking
-  const verifiedState = state ? verifySessionToken(state) : null;
-  if (
-    !verifiedState ||
-    verifiedState.role !== "superadmin" ||
-    verifiedState.purpose !== "email_oauth_connect"
-  ) {
+  const callerSession = await extractSession(req);
+
+  // Validate state token: HMAC signature, expiry, purpose, user binding, and single-use replay protection
+  const stateValidation = validateOAuthState(state, {
+    expectedPurpose: "email_oauth_connect",
+    expectedSub: callerSession ? callerSession.sub : null,
+  });
+
+  if (!stateValidation.valid) {
     return res.status(403).json({
-      error: "Invalid or unauthorized OAuth state. Binding rejected.",
+      error: `Invalid or unauthorized OAuth state: ${stateValidation.error}`,
     });
   }
 
   const clientId = process.env.MICROSOFT_CLIENT_ID;
   const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/microsoft/callback`;
-  const scope = "openid email offline_access https://outlook.office.com/SMTP.Send";
 
   try {
-    const tokenResponse = await fetch(
-      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: redirectUri,
-          scope: scope,
-        }),
-      }
-    );
+    // 1. Exchange authorization code for tokens
+    const tokenRes = await fetch("https://login.microsoftonline.com/common/oauth2/v2.0/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
 
-    const tokenData = await tokenResponse.json();
-
-    if (!tokenResponse.ok) {
-      throw new Error(tokenData.error_description || "Microsoft token exchange failed");
+    const tokenData = await tokenRes.json();
+    if (!tokenRes.ok) {
+      throw new Error(tokenData.error_description || "Token exchange failed");
     }
 
-    // Decode the ID token to extract the email directly
-    const payloadBuffer = Buffer.from(tokenData.id_token.split('.')[1], 'base64');
-    const decodedIdToken = JSON.parse(payloadBuffer.toString('utf8'));
-    const userEmail = decodedIdToken.email || decodedIdToken.preferred_username;
+    // 2. Fetch the connected user's Outlook profile email
+    const userRes = await fetch("https://graph.microsoft.com/v1.0/me", {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const userData = await userRes.json();
+    const userEmail = userData.mail || userData.userPrincipalName;
 
-    if (!userEmail) {
-      throw new Error("Could not extract email address from Microsoft account.");
-    }
-
+    // 3. Store OAuth credentials in Firebase settings/email_config
     await update(ref(db, "settings/email_config"), {
-      provider: "microsoft",
+      provider: "microsoft_oauth",
       smtpEmail: userEmail,
       refreshToken: tokenData.refresh_token,
       clientId: clientId,
-      clientSecret: clientSecret,
-      connectedAt: Date.now(),
+      connectedAt: new Date().toISOString(),
     });
 
-    return res.send(`
-      <script>
-        if (window.opener) {
-          window.opener.postMessage({ type: 'OAUTH_SUCCESS' }, '*');
-          window.close();
-        } else {
-          window.location.href = "/lg";
-        }
-      </script>
-    `);
+    // 4. Redirect to Settings with success indicator
+    res.redirect("/lg?status=microsoft_auth_success");
   } catch (err) {
-    console.error("Microsoft OAuth Error:", err);
-    return res.send(`
-      <script>
-        if (window.opener) {
-          window.opener.postMessage({ type: 'OAUTH_ERROR' }, '*');
-          window.close();
-        } else {
-          window.location.href = "/lg";
-        }
-      </script>
-    `);
+    console.error("Microsoft OAuth Callback Error:", err);
+    res.redirect(`/lg?status=microsoft_auth_error&msg=${encodeURIComponent(err.message)}`);
   }
 }

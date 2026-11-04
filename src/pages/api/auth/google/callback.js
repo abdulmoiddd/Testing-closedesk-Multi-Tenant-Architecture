@@ -1,7 +1,8 @@
 // src/pages/api/auth/google/callback.js
 import { db } from "../../../../lib/firebase";
 import { ref, update } from "firebase/database";
-import { verifySessionToken } from "../../../../lib/authSession";
+import { extractSession } from "../../../../lib/authSession";
+import { validateOAuthState } from "../../../../lib/oauthState";
 
 export default async function handler(req, res) {
   const { code, state, error } = req.query;
@@ -10,15 +11,17 @@ export default async function handler(req, res) {
     return res.redirect("/lg?status=google_auth_failed");
   }
 
-  // Verify HMAC-signed cryptographic state token to prevent CSRF and unauthenticated email hijacking
-  const verifiedState = state ? verifySessionToken(state) : null;
-  if (
-    !verifiedState ||
-    verifiedState.role !== "superadmin" ||
-    verifiedState.purpose !== "email_oauth_connect"
-  ) {
+  const callerSession = await extractSession(req);
+
+  // Validate state token: HMAC signature, expiry, purpose, user binding, and single-use replay protection
+  const stateValidation = validateOAuthState(state, {
+    expectedPurpose: "email_oauth_connect",
+    expectedSub: callerSession ? callerSession.sub : null,
+  });
+
+  if (!stateValidation.valid) {
     return res.status(403).json({
-      error: "Invalid or unauthorized OAuth state. Binding rejected.",
+      error: `Invalid or unauthorized OAuth state: ${stateValidation.error}`,
     });
   }
 
@@ -58,32 +61,13 @@ export default async function handler(req, res) {
       smtpEmail: userEmail,
       refreshToken: tokenData.refresh_token,
       clientId: clientId,
-      clientSecret: clientSecret,
-      connectedAt: Date.now(),
+      connectedAt: new Date().toISOString(),
     });
 
-    // Send a success message to the parent window and close the popup
-    return res.send(`
-      <script>
-        if (window.opener) {
-          window.opener.postMessage({ type: 'OAUTH_SUCCESS' }, '*');
-          window.close();
-        } else {
-          window.location.href = "/lg";
-        }
-      </script>
-    `);
+    // 4. Redirect to Settings with success indicator
+    res.redirect("/lg?status=google_auth_success");
   } catch (err) {
-    console.error("Google OAuth Error:", err);
-    return res.send(`
-      <script>
-        if (window.opener) {
-          window.opener.postMessage({ type: 'OAUTH_ERROR' }, '*');
-          window.close();
-        } else {
-          window.location.href = "/lg";
-        }
-      </script>
-    `);
+    console.error("Google OAuth Callback Error:", err);
+    res.redirect(`/lg?status=google_auth_error&msg=${encodeURIComponent(err.message)}`);
   }
 }

@@ -2,8 +2,9 @@
 import { ref, set } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
-import { resolveTenantId } from "../../lib/tenantResolver";
-import { sanitizeFirebaseKey } from "../../lib/sanitizer";
+import { resolveTenantId, resolveAuthenticatedTenantId, sanitizeTenantId } from "../../lib/tenantResolver";
+import { sanitizeFirebaseKey, redactSensitiveSecrets } from "../../lib/sanitizer";
+import { safeDbGet, safeDbSet } from "../../lib/safeDb";
 
 // Helper: Safely deep-sanitize objects to ensure NO property contains `undefined`
 // which causes Firebase Realtime Database set() to throw fatal errors
@@ -26,6 +27,47 @@ async function handler(req, res, apiLogger) {
     return res.status(200).end();
   }
 
+  // ==========================================
+  // GET REQUEST: FETCH COOKIE RECORDS FOR DASHBOARD
+  // ==========================================
+  if (req.method === "GET") {
+    const authResult = await resolveAuthenticatedTenantId(req);
+    if (!authResult.allowed) {
+      apiLogger.warn("security", "unauthorized_cookie_data_fetch_blocked", {
+        context: { error: authResult.error, status: authResult.status },
+      });
+      return res.status(authResult.status || 401).json({ error: authResult.error });
+    }
+
+    try {
+      const tenantId = authResult.tenantId;
+      const cookiesPath =
+        tenantId && tenantId !== "default"
+          ? `tenants/${tenantId}/user_cookies`
+          : "user_cookies";
+
+      let snapshot = null;
+      try {
+        snapshot = await safeDbGet(ref(db, cookiesPath), 600);
+      } catch (e) {
+        // offline fallback
+      }
+
+      if (snapshot && snapshot.exists()) {
+        const val = redactSensitiveSecrets(snapshot.val());
+        return res.status(200).json({ success: true, cookies: val, tenantId });
+      }
+
+      return res.status(200).json({ success: true, cookies: {}, tenantId });
+    } catch (err) {
+      apiLogger.error("Cookie Data Fetch Error:", err);
+      return res.status(500).json({ error: "Failed to fetch cookie data" });
+    }
+  }
+
+  // ==========================================
+  // POST REQUEST: RECORD COOKIE CONSENT (VISITOR)
+  // ==========================================
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -72,16 +114,18 @@ async function handler(req, res, apiLogger) {
       return res.status(400).json({ error: "Valid anonId is required" });
     }
 
-    const tenantId = resolveTenantId(req) || tenant_id || "default";
+    const rawTenant = resolveTenantId(req) || tenant_id || "default";
+    const tenantId = sanitizeTenantId(rawTenant);
     const timestamp = new Date().toISOString();
 
     // Fallback IP extraction from server headers if client didn't supply it
     const clientIp =
       ipAddress && ipAddress !== "unknown"
-        ? ipAddress
-        : (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown")
+        ? String(ipAddress).substring(0, 45)
+        : (req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown")
             .split(",")[0]
-            .trim();
+            .trim()
+            .substring(0, 45);
 
     // Parse numeric coordinates safely for Google Maps markers
     const numLat =
@@ -103,46 +147,54 @@ async function handler(req, res, apiLogger) {
       (consentStatus === "accepted" && numLat != null ? "allowed" : "rejected");
 
     const payload = sanitizeForFirebase({
-      id: String(anonId),
-      anonId: String(anonId),
-      username: username || `Visitor_${String(anonId).substring(4, 12)}`,
-      deviceName: deviceName || "Unknown Device",
-      consentStatus: String(consentStatus),
+      id: String(safeAnonId),
+      anonId: String(safeAnonId),
+      username: String(username || `Visitor_${String(safeAnonId).substring(4, 12)}`).substring(0, 50),
+      deviceName: String(deviceName || "Unknown Device").substring(0, 60),
+      consentStatus: String(consentStatus).substring(0, 20),
       ipAddress: clientIp,
       ipLocation: {
         ip: clientIp,
-        city: (ipLocation && ipLocation.city) || "Unknown",
-        region: (ipLocation && ipLocation.region) || "Unknown",
-        country: (ipLocation && ipLocation.country) || "Unknown",
+        city: String((ipLocation && ipLocation.city) || "Unknown").substring(0, 50),
+        region: String((ipLocation && ipLocation.region) || "Unknown").substring(0, 50),
+        country: String((ipLocation && ipLocation.country) || "Unknown").substring(0, 50),
         lat: numLat,
         lng: numLng,
       },
       location: {
-        status: locationStatus,
+        status: String(locationStatus).substring(0, 20),
         lat: numLat,
         lng: numLng,
       },
-      language: language || "en-US",
-      timeZone: timeZone || "UTC",
-      rawUserAgent: rawUserAgent || req.headers["user-agent"] || "unknown",
-      hostUrl: hostUrl || "",
-      pagePath: pagePath || "/",
+      language: String(language || "en-US").substring(0, 20),
+      timeZone: String(timeZone || "UTC").substring(0, 40),
+      rawUserAgent: String(rawUserAgent || req.headers["user-agent"] || "unknown").substring(0, 255),
+      hostUrl: String(hostUrl || "").substring(0, 255),
+      pagePath: String(pagePath || "/").substring(0, 255),
       tenant_id: tenantId,
       isArchived: false,
       updatedAt: timestamp,
     });
 
-    // 1. Write to global user_cookies partition (consumed by Pulse Dashboard /lg)
-    const globalCookieRef = ref(db, `user_cookies/${safeAnonId}`);
-    await set(globalCookieRef, payload);
-
-    // 2. Also write to tenant-scoped partition for multi-tenant isolation
+    // 1. Write to tenant-scoped partition for multi-tenant isolation
     if (tenantId && tenantId !== "default") {
       const tenantCookieRef = ref(db, `tenants/${tenantId}/user_cookies/${safeAnonId}`);
-      await set(tenantCookieRef, payload);
+      try {
+        await safeDbSet(tenantCookieRef, payload, 600);
+      } catch (e) {
+        // offline fallback
+      }
+    } else {
+      // 2. Write to default partition
+      const globalCookieRef = ref(db, `user_cookies/${safeAnonId}`);
+      try {
+        await safeDbSet(globalCookieRef, payload, 600);
+      } catch (e) {
+        // offline fallback
+      }
     }
 
-    return res.status(200).json({ success: true, anonId, tenantId });
+    return res.status(200).json({ success: true, anonId: safeAnonId, tenantId });
   } catch (error) {
     apiLogger.error("Cookie Consent Save Error:", error);
     return res.status(500).json({ error: "Failed to persist cookie data" });

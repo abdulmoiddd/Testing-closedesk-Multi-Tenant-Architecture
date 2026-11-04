@@ -5,6 +5,7 @@ import { ref, update, get } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { createAiLogger } from "../../lib/loggerPresets";
 import { getVisionSystemPrompt, VISION_DEFAULT_MODEL, VISION_POLICY_VERSION } from "../../lib/visionRuleBook";
+import { resolveTenantId, sanitizeTenantId } from "../../lib/tenantResolver";
 
 // 🔥 INFRASTRUCTURE SECURITY: Enforce a strict body size limit BEFORE Next.js attempts to parse it into RAM.
 // This prevents immediate Out-of-Memory (OOM) crashes if a malicious client sends a massive Base64 payload.
@@ -85,7 +86,12 @@ async function handler(req, res) {
 
     await update(ref(db, `prospects/${session_id}/last_vision_inspection`), imagePayload);
 
-    await update(ref(db, `leads/${session_id}`), {
+    const resolvedTenant = sanitizeTenantId(resolveTenantId(req) || prospectData.tenant_id || "default");
+    const targetLeadPath = resolvedTenant && resolvedTenant !== "default"
+      ? `tenants/${resolvedTenant}/leads/${session_id}`
+      : `leads/${session_id}`;
+
+    await update(ref(db, targetLeadPath), {
       last_inspected_image: image_url,
       identified_issue: parsedResult.identified_issue || "",
       urgency_level: parsedResult.urgency_level || "Medium"

@@ -1,8 +1,8 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-03T15:39:28.598Z",
+  "generated_at": "2026-11-04T18:07:35.636Z",
   "git": {
-    "headCommit": "18a580dbecfec881c2502586232c1b5a766ef46b",
+    "headCommit": "976352b873f56dab8ae213e8a6a24d5a13e48777",
     "branch": "feat/cd03-tenant-isolation-secret-protection"
   },
   "runtime": {
@@ -28,7 +28,7 @@
   "policy_hashes": {
     "ruleBook": "8125aa618e7c4871d8f5fb62d4c1f9510dcc66c01f49b63fc44588cf8c5f57ee",
     "visionRuleBook": "09bccc15b48f40efda925497b1d8ca5f84a01947ce9bbdfae17a2a5804c71a19",
-    "databaseRules": "2603d6dfc2bdecf30a449aed429197b1eb41b3cd3d281fdc0082f2195a8560e9"
+    "databaseRules": "990811e543aa7f5b020f0ecf86b9dc8d6fa0cfdf6d5343565a9408e2e9b73bb3"
   },
   "evaluation_artifact": {
     "rawReportPath": "evaluations/report_v2.1.0.json",
@@ -91,7 +91,7 @@
   "verified_files": [
     {
       "path": "package.json",
-      "sizeBytes": 1015
+      "sizeBytes": 1053
     },
     {
       "path": "netlify.toml",
@@ -107,7 +107,7 @@
     },
     {
       "path": "database.rules.json",
-      "sizeBytes": 4155
+      "sizeBytes": 4605
     },
     {
       "path": "src/lib/ruleBook.js",
@@ -155,23 +155,23 @@
     },
     {
       "path": "src/pages/api/auth/google/login.js",
-      "sizeBytes": 693
+      "sizeBytes": 1255
     },
     {
       "path": "src/pages/api/auth/google/callback.js",
-      "sizeBytes": 2448
+      "sizeBytes": 2885
     },
     {
       "path": "src/pages/api/auth/microsoft/login.js",
-      "sizeBytes": 748
+      "sizeBytes": 1228
     },
     {
       "path": "src/pages/api/auth/microsoft/callback.js",
-      "sizeBytes": 2734
+      "sizeBytes": 3007
     },
     {
       "path": "src/pages/api/leads.js",
-      "sizeBytes": 8830
+      "sizeBytes": 8866
     },
     {
       "path": "src/pages/api/cron/retention-cleanup.js",
@@ -183,11 +183,11 @@
     },
     {
       "path": "src/pages/api/analyze-image.js",
-      "sizeBytes": 4062
+      "sizeBytes": 4291
     },
     {
       "path": "src/Closedesk/Dashboard/Report.jsx",
-      "sizeBytes": 32815
+      "sizeBytes": 33690
     },
     {
       "path": "src/Closedesk/Dashboard/LiveNotifications.jsx",
@@ -211,7 +211,7 @@
     },
     {
       "path": "functions/index.js",
-      "sizeBytes": 24471
+      "sizeBytes": 24562
     },
     {
       "path": "docs/VOICE_PRIVACY_POLICY.md",

@@ -63,12 +63,12 @@
         },
         "leads": {
           ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
-          ".write": true,
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
           ".indexOn": ["timestamp", "booking_status", "urgency_level"]
         },
         "user_cookies": {
           ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
-          ".write": true,
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
           ".indexOn": ["updatedAt", "isArchived", "anonId"]
         },
         "email_config": {
@@ -87,33 +87,33 @@
     },
     "leads": {
       ".read": "auth != null && auth.token.role === 'superadmin'",
-      ".write": true,
+      ".write": "auth != null && auth.token.role === 'superadmin'",
       ".indexOn": ["timestamp", "booking_status", "urgency_level", "tenant_id"]
     },
     "user_cookies": {
       ".read": "auth != null && auth.token.role === 'superadmin'",
-      ".write": true,
+      ".write": "auth != null && auth.token.role === 'superadmin'",
       ".indexOn": ["updatedAt", "isArchived", "anonId", "tenant_id"]
     },
     "system_logs": {
       "structured_events": {
         ".read": "auth != null && auth.token.role === 'superadmin'",
-        ".write": true,
+        ".write": "auth != null && auth.token.role === 'superadmin'",
         ".indexOn": ["timestamp", "service", "level", "tenant_id"]
       },
       "activity_events": {
         ".read": "auth != null && auth.token.role === 'superadmin'",
-        ".write": true,
+        ".write": "auth != null && auth.token.role === 'superadmin'",
         ".indexOn": ["timestamp"]
       }
     },
     "email_alerts": {
       ".read": "auth != null && auth.token.role === 'superadmin'",
-      ".write": true
+      ".write": "auth != null && auth.token.role === 'superadmin'"
     },
     "scheduled_reminders": {
       ".read": "auth != null && auth.token.role === 'superadmin'",
-      ".write": true
+      ".write": "auth != null && auth.token.role === 'superadmin'"
     }
   }
 }

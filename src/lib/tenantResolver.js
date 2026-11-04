@@ -1,6 +1,7 @@
 // src/lib/tenantResolver.js
 import { db } from "./firebase";
-import { ref, get } from "firebase/database";
+import { ref } from "firebase/database";
+import { safeDbGet } from "./safeDb";
 import { extractSession } from "./authSession";
 import { redactSensitiveSecrets } from "./sanitizer";
 
@@ -167,18 +168,27 @@ export async function getTenantConfig(tenantId = "default") {
   // If a specific tenant is requested, attempt to read their tenant partition
   if (safeId && safeId !== "default") {
     try {
-      const tenantRef = ref(db, `tenants/${safeId}`);
-      const snap = await get(tenantRef);
-      if (snap.exists()) {
-        const val = snap.val();
+      const [configSnap, appearSnap, botSnap, bizSnap] = await Promise.all([
+        safeDbGet(ref(db, `tenants/${safeId}/config`)).catch(() => null),
+        safeDbGet(ref(db, `tenants/${safeId}/appearance`)).catch(() => null),
+        safeDbGet(ref(db, `tenants/${safeId}/chatbot_config`)).catch(() => null),
+        safeDbGet(ref(db, `tenants/${safeId}/business_profile`)).catch(() => null),
+      ]);
+
+      const configVal = configSnap && configSnap.exists() ? configSnap.val() : {};
+      const appearVal = appearSnap && appearSnap.exists() ? appearSnap.val() : {};
+      const botVal = botSnap && botSnap.exists() ? botSnap.val() : {};
+      const bizVal = bizSnap && bizSnap.exists() ? bizSnap.val() : {};
+
+      if (configSnap?.exists() || appearSnap?.exists() || botSnap?.exists() || bizSnap?.exists()) {
         return {
           tenantId: safeId,
-          config: redactSensitiveSecrets(val.config || {}),
-          appearance: redactSensitiveSecrets(val.appearance || {}),
-          chatbotConfig: redactSensitiveSecrets(val.chatbot_config || val.config?.chatbot || {}),
-          businessProfile: redactSensitiveSecrets(val.business_profile || val.config?.business_profile || {}),
+          config: redactSensitiveSecrets(configVal),
+          appearance: redactSensitiveSecrets(appearVal),
+          chatbotConfig: redactSensitiveSecrets(botVal),
+          businessProfile: redactSensitiveSecrets(bizVal),
           isMultiTenant: true,
-          enabled: val.enabled !== false,
+          enabled: configVal.enabled !== false,
         };
       }
     } catch (err) {

@@ -1,12 +1,25 @@
 // src/pages/api/auth/google/callback.js
-import { db } from "@/lib/firebase";
+import { db } from "../../../../lib/firebase";
 import { ref, update } from "firebase/database";
+import { verifySessionToken } from "../../../../lib/authSession";
 
 export default async function handler(req, res) {
-  const { code, error } = req.query;
+  const { code, state, error } = req.query;
 
   if (error || !code) {
     return res.redirect("/lg?status=google_auth_failed");
+  }
+
+  // Verify HMAC-signed cryptographic state token to prevent CSRF and unauthenticated email hijacking
+  const verifiedState = state ? verifySessionToken(state) : null;
+  if (
+    !verifiedState ||
+    verifiedState.role !== "superadmin" ||
+    verifiedState.purpose !== "email_oauth_connect"
+  ) {
+    return res.status(403).json({
+      error: "Invalid or unauthorized OAuth state. Binding rejected.",
+    });
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -49,29 +62,28 @@ export default async function handler(req, res) {
       connectedAt: Date.now(),
     });
 
-// 🔥 Send a success message to the parent window and close the popup
-return res.send(`
-  <script>
-    if (window.opener) {
-      window.opener.postMessage({ type: 'OAUTH_SUCCESS' }, '*');
-      window.close();
-    } else {
-      window.location.href = "/lg";
-    }
-  </script>
-`);
-} catch (err) {
-console.error("Microsoft OAuth Error:", err);
-// 🔥 Send an error message to the parent window and close the popup
-return res.send(`
-  <script>
-    if (window.opener) {
-      window.opener.postMessage({ type: 'OAUTH_ERROR' }, '*');
-      window.close();
-    } else {
-      window.location.href = "/lg";
-    }
-  </script>
-`);
-}
+    // Send a success message to the parent window and close the popup
+    return res.send(`
+      <script>
+        if (window.opener) {
+          window.opener.postMessage({ type: 'OAUTH_SUCCESS' }, '*');
+          window.close();
+        } else {
+          window.location.href = "/lg";
+        }
+      </script>
+    `);
+  } catch (err) {
+    console.error("Google OAuth Error:", err);
+    return res.send(`
+      <script>
+        if (window.opener) {
+          window.opener.postMessage({ type: 'OAUTH_ERROR' }, '*');
+          window.close();
+        } else {
+          window.location.href = "/lg";
+        }
+      </script>
+    `);
+  }
 }

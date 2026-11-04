@@ -1,19 +1,30 @@
 // src/pages/api/auth/microsoft/callback.js
-import { db } from "@/lib/firebase";
+import { db } from "../../../../lib/firebase";
 import { ref, update } from "firebase/database";
+import { verifySessionToken } from "../../../../lib/authSession";
 
 export default async function handler(req, res) {
-  const { code, error } = req.query;
+  const { code, state, error } = req.query;
 
   if (error || !code) {
     return res.redirect("/lg?status=microsoft_auth_failed");
   }
 
+  // Verify HMAC-signed cryptographic state token to prevent CSRF and unauthenticated email hijacking
+  const verifiedState = state ? verifySessionToken(state) : null;
+  if (
+    !verifiedState ||
+    verifiedState.role !== "superadmin" ||
+    verifiedState.purpose !== "email_oauth_connect"
+  ) {
+    return res.status(403).json({
+      error: "Invalid or unauthorized OAuth state. Binding rejected.",
+    });
+  }
+
   const clientId = process.env.MICROSOFT_CLIENT_ID;
   const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/microsoft/callback`;
-  
-  // 🔥 Must perfectly match the new login.js scopes
   const scope = "openid email offline_access https://outlook.office.com/SMTP.Send";
 
   try {
@@ -39,7 +50,7 @@ export default async function handler(req, res) {
       throw new Error(tokenData.error_description || "Microsoft token exchange failed");
     }
 
-    // 🔥 Decode the ID token to extract the email directly (No Graph API call needed)
+    // Decode the ID token to extract the email directly
     const payloadBuffer = Buffer.from(tokenData.id_token.split('.')[1], 'base64');
     const decodedIdToken = JSON.parse(payloadBuffer.toString('utf8'));
     const userEmail = decodedIdToken.email || decodedIdToken.preferred_username;
@@ -56,29 +67,28 @@ export default async function handler(req, res) {
       clientSecret: clientSecret,
       connectedAt: Date.now(),
     });
-// 🔥 Send a success message to the parent window and close the popup
-return res.send(`
-  <script>
-    if (window.opener) {
-      window.opener.postMessage({ type: 'OAUTH_SUCCESS' }, '*');
-      window.close();
-    } else {
-      window.location.href = "/lg";
-    }
-  </script>
-`);
-} catch (err) {
-console.error("Microsoft OAuth Error:", err);
-// 🔥 Send an error message to the parent window and close the popup
-return res.send(`
-  <script>
-    if (window.opener) {
-      window.opener.postMessage({ type: 'OAUTH_ERROR' }, '*');
-      window.close();
-    } else {
-      window.location.href = "/lg";
-    }
-  </script>
-`);
-}
+
+    return res.send(`
+      <script>
+        if (window.opener) {
+          window.opener.postMessage({ type: 'OAUTH_SUCCESS' }, '*');
+          window.close();
+        } else {
+          window.location.href = "/lg";
+        }
+      </script>
+    `);
+  } catch (err) {
+    console.error("Microsoft OAuth Error:", err);
+    return res.send(`
+      <script>
+        if (window.opener) {
+          window.opener.postMessage({ type: 'OAUTH_ERROR' }, '*');
+          window.close();
+        } else {
+          window.location.href = "/lg";
+        }
+      </script>
+    `);
+  }
 }

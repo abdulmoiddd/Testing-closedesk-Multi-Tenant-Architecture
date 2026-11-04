@@ -143,10 +143,15 @@ const executeSilentTracking = async (consentStatus) => {
   };
 
   try {
-    if (db && anonId) {
-      const userCookieRef = ref(db, `user_cookies/${anonId}`);
-      await set(userCookieRef, payload);
-    }
+    const activeTenant = typeof window !== "undefined" ? (localStorage.getItem("currentTenant") || "default") : "default";
+    await fetch("/api/cookie-consent", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(activeTenant && activeTenant !== "default" ? { "x-tenant-id": activeTenant } : {}),
+      },
+      body: JSON.stringify({ ...payload, tenant_id: activeTenant }),
+    });
   } catch (error) {
     txLogger.error("database", "tracking_save_failed", { error });
   }

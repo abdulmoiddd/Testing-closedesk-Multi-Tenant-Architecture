@@ -5,7 +5,7 @@ import { db } from "../../lib/firebase";
 import { ref, update, get } from "firebase/database";
 import { traceAiExecution } from "../../lib/aiTracer"; // 🔥 Integrates Ticket 5 Tracer for the abandoned summaries
 import { executeDbWithTrace } from "../../lib/dbTracer";
-import { resolveTenantId, resolveAuthenticatedTenantId } from "../../lib/tenantResolver";
+import { resolveTenantId, resolveAuthenticatedTenantId, sanitizeTenantId } from "../../lib/tenantResolver";
 import { sanitizeFirebaseKey, sanitizeFirebasePayload, redactSensitiveSecrets } from "../../lib/sanitizer";
 import { safeDbGet, safeDbUpdate } from "../../lib/safeDb";
 
@@ -73,7 +73,7 @@ async function handler(req, res, apiLogger) {
 
     try {
       // 1. Check existing state in the database
-      const tenantId = resolveTenantId(req) || data.tenant_id || "default";
+      const tenantId = sanitizeTenantId(resolveTenantId(req) || data.tenant_id || "default");
       const leadPath = tenantId && tenantId !== "default" ? `tenants/${tenantId}/leads/${lead_id}` : `leads/${lead_id}`;
       const leadRef = ref(db, leadPath);
       let snapshot = null;

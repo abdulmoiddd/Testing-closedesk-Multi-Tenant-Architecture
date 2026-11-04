@@ -339,6 +339,7 @@ exports.sendEmailAlert = functions.database
 
             if (meetingDate - bookingTimestamp > ONE_DAY_MS * 1.5) {
               await remindersRef.push({
+                tenant_id: targetTenant,
                 type: "24h_after_booking",
                 scheduledFor: timeAfter1Day,
                 email: vConf.visitorEmail,
@@ -350,6 +351,7 @@ exports.sendEmailAlert = functions.database
 
             if (timeBefore1Day > bookingTimestamp) {
               await remindersRef.push({
+                tenant_id: targetTenant,
                 type: "24h_before_meeting",
                 scheduledFor: timeBefore1Day,
                 email: vConf.visitorEmail,
@@ -400,17 +402,23 @@ exports.processScheduledReminders = functions.pubsub
     const reminders = snapshot.val();
     const promises = [];
 
-    let transporterConfig;
-    try {
-      transporterConfig = await getDynamicTransporter();
-    } catch (err) {
-      console.error("CRON Failed to initialize dynamic transporter:", err);
-      return null;
-    }
-    const { transporter, userEmail, senderName } = transporterConfig;
-
     for (const [key, reminder] of Object.entries(reminders)) {
       if (reminder.status !== "pending") continue;
+
+      const targetTenant = reminder.tenant_id || "default";
+      let transporterConfig;
+      try {
+        transporterConfig = await getDynamicTransporter(targetTenant);
+      } catch (err) {
+        console.error(`CRON Failed to initialize dynamic transporter for reminder ${key} (tenant: ${targetTenant}):`, err);
+        const isFallbackDenied = err.code === "GLOBAL_FALLBACK_UNAUTHORIZED";
+        await remindersRef.child(key).update({
+          status: isFallbackDenied ? "rejected_fallback_unauthorized" : "error",
+          error: err.message,
+        });
+        continue;
+      }
+      const { transporter, userEmail, senderName } = transporterConfig;
 
       let subject = "";
       let htmlBody = "";

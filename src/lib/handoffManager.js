@@ -12,6 +12,7 @@ import {
   createDeliveryAttemptRecord,
 } from "./handoffContract";
 import { sanitizeFirebaseKey } from "./sanitizer";
+import { processSmartAlert, MAX_DELIVERY_RETRIES } from "./alertManager";
 
 function resolveDbOps(dbInstance, dbOps) {
   return {
@@ -384,6 +385,9 @@ export async function updateJobDeliveryStatus({
   }
 
   const nowIso = new Date().toISOString();
+  const attemptsCount = currentJob.attempts || 1;
+  const isDeadLetter = finalStatus === DELIVERY_STATUS.FAILED && attemptsCount >= (MAX_DELIVERY_RETRIES || 3);
+
   const patch = {
     delivery_status: finalStatus,
     failure_reason: effectiveReason,
@@ -391,7 +395,8 @@ export async function updateJobDeliveryStatus({
     error_code: errorCode || currentJob.error_code || null,
     provider_message_id: providerMessageId || currentJob.provider_message_id,
     is_ambiguous: effectiveAmbiguous,
-    next_retry_at: nextRetryAt,
+    is_dead_letter: isDeadLetter,
+    next_retry_at: isDeadLetter ? null : nextRetryAt,
     lease_expires_at: null,
     claimed_by: null,
     updated_at: nowIso,
@@ -399,6 +404,32 @@ export async function updateJobDeliveryStatus({
   };
 
   await ops.update(jobPath, patch);
+
+  // 🚨 CD15: Trigger Actionable Operational Alerts on Provider Failure or Dead-Letter
+  if (finalStatus === DELIVERY_STATUS.FAILED) {
+    try {
+      await processSmartAlert("CRITICAL", "notification_lifecycle", "provider_failure", {
+        tenantId: cleanTenant,
+        error_code: errorCode || "PROVIDER_DELIVERY_FAILED",
+        error_message: effectiveReason || "Provider delivery failed.",
+        correlation_id: currentJob.lead_id || cleanJobId,
+        provider_id: currentJob.provider_id || "nodemailer-smtp",
+      });
+
+      if (isDeadLetter) {
+        await processSmartAlert("CRITICAL", "notification_lifecycle", "dead_letter_queue_threshold_exceeded", {
+          tenantId: cleanTenant,
+          error_code: "DLQ_THRESHOLD_EXCEEDED",
+          error_message: `Notification job '${cleanJobId}' reached maximum retry threshold (${attemptsCount} attempts) and is held in dead-letter state.`,
+          correlation_id: currentJob.lead_id || cleanJobId,
+          provider_id: currentJob.provider_id || "nodemailer-smtp",
+        });
+      }
+    } catch (_) {
+      // safe fallback
+    }
+  }
+
   return { success: true, ...currentJob, ...patch };
 }
 

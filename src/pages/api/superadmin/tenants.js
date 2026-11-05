@@ -106,6 +106,11 @@ async function handler(req, res, apiLogger) {
         success: true,
         tenantId: cleanTenantId,
         message: `Tenant ${cleanTenantId} created successfully.`,
+        readiness: {
+          ready: readiness.ready,
+          status: readiness.status,
+          score: readiness.score,
+        },
       });
     } catch (err) {
       apiLogger.error("Tenant creation error:", err);

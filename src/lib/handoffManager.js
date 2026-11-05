@@ -1,6 +1,7 @@
 // src/lib/handoffManager.js
 import { ref, get, set, update, push } from "firebase/database";
 import { db } from "./firebase";
+import { safeDbGet, safeDbSet, safeDbUpdate } from "./safeDb";
 import {
   DELIVERY_STATUS,
   ACKNOWLEDGEMENT_STATUS,
@@ -21,20 +22,32 @@ function resolveDbOps(dbInstance, dbOps) {
         return res && typeof res.val === "function" ? res.val() : res;
       }
       const dbRef = ref(dbInstance || db, dbPath);
-      const snap = await get(dbRef);
-      return snap && snap.exists() ? snap.val() : null;
+      try {
+        const snap = await safeDbGet(dbRef, 800);
+        return snap && snap.exists() ? snap.val() : null;
+      } catch (_) {
+        return null;
+      }
     },
     set: async (dbPath, val) => {
       if (dbOps?.set) return await dbOps.set(dbPath, val);
       if (typeof dbInstance?.set === "function") return await dbInstance.set(dbPath, val);
       const dbRef = ref(dbInstance || db, dbPath);
-      await set(dbRef, val);
+      try {
+        await safeDbSet(dbRef, val, 800);
+      } catch (_) {
+        // offline fallback
+      }
     },
     update: async (dbPath, patch) => {
       if (dbOps?.update) return await dbOps.update(dbPath, patch);
       if (typeof dbInstance?.update === "function") return await dbInstance.update(dbPath, patch);
       const dbRef = ref(dbInstance || db, dbPath);
-      await update(dbRef, patch);
+      try {
+        await safeDbUpdate(dbRef, patch, 800);
+      } catch (_) {
+        // offline fallback
+      }
     },
   };
 }

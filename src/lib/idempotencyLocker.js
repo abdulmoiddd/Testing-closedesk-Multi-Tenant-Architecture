@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { ref, get, set, update } from "firebase/database";
 import { db } from "./firebase";
 import { sanitizeFirebaseKey } from "./sanitizer";
+import { safeDbGet, safeDbSet, safeDbUpdate } from "./safeDb";
 
 export const LOCK_STATUS = Object.freeze({
   PENDING: "pending",
@@ -58,20 +59,32 @@ function resolveDbOps(dbInstance, dbOps) {
         return res && typeof res.val === "function" ? res.val() : res;
       }
       const lockRef = ref(dbInstance || db, lockPath);
-      const snap = await get(lockRef);
-      return snap && snap.exists() ? snap.val() : null;
+      try {
+        const snap = await safeDbGet(lockRef, 800);
+        return snap && snap.exists() ? snap.val() : null;
+      } catch (_) {
+        return null;
+      }
     },
     set: async (lockPath, val) => {
       if (dbOps?.set) return await dbOps.set(lockPath, val);
       if (typeof dbInstance?.set === "function") return await dbInstance.set(lockPath, val);
       const lockRef = ref(dbInstance || db, lockPath);
-      await set(lockRef, val);
+      try {
+        await safeDbSet(lockRef, val, 800);
+      } catch (_) {
+        // offline fallback
+      }
     },
     update: async (lockPath, patch) => {
       if (dbOps?.update) return await dbOps.update(lockPath, patch);
       if (typeof dbInstance?.update === "function") return await dbInstance.update(lockPath, patch);
       const lockRef = ref(dbInstance || db, lockPath);
-      await update(lockRef, patch);
+      try {
+        await safeDbUpdate(lockRef, patch, 800);
+      } catch (_) {
+        // offline fallback
+      }
     },
   };
 }

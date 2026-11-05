@@ -161,12 +161,6 @@ async function handler(req, res, apiLogger) {
       injectionDetected = true;
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      errorCategory = "config_failure";
-      throw new Error("Chat service API key not configured.");
-    }
-
     const activeTenant = resolveTenantId(req) || "default";
 
     // 🚨 CD11: Strict Fail-Closed Multi-Tenancy (unknown or inactive tenants rejected)
@@ -182,6 +176,13 @@ async function handler(req, res, apiLogger) {
         });
       }
     }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      errorCategory = "config_failure";
+      throw new Error("Chat service API key not configured.");
+    }
+
     const getScopedPath = (subPath) => (activeTenant && activeTenant !== "default" ? `tenants/${activeTenant}/${subPath}` : subPath);
 
     // --- CROSS-CHANNEL CONTEXT MERGING ---

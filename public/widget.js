@@ -657,10 +657,11 @@
       return;
     }
 
+    const hasOwn = Object.prototype.hasOwnProperty;
     if (
-      "__proto__" in event.data ||
-      "constructor" in event.data ||
-      "prototype" in event.data
+      hasOwn.call(event.data, "__proto__") ||
+      hasOwn.call(event.data, "constructor") ||
+      hasOwn.call(event.data, "prototype")
     ) {
       console.warn("[CloseDesk SDK] Dropping malicious postMessage payload: Prototype pollution attempt detected.");
       return;

@@ -1179,7 +1179,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
           conversation_ended_at: new Date().toISOString(),
         });
         setIsProcessing(false);
-        addBotMessage(`✅ Appointment Confirmed! | Your appointment is officially booked for ${timeText} (Booking Ref: ${bookingId}). We look forward to meeting with you!`, [{ label: "Close Chat", value: "close" }], true);
+        addBotMessage(`✅ Appointment Confirmed! | Your appointment is officially booked for ${timeText} (Ref: ${confirmedLead?.lead_id || bookingId}, Booking Ref: ${bookingId}). We look forward to meeting with you!`, [{ label: "Close Chat", value: "close" }], true);
       } else {
         // Truthful Request-Only handling
         uiLogger.info("booking_lifecycle", "appointment_request_submitted", { context: { session_id: firebaseDbId, target_time: timeText }});

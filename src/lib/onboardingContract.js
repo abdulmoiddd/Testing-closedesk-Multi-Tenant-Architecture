@@ -77,13 +77,15 @@ export function isOriginAllowedForTenant(incomingOrigin, allowedOrigins = []) {
   if (!Array.isArray(allowedOrigins) || allowedOrigins.length === 0) return false;
 
   const normalizedIncoming = normalizeEmbedOrigin(incomingOrigin);
-  const incomingHost = (() => {
-    try {
-      return new URL(normalizedIncoming).hostname;
-    } catch (_) {
-      return normalizedIncoming;
-    }
-  })();
+  let incomingParsed = null;
+  try {
+    incomingParsed = new URL(normalizedIncoming);
+  } catch (_) {
+    return false;
+  }
+
+  const incomingHost = incomingParsed.hostname;
+  const incomingProtocol = incomingParsed.protocol;
 
   for (const allowed of allowedOrigins) {
     if (!allowed || typeof allowed !== "string") continue;
@@ -95,9 +97,13 @@ export function isOriginAllowedForTenant(incomingOrigin, allowedOrigins = []) {
     const normalizedAllowed = normalizeEmbedOrigin(cleanAllowed);
     if (normalizedIncoming === normalizedAllowed) return true;
 
-    // Subdomain matching if allowed starts with "." or "*."
     try {
-      const allowedHost = new URL(normalizedAllowed).hostname;
+      const allowedParsed = new URL(normalizedAllowed);
+      // Protocol match required: insecure http cannot impersonate https
+      if (incomingProtocol !== allowedParsed.protocol) {
+        continue;
+      }
+      const allowedHost = allowedParsed.hostname;
       if (incomingHost === allowedHost || incomingHost.endsWith(`.${allowedHost}`)) {
         return true;
       }
@@ -204,12 +210,12 @@ export function validateTenantReadiness(tenantData = {}) {
   }
 
   // 6. Supported Modes
-  const supportedModes = config.supported_modes || chatbotConfig.supported_modes || ["chat"];
+  const supportedModes = config.supported_modes || chatbotConfig.supported_modes || bizProfile.supported_modes;
   const hasValidModes = Array.isArray(supportedModes) && supportedModes.length > 0 && supportedModes.every((m) => ["chat", "voice", "vision"].includes(m.toLowerCase()));
 
   checklist[ACTIVATION_CHECKLIST_ITEMS.SUPPORTED_MODES] = {
     passed: hasValidModes,
-    details: supportedModes,
+    details: supportedModes || [],
   };
   if (!hasValidModes) {
     missing.push("Supported Modes: At least one permitted operational mode (chat, voice, vision) must be enabled");

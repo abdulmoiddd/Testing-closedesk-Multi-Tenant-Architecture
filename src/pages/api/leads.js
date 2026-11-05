@@ -5,7 +5,7 @@ import { db } from "../../lib/firebase";
 import { ref } from "firebase/database";
 import { traceAiExecution } from "../../lib/aiTracer";
 import { executeDbWithTrace } from "../../lib/dbTracer";
-import { resolveTenantId, resolveAuthenticatedTenantId, sanitizeTenantId } from "../../lib/tenantResolver";
+import { resolveTenantId, resolveAuthenticatedTenantId, sanitizeTenantId, getTenantConfig } from "../../lib/tenantResolver";
 import { sanitizeFirebaseKey, sanitizeFirebasePayload, redactSensitiveSecrets } from "../../lib/sanitizer";
 import { safeDbGet, safeDbUpdate } from "../../lib/safeDb";
 import {
@@ -83,6 +83,20 @@ async function handler(req, res, apiLogger) {
     const session_id = sanitizeFirebaseKey(rawSessionId, "session");
 
     const tenantId = sanitizeTenantId(resolveTenantId(req) || data.tenant_id || "default");
+
+    // 🚨 CD11: Strict Fail-Closed Multi-Tenancy for lead ingestion
+    if (tenantId !== "default") {
+      const tenantCheck = await getTenantConfig(tenantId);
+      if (!tenantCheck.exists || tenantCheck.enabled === false) {
+        apiLogger.warn("security", "lead_submission_rejected_inactive_tenant", {
+          context: { tenantId, lead_id },
+        });
+        return res.status(403).json({
+          error: `Tenant '${tenantId}' is not active or unauthorized.`,
+          code: "TENANT_INACTIVE",
+        });
+      }
+    }
     const operationKey = req.headers["x-idempotency-key"] || data.operation_key || `op_${session_id}_${data.booking_status || "update"}`;
 
     let lockResult = null;

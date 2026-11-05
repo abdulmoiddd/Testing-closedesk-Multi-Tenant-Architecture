@@ -1,7 +1,7 @@
 // src/pages/api/openai-token.js
 import { getMasterRuleBook, POLICY_VERSION } from "../../lib/ruleBook";
 import { withApiLogger } from "../../lib/apiMiddleware";
-import { resolveTenantId } from "../../lib/tenantResolver";
+import { resolveTenantId, getTenantConfig } from "../../lib/tenantResolver";
 import { db } from "../../lib/firebase";
 import { ref, get } from "firebase/database";
 import {
@@ -37,14 +37,23 @@ async function handler(req, res, apiLogger) {
     const tenantId = resolveTenantId(req);
     const isTenant = tenantId && tenantId !== "default";
 
-    // 🚨 SECURITY GATE: Verify tenant validity
+    // 🚨 SECURITY GATE: Verify tenant validity (CD11 Fail-Closed)
     if (isTenant) {
-      const tenantSnap = await get(ref(db, `tenants/${tenantId}`));
-      if (!tenantSnap.exists()) {
+      const tenantCheck = await getTenantConfig(tenantId);
+      if (!tenantCheck.exists) {
         apiLogger.warn("security", "unauthorized_fake_tenant_voice_token_access", {
-          context: { tenantId }
+          context: { tenantId },
         });
         return res.status(404).json({ error: `Tenant '${tenantId}' not found or unauthorized.` });
+      }
+      if (tenantCheck.enabled === false) {
+        apiLogger.warn("security", "inactive_tenant_voice_token_access", {
+          context: { tenantId },
+        });
+        return res.status(403).json({
+          error: `Tenant '${tenantId}' is not active or pending setup.`,
+          code: "TENANT_INACTIVE",
+        });
       }
     }
 

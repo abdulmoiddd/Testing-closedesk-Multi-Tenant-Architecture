@@ -5,7 +5,7 @@ import { ref, set, get, update, push } from "firebase/database";
 import { getMasterRuleBook, POLICY_VERSION } from "../../lib/ruleBook";
 import { authorizeToolAction } from "../../lib/toolAuthorizer";
 import { withApiLogger } from "../../lib/apiMiddleware";
-import { resolveTenantId } from "../../lib/tenantResolver";
+import { resolveTenantId, getTenantConfig } from "../../lib/tenantResolver";
 import { executeRagWithTrace } from "../../lib/ragTracer";
 
 import { traceAiExecution, safeParseAiResponse } from "../../lib/aiTracer";
@@ -168,6 +168,20 @@ async function handler(req, res, apiLogger) {
     }
 
     const activeTenant = resolveTenantId(req) || "default";
+
+    // 🚨 CD11: Strict Fail-Closed Multi-Tenancy (unknown or inactive tenants rejected)
+    if (activeTenant !== "default") {
+      const tenantCheck = await getTenantConfig(activeTenant);
+      if (!tenantCheck.exists || tenantCheck.enabled === false) {
+        apiLogger.warn("security", "inactive_or_unknown_tenant_chat_rejected", {
+          context: { tenant: activeTenant, exists: tenantCheck.exists, enabled: tenantCheck.enabled },
+        });
+        return res.status(403).json({
+          error: `Tenant '${activeTenant}' is not active or unauthorized.`,
+          code: "TENANT_INACTIVE",
+        });
+      }
+    }
     const getScopedPath = (subPath) => (activeTenant && activeTenant !== "default" ? `tenants/${activeTenant}/${subPath}` : subPath);
 
     // --- CROSS-CHANNEL CONTEXT MERGING ---

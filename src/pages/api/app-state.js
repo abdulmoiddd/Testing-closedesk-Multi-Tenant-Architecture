@@ -1,19 +1,37 @@
 // src/pages/api/app-state.js
 import { db } from "../../lib/firebase";
 import { ref } from "firebase/database";
-import { sanitizeFirebaseKey, sanitizeFirebasePayload } from "../../lib/sanitizer";
 import { safeDbSet } from "../../lib/safeDb";
+import {
+  sanitizeFirebaseKey,
+  sanitizeFirebasePayload,
+  sanitizeUntrustedTelemetry,
+} from "../../lib/sanitizer";
+import { validateRequestBodySize } from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '16kb',
+    },
+  },
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed", code: "METHOD_NOT_ALLOWED" });
   }
 
+  // 1. Enforce 16KB body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 16384)) return;
+
   try {
-    const logEntry = sanitizeFirebasePayload(req.body);
+    // 2. Untrusted Telemetry Isolation: Quarantine client-supplied authority/role claims
+    const sanitizedTelemetry = sanitizeUntrustedTelemetry(req.body);
+    const logEntry = sanitizeFirebasePayload(sanitizedTelemetry);
 
     if (!logEntry.log_id || !logEntry.timestamp || !logEntry.service) {
-      return res.status(400).json({ error: "Invalid log schema format" });
+      return res.status(400).json({ error: "Invalid log schema format", code: "INVALID_PAYLOAD" });
     }
 
     const safeLogId = sanitizeFirebaseKey(logEntry.log_id, "log");

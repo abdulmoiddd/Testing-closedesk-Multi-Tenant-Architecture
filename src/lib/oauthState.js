@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { signSessionToken, verifySessionToken } from "./authSession.js";
 
 // In-memory cache for consumed state nonces to prevent replay attacks
-const consumedStateJtis = new Map();
+export const consumedStateJtis = new Map();
 
 // Regularly purge expired nonces
 if (typeof setInterval !== "undefined") {

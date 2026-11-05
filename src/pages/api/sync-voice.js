@@ -9,16 +9,28 @@ import {
   completeIdempotencyLock,
   failIdempotencyLock,
 } from "../../lib/idempotencyLocker";
-import { sanitizeFirebaseKey } from "../../lib/sanitizer";
+import { sanitizeFirebaseKey, sanitizeUntrustedTelemetry } from "../../lib/sanitizer";
 import { authorizeToolAction } from "../../lib/toolAuthorizer";
 import { validateVoiceSessionForAction } from "../../lib/voiceLifecycle";
+import { validateRequestBodySize } from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '32kb',
+    },
+  },
+};
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const isValidSessionId = (id) => /^lead_\d+_[a-z0-9]{5,10}$/i.test(id);
 
 async function handler(req, res, apiLogger) {
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed", code: "METHOD_NOT_ALLOWED" });
+
+  // 1. Enforce 32KB body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 32768)) return;
 
   const tenantId = sanitizeTenantId(resolveTenantId(req) || req.body?.tenant_id || "default");
 
@@ -48,6 +60,63 @@ async function handler(req, res, apiLogger) {
 
   const cleanSessionId = sanitizeFirebaseKey(session_id, "session");
   const getScopedPath = (subPath) => (tenantId && tenantId !== "default" ? `tenants/${tenantId}/${subPath}` : subPath);
+
+  // --- TELEMETRY LOGGING ---
+  if (action === "log_telemetry") {
+    try {
+      await push(ref(db, getScopedPath(`voice_telemetry/${cleanSessionId}`)), {
+        timestamp: new Date().toISOString(),
+        ...sanitizeUntrustedTelemetry(telemetry_data || {}),
+      });
+
+      apiLogger.info("voice_telemetry", "turn_metrics_recorded", {
+        context: { session_id: cleanSessionId, turn_id: telemetry_data?.turn_id },
+        metadata: {
+          recording_duration_ms: telemetry_data?.recording_duration,
+          stt_latency_ms: telemetry_data?.stt_latency,
+          ai_latency_ms: telemetry_data?.ai_latency,
+          first_audio_latency_ms: telemetry_data?.first_audio_latency,
+          total_turn_latency_ms: telemetry_data?.total_turn_latency,
+          interrupted: telemetry_data?.interrupted
+        },
+        duration_ms: telemetry_data?.total_turn_latency 
+      });
+
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      apiLogger.error("system_event", "telemetry_save_failed", { error: err });
+      return res.status(500).json({ error: "Telemetry logging failed." });
+    }
+  }
+
+  // --- ERROR LOGGING ---
+  if (action === "log_error") {
+    try {
+      await push(ref(db, getScopedPath(`voice_errors/${cleanSessionId}`)), {
+        timestamp: new Date().toISOString(),
+        error_stage,
+        error_message,
+        raw_error: raw_error || null,
+      });
+
+      let errorCategory = "voice_network_error";
+      const stageUpper = (error_stage || "").toUpperCase();
+      
+      if (stageUpper.includes("MIC") || stageUpper.includes("PERMISSION")) errorCategory = "voice_mic_error";
+      else if (stageUpper.includes("STT") || stageUpper.includes("TRANSCRIPT")) errorCategory = "voice_stt_error";
+      else if (stageUpper.includes("AI") || stageUpper.includes("REALTIME") || stageUpper.includes("OPENAI")) errorCategory = "voice_ai_error";
+      else if (stageUpper.includes("TTS") || stageUpper.includes("AUDIO") || stageUpper.includes("PLAYBACK")) errorCategory = "voice_tts_error";
+
+      apiLogger.error("voice_lifecycle", errorCategory, {
+        error: raw_error ? new Error(String(raw_error)) : new Error(error_message),
+        context: { session_id: cleanSessionId, error_stage, error_message }
+      });
+
+      return res.status(200).json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: "Logging failed." });
+    }
+  }
 
   // 🚨 CD09: SERVER-SIDE VOICE SESSION & KILL SWITCH VALIDATION
   const sessionCheck = await validateVoiceSessionForAction({

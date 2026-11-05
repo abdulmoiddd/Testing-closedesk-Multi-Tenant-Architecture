@@ -1253,6 +1253,10 @@ async function runCd03Suite() {
   // CATEGORY 8: OAuth Credential Handling Security
   // ============================================================================
   console.log("\n--- Category 8: OAuth Credential Handling Security ---");
+  process.env.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "mock-google-client-id";
+  process.env.GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "mock-google-client-secret";
+  process.env.MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || "mock-ms-client-id";
+  process.env.MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET || "mock-ms-client-secret";
 
   // AC8.1: Unauthenticated visitors rejected when accessing OAuth initiate
   try {

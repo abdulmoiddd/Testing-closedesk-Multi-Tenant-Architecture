@@ -1,73 +1,157 @@
 // src/pages/api/auth/google/callback.js
-import { db } from "../../../../lib/firebase";
-import { ref, update } from "firebase/database";
-import { extractSession } from "../../../../lib/authSession";
-import { validateOAuthState } from "../../../../lib/oauthState";
+import { db } from "@/lib/firebase";
+import { ref } from "firebase/database";
+import { safeDbUpdate } from "@/lib/safeDb";
+import {
+  getProviderConfig,
+  verifyAndConsumeOAuthState,
+  validateIdToken,
+  buildPostMessageHtml,
+  getAppBaseUrl,
+} from "@/lib/oauthService";
 
 export default async function handler(req, res) {
-  const { code, state, error } = req.query;
+  const { code, state, error } = req.query || {};
+  const allowedOrigin = getAppBaseUrl(req);
 
+  // 1. Check for provider callback error
   if (error || !code) {
-    return res.redirect("/lg?status=google_auth_failed");
+    return res.status(400).send(
+      buildPostMessageHtml({
+        status: "error",
+        provider: "google",
+        error: error || "Authorization code missing from Google callback",
+        allowedOrigin,
+      })
+    );
   }
 
-  const callerSession = await extractSession(req);
-
-  // Validate state token: HMAC signature, expiry, purpose, user binding, and single-use replay protection
-  const stateValidation = validateOAuthState(state, {
-    expectedPurpose: "email_oauth_connect",
-    expectedSub: callerSession ? callerSession.sub : null,
-  });
-
-  if (!stateValidation.valid) {
-    return res.status(403).json({
-      error: `Invalid or unauthorized OAuth state: ${stateValidation.error}`,
-    });
+  // 2. Reject absent or missing state parameter
+  if (!state) {
+    const errorMsg = "OAuth state parameter missing. CSRF protection check failed.";
+    if (req.headers?.accept?.includes("text/html")) {
+      return res.status(403).send(
+        buildPostMessageHtml({
+          status: "error",
+          provider: "google",
+          error: errorMsg,
+          allowedOrigin,
+        })
+      );
+    }
+    return res.status(403).json({ status: "error", provider: "google", error: errorMsg });
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/google/callback`;
+  // 3. Cryptographically verify state token, tenant binding, and replay defense
+  const stateCheck = verifyAndConsumeOAuthState(state, "google");
+  if (!stateCheck.valid) {
+    const errorMsg = stateCheck.error || "Invalid or expired OAuth state parameter (replay defense triggered).";
+    if (req.headers?.accept?.includes("text/html")) {
+      return res.status(403).send(
+        buildPostMessageHtml({
+          status: "error",
+          provider: "google",
+          error: errorMsg,
+          allowedOrigin,
+        })
+      );
+    }
+    return res.status(403).json({ status: "error", provider: "google", error: errorMsg });
+  }
+
+  const { sub: operator, tenantId, nonce, cv: codeVerifier, redirectUri } = stateCheck.payload;
+  const config = getProviderConfig("google", req);
 
   try {
-    // 1. Exchange authorization code for Refresh & Access tokens
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    // 4. Exchange authorization code for tokens
+    const bodyParams = {
+      code,
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      redirect_uri: redirectUri || config.redirectUri,
+      grant_type: "authorization_code",
+    };
+    if (codeVerifier) {
+      bodyParams.code_verifier = codeVerifier;
+    }
+
+    const tokenRes = await fetch(config.tokenUrl, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: "authorization_code",
-      }),
+      body: new URLSearchParams(bodyParams),
     });
 
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok) {
-      throw new Error(tokenData.error_description || "Token exchange failed");
+      throw new Error(tokenData.error_description || tokenData.error || "Token exchange failed with Google");
     }
 
-    // 2. Fetch the connected Gmail address
-    const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
-    });
-    const userData = await userRes.json();
-    const userEmail = userData.email;
+    let userEmail = null;
 
-    // 3. Store OAuth credentials in Firebase settings/email_config
-    await update(ref(db, "settings/email_config"), {
+    // 5. Cryptographic ID Token validation (not simple base64 decoding!)
+    if (tokenData.id_token) {
+      const idCheck = validateIdToken(tokenData.id_token, {
+        expectedClientId: config.clientId,
+        expectedNonce: nonce,
+        provider: "google",
+      });
+
+      if (!idCheck.valid) {
+        throw new Error(`ID token verification failed: ${idCheck.error}`);
+      }
+      userEmail = idCheck.email;
+    }
+
+    // Fallback: fetch user profile if email claim was not present in ID token
+    if (!userEmail && tokenData.access_token) {
+      const userRes = await fetch(config.userinfoUrl, {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const userData = await userRes.json();
+      userEmail = userData.email;
+    }
+
+    if (!userEmail) {
+      throw new Error("Could not extract verified email from Google account");
+    }
+
+    // 6. Strict Tenant Isolation Storage:
+    // SuperAdmin connects to global settings/email_config.
+    // Tenant operators connect to their specific tenant partition tenants/{tenantId}/email_config.
+    const targetPath = tenantId && tenantId !== "default"
+      ? `tenants/${tenantId}/email_config`
+      : "settings/email_config";
+
+    await safeDbUpdate(ref(db, targetPath), {
       provider: "google_oauth",
       smtpEmail: userEmail,
-      refreshToken: tokenData.refresh_token,
-      clientId: clientId,
-      connectedAt: new Date().toISOString(),
-    });
+      refreshToken: tokenData.refresh_token || null,
+      clientId: config.clientId,
+      clientSecret: config.clientSecret,
+      connectedAt: Date.now(),
+      connectedBy: operator,
+      status: "connected",
+    }, 800);
 
-    // 4. Redirect to Settings with success indicator
-    res.redirect("/lg?status=google_auth_success");
+    // 7. Dispatch connection status (NEVER raw tokens) to exact trusted origin
+    return res.status(200).send(
+      buildPostMessageHtml({
+        status: "connected",
+        provider: "google",
+        tenantId,
+        allowedOrigin,
+      })
+    );
+
   } catch (err) {
-    console.error("Google OAuth Callback Error:", err);
-    res.redirect(`/lg?status=google_auth_error&msg=${encodeURIComponent(err.message)}`);
+    return res.status(500).send(
+      buildPostMessageHtml({
+        status: "error",
+        provider: "google",
+        tenantId,
+        error: err.message || "OAuth linking failed",
+        allowedOrigin,
+      })
+    );
   }
 }

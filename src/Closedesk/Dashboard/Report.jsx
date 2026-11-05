@@ -285,7 +285,12 @@ export default function Report({ onLogout }) {
   const maxChartVal = Math.max(...reportData.chartBuckets.map((d) => d.val), 1);
 
   const executeCSVExport = () => {
-    const escapeCSV = (str) => String(str).replace(/"/g, '""');
+    const escapeCSV = (str) => {
+      if (str === null || str === undefined) return "";
+      let s = String(str);
+      if (/^[\s]*[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return s.replace(/"/g, '""');
+    };
     const headers = ["Lead ID,Name,Email,Phone,Business Name,Service Requested,Status,Lead Score,Date"];
     const rows = reportData.tableData.map((l) => `"${escapeCSV(l.id)}","${escapeCSV(l.name || "")}","${escapeCSV(l.email || "")}","${escapeCSV(l.phone || "")}","${escapeCSV(l.business_name || "")}","${escapeCSV(l.service_requested || "")}","${escapeCSV(l.booking_status || "")}","${escapeCSV(l.lead_score || "")}","${l.timestamp ? new Date(l.timestamp).toLocaleDateString() : "N/A"}"`);
     const csvContent = "data:text/csv;charset=utf-8," + headers.concat(rows).join("\n");

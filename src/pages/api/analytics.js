@@ -4,6 +4,16 @@ import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
 import { resolveTenantId, resolveAuthenticatedTenantId } from "../../lib/tenantResolver";
 import { safeDbGet } from "../../lib/safeDb";
+import { sanitizeUntrustedTelemetry } from "../../lib/sanitizer";
+import { validateRequestBodySize } from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '16kb',
+    },
+  },
+};
 
 async function handler(req, res, apiLogger) {
   // CORS Headers for cross-domain SDK embed requests
@@ -79,10 +89,15 @@ async function handler(req, res, apiLogger) {
   // POST: Record Tracking Event (Multi-Tenant Scoped)
   // ──────────────────────────────────────────────────────────────────────────
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed", code: "METHOD_NOT_ALLOWED" });
   }
 
+  // 1. Enforce 16KB body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 16384)) return;
+
   try {
+    // 2. Untrusted Telemetry Isolation: Strip spoofed privilege claims
+    req.body = sanitizeUntrustedTelemetry(req.body);
     const {
       event_type,
       anonId = "unknown_visitor",

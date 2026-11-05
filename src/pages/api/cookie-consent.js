@@ -3,8 +3,17 @@ import { ref, set } from "firebase/database";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { db } from "../../lib/firebase";
 import { resolveTenantId, resolveAuthenticatedTenantId, sanitizeTenantId } from "../../lib/tenantResolver";
-import { sanitizeFirebaseKey, redactSensitiveSecrets } from "../../lib/sanitizer";
+import { sanitizeFirebaseKey, redactSensitiveSecrets, sanitizeUntrustedTelemetry } from "../../lib/sanitizer";
 import { safeDbGet, safeDbSet } from "../../lib/safeDb";
+import { validateRequestBodySize } from "../../lib/publicEndpointGuard";
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '16kb',
+    },
+  },
+};
 
 // Helper: Safely deep-sanitize objects to ensure NO property contains `undefined`
 // which causes Firebase Realtime Database set() to throw fatal errors
@@ -69,8 +78,11 @@ async function handler(req, res, apiLogger) {
   // POST REQUEST: RECORD COOKIE CONSENT (VISITOR)
   // ==========================================
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method not allowed", code: "METHOD_NOT_ALLOWED" });
   }
+
+  // 1. Enforce 16KB body size cap (returns 413)
+  if (!validateRequestBodySize(req, res, 16384)) return;
 
   try {
     // Robust body parsing: handle objects, raw JSON strings, and buffers
@@ -92,6 +104,7 @@ async function handler(req, res, apiLogger) {
     if (!body || typeof body !== "object") {
       body = {};
     }
+    body = sanitizeUntrustedTelemetry(body);
 
     const {
       anonId,

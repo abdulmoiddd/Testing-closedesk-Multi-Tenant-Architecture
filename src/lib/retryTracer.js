@@ -1,31 +1,59 @@
 // src/lib/retryTracer.js
+import { checkAndReserveBudget } from "./publicEndpointGuard.js";
 
 /**
- * Enhanced Retry Tracer (CD06 / Ticket 12)
+ * Enhanced Retry Tracer (CD05 / CD06 Unified)
  * 
  * Supports:
  * - Tracking operation state (pending, retrying, recovered, failed, unknown)
  * - Capturing operation keys and payload hashes for audit tracing
  * - Automatic redaction of sensitive credentials (OAuth tokens, SMTP passwords)
+ * - Tenant AI budget exhaustion protection during backoff
  * - Optional reconciliation hook before retrying external ambiguous operations
  * 
  * @param {Object} apiLogger - Scoped logger from API middleware
  * @param {string} operationName - Name of the process
- * @param {Object} options - { maxAttempts, delayMs, operationKey, payloadHash, tenantId, reconcileFn }
- * @param {Function} operationFn - Async function (attemptNumber) => Promise
+ * @param {Object} options - { maxAttempts, delayMs, operationKey, payloadHash, tenantId, reconcileFn, estimatedRetryTokens }
+ * @param {Function} operationFn - Async function (attempt, retryCount) => Promise
  */
 export async function withRetryTrace(apiLogger, operationName, options = {}, operationFn) {
   const maxAttempts = options.maxAttempts || 3;
   const baseDelayMs = options.delayMs || 1000;
   const operationKey = options.operationKey || null;
   const payloadHash = options.payloadHash || null;
-  const tenantId = options.tenantId || "default";
+  const tenantId = options.tenantId || null;
   const reconcileFn = typeof options.reconcileFn === "function" ? options.reconcileFn : null;
-
+  const estimatedRetryTokens = options.estimatedRetryTokens || 500;
   let attempt = 1;
 
   while (attempt <= maxAttempts) {
     const startTime = Date.now();
+    const retryCount = attempt - 1;
+
+    // Before attempting a retry, verify tenant budget has not been exhausted
+    if (attempt > 1 && tenantId && typeof checkAndReserveBudget === "function") {
+      try {
+        const budgetCheck = checkAndReserveBudget(tenantId, estimatedRetryTokens);
+        if (budgetCheck && !budgetCheck.allowed) {
+          apiLogger.error("retry_lifecycle", "retry_aborted_budget_exhausted", {
+            context: {
+              operation_name: operationName,
+              attempt_number: attempt,
+              tenantId,
+              reason: "Tenant AI budget exhausted during retry backoff.",
+            },
+          });
+          const err = new Error(`Retry aborted: AI budget exhausted for tenant '${tenantId}'`);
+          err.code = "BUDGET_EXCEEDED";
+          throw err;
+        }
+        if (budgetCheck?.commit) {
+          budgetCheck.commit(0);
+        }
+      } catch (budgetErr) {
+        if (budgetErr.code === "BUDGET_EXCEEDED") throw budgetErr;
+      }
+    }
 
     try {
       // If retrying, check if reconciliation is required before repeating side-effect
@@ -52,7 +80,7 @@ export async function withRetryTrace(apiLogger, operationName, options = {}, ope
         }
       }
 
-      const result = await operationFn(attempt);
+      const result = await operationFn(attempt, retryCount);
 
       // Log recovery if it required multiple attempts
       if (attempt > 1) {
@@ -63,6 +91,7 @@ export async function withRetryTrace(apiLogger, operationName, options = {}, ope
             payload_hash: payloadHash,
             tenant_id: tenantId,
             attempt_number: attempt,
+            retry_count: retryCount,
             max_attempts: maxAttempts,
             final_status: "recovered",
           },
@@ -89,6 +118,7 @@ export async function withRetryTrace(apiLogger, operationName, options = {}, ope
             payload_hash: payloadHash,
             tenant_id: tenantId,
             attempt_number: attempt,
+            retry_count: retryCount,
             max_attempts: maxAttempts,
             failure_reason: cleanError.message,
             final_status: finalStatus,
@@ -112,6 +142,7 @@ export async function withRetryTrace(apiLogger, operationName, options = {}, ope
             payload_hash: payloadHash,
             tenant_id: tenantId,
             attempt_number: attempt,
+            retry_count: retryCount,
             max_attempts: maxAttempts,
             failure_reason: cleanError.message,
             next_retry: `${nextRetryMs}ms`,

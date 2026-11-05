@@ -3,12 +3,13 @@ import OpenAI from "openai";
 import { db } from "../../lib/firebase";
 import { ref, set, get, update, push } from "firebase/database";
 import { getMasterRuleBook, POLICY_VERSION } from "../../lib/ruleBook";
+import { authorizeToolAction } from "../../lib/toolAuthorizer";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { resolveTenantId } from "../../lib/tenantResolver";
 import { executeRagWithTrace } from "../../lib/ragTracer";
 
 import { traceAiExecution, safeParseAiResponse } from "../../lib/aiTracer";
-import { withRetryTrace } from "../../lib/retryTracer"; // 🔥 TICKET 12: Added Retry Tracer
+import { withRetryTrace } from "../../lib/retryTracer";
 
 function generateHash(str) {
   let hash = 5381;
@@ -25,8 +26,6 @@ const MAX_REQUESTS_PER_WINDOW = 15;
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isValidPhone = (phone) => /^[\d\+\-\(\)\s]{7,20}$/.test(phone);
 const isValidWebsite = (url) => /^[^\s]+\.[^\s]+$/.test(url);
-
-
 
 function validateAndSanitizePayload(aiResponse) {
   if (!aiResponse || typeof aiResponse !== "object") {
@@ -111,7 +110,13 @@ async function handler(req, res, apiLogger) {
   let sessionIdForErrorLog = "unknown";
   let channelForErrorLog = "web_widget";
   let errorCategory = "general_backend_failure";
-  let sessionVersions = { policy: POLICY_VERSION, config_snapshot: "unknown", knowledge: "unknown" };
+  let sessionVersions = {
+    policy: POLICY_VERSION,
+    industry_version: "1.2.0",
+    config_snapshot: "unknown",
+    knowledge: "unknown",
+    composition_hash: "unknown",
+  };
 
   try {
     const {
@@ -148,7 +153,7 @@ async function handler(req, res, apiLogger) {
 
     // --- SECURITY: Prompt Injection Detection ---
     const lastUserMessage = messages[messages.length - 1]?.content || "";
-    const injectionPattern = /(ignore (all )?previous|system prompt|developer mode|jailbreak|bypass instructions)/i;
+    const injectionPattern = /(ignore (all )?previous|system prompt|developer mode|jailbreak|bypass instructions|override permissions)/i;
     let injectionDetected = false;
 
     if (injectionPattern.test(lastUserMessage)) {
@@ -162,10 +167,13 @@ async function handler(req, res, apiLogger) {
       throw new Error("Chat service API key not configured.");
     }
 
+    const activeTenant = resolveTenantId(req) || "default";
+    const getScopedPath = (subPath) => (activeTenant && activeTenant !== "default" ? `tenants/${activeTenant}/${subPath}` : subPath);
+
     // --- CROSS-CHANNEL CONTEXT MERGING ---
     let existingProspect = {};
     try {
-      const prospectSnap = await get(ref(db, `prospects/${session_id}`));
+      const prospectSnap = await get(ref(db, getScopedPath(`prospects/${session_id}`)));
       if (prospectSnap.exists()) {
         existingProspect = prospectSnap.val() || {};
       }
@@ -192,50 +200,52 @@ async function handler(req, res, apiLogger) {
       declined_fields: Array.from(new Set([...(current_lead_data.declined_fields || []), ...(existingProspect.privacy_patch || [])])),
     };
 
-   // 🔥 TICKET 6: RAG Tracer Integration
-   const ragContext = { query_id: `rag_${session_id}_${Date.now()}`, knowledge_version: "v1.0" };
-    
-   // Because your Vector DB isn't fully built yet (data comes from frontend), 
-   // we wrap a simulated promise so the logs work perfectly without crashing!
-   const mockVectorSearch = Promise.resolve(
-     retrievedKnowledge ? [{ id: "frontend_provided_doc", score: 0.95 }] : []
-   );
-   await executeRagWithTrace(apiLogger, ragContext, mockVectorSearch);
+    // RAG Tracer Integration
+    const ragContext = { query_id: `rag_${session_id}_${Date.now()}`, knowledge_version: "v1.0" };
+    const mockVectorSearch = Promise.resolve(
+      retrievedKnowledge ? [{ id: "frontend_provided_doc", score: 0.95 }] : []
+    );
+    await executeRagWithTrace(apiLogger, ragContext, mockVectorSearch);
 
-   
-    let instructions, botConfig;
+    let instructions, botConfig, policyMeta;
     try {
-      const tenantId = resolveTenantId(req);
-      const ruleBook = await getMasterRuleBook("text", mergedLeadData, retrievedKnowledge, tenantId);
+      const ruleBook = await getMasterRuleBook("text", mergedLeadData, retrievedKnowledge, activeTenant);
       instructions = ruleBook.instructions;
       botConfig = ruleBook.botConfig;
-      sessionVersions.config_snapshot = generateHash(JSON.stringify(botConfig));
-      sessionVersions.knowledge = retrievedKnowledge ? generateHash(retrievedKnowledge) : "none";
+      policyMeta = ruleBook.metadata || {};
+
+      sessionVersions = {
+        policy: policyMeta.commonRuleVersion || POLICY_VERSION,
+        industry_version: policyMeta.industryVersion || "1.2.0",
+        tenant_config_version: policyMeta.tenantConfigVersion || "initial",
+        composition_hash: policyMeta.policyCompositionHash || generateHash(JSON.stringify(botConfig)),
+        config_snapshot: policyMeta.policyCompositionHash || generateHash(JSON.stringify(botConfig)),
+        knowledge: retrievedKnowledge ? generateHash(retrievedKnowledge) : "none",
+        tenant_id: activeTenant,
+      };
     } catch (fbErr) {
       errorCategory = "firebase_config_failure";
       throw fbErr;
     }
 
     const openai = new OpenAI({ apiKey });
-    let validatedData = null; // ONLY DECLARED ONCE
+    let validatedData = null;
 
     const aiContext = {
       ai_model: botConfig.aiModel || "gpt-4o-mini",
-      prompt_version: sessionVersions.config_snapshot,
+      prompt_version: sessionVersions.composition_hash,
       conversation_state: existingProspect.state || (isFirstMessage ? "initial_greeting" : "in_progress"),
       detected_intent: existingProspect.intent_object ? existingProspect.intent_object[0] : "general_chat",
       rag_used: !!retrievedKnowledge,
     };
 
-    // --- LLM & SCHEMA EXECUTION BLOCK (TICKET 12) ---
+    // --- LLM & SCHEMA EXECUTION BLOCK ---
     try {
-      // Reassigning validatedData without 'let' to avoid the duplicate declaration error
       validatedData = await withRetryTrace(
-        apiLogger, 
-        "LLM_Execution_And_Parsing", 
-        { maxAttempts: 2, delayMs: 1000 }, 
-        async (attempt) => {
-          
+        apiLogger,
+        "LLM_Execution_And_Parsing",
+        { maxAttempts: 2, delayMs: 1000 },
+        async () => {
           const llmPromise = openai.chat.completions.create({
             model: aiContext.ai_model,
             response_format: { type: "json_object" },
@@ -244,21 +254,47 @@ async function handler(req, res, apiLogger) {
             max_tokens: 500,
           });
 
-          // Triggers Ticket 5 (AI Trace) inside Ticket 12 (Retry Trace)
           const completion = await traceAiExecution(apiLogger, llmPromise, aiContext);
           const rawContent = completion.choices[0].message.content;
           const aiResponse = safeParseAiResponse(apiLogger, rawContent, aiContext);
-          
+
           return validateAndSanitizePayload(aiResponse);
         }
       );
     } catch (err) {
       errorCategory = err instanceof SyntaxError ? "schema_failure" : "model_failure";
-      throw err; // Send to the outermost fallback catch block
+      throw err;
     }
 
     if (!validatedData) {
       throw new Error("Exhausted retries for LLM call.");
+    }
+
+    // --- CD08: SERVER-SIDE TOOL & SIDE-EFFECT AUTHORIZATION GATE ---
+    if (validatedData.next_action && validatedData.next_action !== "NONE") {
+      const authCheck = await authorizeToolAction({
+        tenantId: activeTenant,
+        action: validatedData.next_action,
+        toolArgs: {
+          ...validatedData.context_patch.booking_request,
+          service: validatedData.context_patch.business_context?.interested_capability,
+          phone: validatedData.context_patch.contact_info?.phone,
+          email: validatedData.context_patch.contact_info?.email,
+        },
+        tenantConfig: botConfig,
+        prospectData: existingProspect,
+      });
+
+      if (!authCheck.allowed) {
+        apiLogger.warn("security", "unauthorized_ai_action_blocked", {
+          context: {
+            action: validatedData.next_action,
+            reason: authCheck.reason,
+            tenantId: activeTenant,
+          },
+        });
+        validatedData.next_action = authCheck.fallbackAction || "NONE";
+      }
     }
 
     if (injectionDetected && !validatedData.intent_object.includes("Security Incident")) {
@@ -275,7 +311,10 @@ async function handler(req, res, apiLogger) {
     const finalFlags = Array.from(new Set([...(existingProspect.flags || []), ...(validatedData.flags || [])]));
 
     const backendPayload = {
-      session_id, channel, last_updated: serverTimestamp, versions: sessionVersions,
+      session_id,
+      channel,
+      last_updated: serverTimestamp,
+      versions: sessionVersions,
       transcript_reference: `transcripts/${session_id}`,
       intent_object: validatedData.intent_object,
       lead_temperature: validatedData.lead_temperature,
@@ -288,14 +327,11 @@ async function handler(req, res, apiLogger) {
       factual_summary: validatedData.factual_summary || existingProspect.factual_summary || null,
       context_patch: { contact_info: finalContact, business_context: finalBiz, booking_request: finalBooking },
       privacy_patch: finalPrivacyPatch,
-      tenant_id: resolveTenantId(req) || "default",
+      tenant_id: activeTenant,
     };
 
     // --- ACTION & DATABASE PERSISTENCE BLOCK ---
     try {
-      const activeTenant = resolveTenantId(req) || "default";
-      const getScopedPath = (subPath) => (activeTenant && activeTenant !== "default" ? `tenants/${activeTenant}/${subPath}` : subPath);
-
       if (backendPayload.flags.length > 0) {
         const actionRef = ref(db, getScopedPath(`session_actions/${session_id}`));
         const existingActionsSnapshot = await get(actionRef);
@@ -309,7 +345,7 @@ async function handler(req, res, apiLogger) {
           for (const flag of newActionsToProcess) {
             updates[flag] = { triggered_at: serverTimestamp, status: "pending" };
 
-            // --- SECURE TEXT ERASURE ---
+            // Secure data deletion
             if (flag === "TRIGGER_DATA_DELETION") {
               const wipedContext = {
                 contact_info: { name: null, email: null, phone: null },
@@ -336,6 +372,8 @@ async function handler(req, res, apiLogger) {
         await logAnalyticsEvent(session_id, channel, validatedData.state, validatedData.lead_temperature, validatedData.intent_object, finalEvents, sessionVersions);
       }
 
+      // 🚨 CD08 TRUTHFUL PERSISTENCE GUARANTEE:
+      // Inbound prospect state is saved to the tenant database partition.
       await set(ref(db, getScopedPath(`prospects/${session_id}`)), backendPayload);
     } catch (dbErr) {
       errorCategory = "firebase_action_failure";
@@ -347,6 +385,7 @@ async function handler(req, res, apiLogger) {
       context_patch: backendPayload.context_patch,
       privacy_patch: backendPayload.privacy_patch,
       next_action: backendPayload.next_action,
+      versions: sessionVersions,
     });
   } catch (error) {
     apiLogger.error("system_event", "chatbot_engine_failure", { error, context: { errorCategory } });
@@ -355,15 +394,23 @@ async function handler(req, res, apiLogger) {
 
     let fallbackReply = "I experienced a brief network delay. Could you please try sending that again?";
     if (errorCategory === "firebase_action_failure") {
-      fallbackReply = "I had trouble saving your last request due to a database delay. Could you please confirm that one more time?";
+      // 🚨 CD08: Never claim request was recorded if database persistence failed!
+      fallbackReply = "I had trouble saving your request due to a database connection delay. Could you please confirm your details once more?";
     } else if (errorCategory === "schema_failure") {
       fallbackReply = "My system had a minor processing hiccup. Could you rephrase that slightly?";
     }
 
     return res.status(200).json({
-      reply: fallbackReply, suggested_shortcuts: [], context_patch: req.body?.current_lead_data || {},
-      privacy_patch: [], intent_object: ["UNKNOWN"], lead_temperature: "UNKNOWN", flags: [],
-      analytics_events: ["error_recovery"], state: "RECOVERY", next_action: "NONE",
+      reply: fallbackReply,
+      suggested_shortcuts: [],
+      context_patch: req.body?.current_lead_data || {},
+      privacy_patch: [],
+      intent_object: ["UNKNOWN"],
+      lead_temperature: "UNKNOWN",
+      flags: [],
+      analytics_events: ["error_recovery"],
+      state: "RECOVERY",
+      next_action: "NONE",
     });
   }
 }

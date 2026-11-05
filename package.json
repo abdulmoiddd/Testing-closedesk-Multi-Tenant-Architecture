@@ -12,7 +12,8 @@
     "test:cd02": "node scripts/cd02_security_acceptance_suite.js",
     "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js",
     "test:cd06": "node scripts/cd06_lead_consistency_suite.js",
-    "test:cd07": "node scripts/cd07_handoff_reliability_suite.js"
+    "test:cd07": "node scripts/cd07_handoff_reliability_suite.js",
+    "test:cd08": "node scripts/cd08_policy_truthfulness_suite.js"
   },
   "engines": {
     "node": ">=20"

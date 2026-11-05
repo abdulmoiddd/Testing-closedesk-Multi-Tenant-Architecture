@@ -7,8 +7,7 @@ import { createAiLogger } from "../../lib/loggerPresets";
 import { getVisionSystemPrompt, VISION_DEFAULT_MODEL, VISION_POLICY_VERSION } from "../../lib/visionRuleBook";
 import { resolveTenantId, sanitizeTenantId } from "../../lib/tenantResolver";
 
-// 🔥 INFRASTRUCTURE SECURITY: Enforce a strict body size limit BEFORE Next.js attempts to parse it into RAM.
-// This prevents immediate Out-of-Memory (OOM) crashes if a malicious client sends a massive Base64 payload.
+// Enforce a strict body size limit BEFORE Next.js attempts to parse it into RAM.
 export const config = {
   api: {
     bodyParser: {
@@ -60,7 +59,7 @@ async function handler(req, res) {
     const parsedResult = JSON.parse(visionResponse.choices[0]?.message?.content || "{}");
     const duration_ms = Date.now() - startTime;
 
-    // 🔥 If the AI determined the image was irrelevant, do NOT save it to the CRM database as a defect.
+    // If the AI determined the image was irrelevant, do NOT save it to the CRM database as a defect.
     if (parsedResult.is_irrelevant) {
       aiLogger.warn("ai_vision", "irrelevant_image_rejected", {
         context: { session_id, model: VISION_DEFAULT_MODEL },
@@ -74,11 +73,17 @@ async function handler(req, res) {
       });
     }
 
-    // Only save valid business problems to Firebase
+    // 🚨 CD08: Bounded intake guarantee — image analysis cannot confirm diagnoses
+    parsedResult.is_diagnosis_confirmed = false;
+    parsedResult.requires_physical_inspection = true;
+
+    // Save bounded visual intake record to Firebase
     const imagePayload = {
       image_url,
-      identified_issue: parsedResult.identified_issue || "Defect inspected",
+      identified_issue: parsedResult.identified_issue || "Visible condition observed",
       urgency_level: parsedResult.urgency_level || "Medium",
+      is_diagnosis_confirmed: false,
+      requires_physical_inspection: true,
       model_used: VISION_DEFAULT_MODEL,
       vision_policy_version: VISION_POLICY_VERSION,
       analyzed_at: new Date().toISOString()
@@ -94,7 +99,9 @@ async function handler(req, res) {
     await update(ref(db, targetLeadPath), {
       last_inspected_image: image_url,
       identified_issue: parsedResult.identified_issue || "",
-      urgency_level: parsedResult.urgency_level || "Medium"
+      urgency_level: parsedResult.urgency_level || "Medium",
+      is_diagnosis_confirmed: false,
+      requires_physical_inspection: true,
     }).catch(() => {});
 
     aiLogger.info("ai_vision", "image_analysis_success", {
@@ -114,4 +121,4 @@ async function handler(req, res) {
   }
 }
 
-export default withApiLogger(handler, "VisionDiagnosticAPI");
+export default withApiLogger(handler, "Vision-Diagnostic-API");

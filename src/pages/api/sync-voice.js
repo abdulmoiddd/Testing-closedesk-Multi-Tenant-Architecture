@@ -2,7 +2,7 @@
 import { db } from "../../lib/firebase";
 import { withApiLogger } from "../../lib/apiMiddleware";
 import { ref, get, update, set, push } from "firebase/database";
-import { resolveTenantId, sanitizeTenantId } from "../../lib/tenantResolver";
+import { resolveTenantId, sanitizeTenantId, getTenantConfig } from "../../lib/tenantResolver";
 import { validateVoiceEvent } from "../../lib/voiceAuth";
 import {
   acquireIdempotencyLock,
@@ -10,6 +10,7 @@ import {
   failIdempotencyLock,
 } from "../../lib/idempotencyLocker";
 import { sanitizeFirebaseKey } from "../../lib/sanitizer";
+import { authorizeToolAction } from "../../lib/toolAuthorizer";
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -36,76 +37,45 @@ async function handler(req, res, apiLogger) {
     action,
     role,
     text,
-    error_stage,
-    error_message,
-    raw_error,
-    telemetry_data,
+    transcript,
+    factual_summary,
   } = req.body;
 
   if (!session_id || !isValidSessionId(session_id)) {
-    return res.status(400).json({ error: "A valid session_id is required." });
+    return res.status(400).json({ error: "A valid session_id format is required." });
   }
 
   const cleanSessionId = sanitizeFirebaseKey(session_id, "session");
-  const basePath = tenantId && tenantId !== "default" ? `tenants/${tenantId}` : "";
+  const getScopedPath = (subPath) => (tenantId && tenantId !== "default" ? `tenants/${tenantId}/${subPath}` : subPath);
 
-  // Helper for tenant-scoped paths
-  const getScopedPath = (subPath) => (basePath ? `${basePath}/${subPath}` : subPath);
-
-  // --- TELEMETRY LOGGING ---
-  if (action === "log_telemetry") {
+  // --- TRANSCRIPT FLUSH AT CALL END ---
+  if (action === "flush_transcript") {
     try {
-      await push(ref(db, getScopedPath(`voice_telemetry/${cleanSessionId}`)), {
-        timestamp: new Date().toISOString(),
-        ...telemetry_data,
-      });
+      if (Array.isArray(transcript) && transcript.length > 0) {
+        const transcriptRef = ref(db, getScopedPath(`transcripts/${cleanSessionId}`));
+        const updates = {};
+        transcript.forEach((item, index) => {
+          updates[`msg_${Date.now()}_${index}`] = {
+            role: item.role,
+            text: item.text,
+            channel: "voice",
+            timestamp: new Date().toISOString(),
+          };
+        });
+        await update(transcriptRef, updates);
+      }
 
-      apiLogger.info("voice_telemetry", "turn_metrics_recorded", {
-        context: { session_id: cleanSessionId, turn_id: telemetry_data?.turn_id, tenantId },
-        metadata: {
-          recording_duration_ms: telemetry_data?.recording_duration,
-          stt_latency_ms: telemetry_data?.stt_latency,
-          ai_latency_ms: telemetry_data?.ai_latency,
-          first_audio_latency_ms: telemetry_data?.first_audio_latency,
-          total_turn_latency_ms: telemetry_data?.total_turn_latency,
-          interrupted: telemetry_data?.interrupted,
-        },
-        duration_ms: telemetry_data?.total_turn_latency,
-      });
+      if (factual_summary) {
+        await update(ref(db, getScopedPath(`prospects/${cleanSessionId}`)), {
+          factual_summary,
+          last_updated: new Date().toISOString(),
+          tenant_id: tenantId,
+        });
+      }
 
       return res.status(200).json({ success: true });
-    } catch (err) {
-      apiLogger.error("system_event", "telemetry_save_failed", { error: err });
-      return res.status(500).json({ error: "Telemetry logging failed." });
-    }
-  }
-
-  // --- ERROR LOGGING ---
-  if (action === "log_error") {
-    try {
-      await push(ref(db, getScopedPath(`voice_errors/${cleanSessionId}`)), {
-        timestamp: new Date().toISOString(),
-        error_stage,
-        error_message,
-        raw_error: raw_error || null,
-      });
-
-      let errorCategory = "voice_network_error";
-      const stageUpper = (error_stage || "").toUpperCase();
-
-      if (stageUpper.includes("MIC") || stageUpper.includes("PERMISSION")) errorCategory = "voice_mic_error";
-      else if (stageUpper.includes("STT") || stageUpper.includes("TRANSCRIPT")) errorCategory = "voice_stt_error";
-      else if (stageUpper.includes("AI") || stageUpper.includes("REALTIME") || stageUpper.includes("OPENAI")) errorCategory = "voice_ai_error";
-      else if (stageUpper.includes("TTS") || stageUpper.includes("AUDIO") || stageUpper.includes("PLAYBACK")) errorCategory = "voice_tts_error";
-
-      apiLogger.error("voice_lifecycle", errorCategory, {
-        error: raw_error ? new Error(String(raw_error)) : new Error(error_message),
-        context: { session_id: cleanSessionId, error_stage, error_message, tenantId },
-      });
-
-      return res.status(200).json({ success: true });
-    } catch (err) {
-      return res.status(500).json({ error: "Logging failed." });
+    } catch (error) {
+      return res.status(500).json({ error: "Failed to flush transcript." });
     }
   }
 
@@ -168,6 +138,38 @@ async function handler(req, res, apiLogger) {
     const prospectRef = ref(db, getScopedPath(`prospects/${cleanSessionId}`));
     const snap = await get(prospectRef);
     const currentData = snap.exists() ? snap.val() : {};
+
+    // 🚨 CD08: SERVER-SIDE TOOL AUTHORIZATION GATE
+    const tenantConfigResult = await getTenantConfig(tenantId);
+    const tenantSettings = {
+      ...(tenantConfigResult?.chatbotConfig || {}),
+      ...(tenantConfigResult?.businessProfile || {}),
+      supportedServices: tenantConfigResult?.businessProfile?.supported_services || tenantConfigResult?.chatbotConfig?.services,
+      unsupportedServices: tenantConfigResult?.businessProfile?.unsupported_services || tenantConfigResult?.chatbotConfig?.unsupportedServices,
+      serviceArea: tenantConfigResult?.businessProfile?.service_area || tenantConfigResult?.chatbotConfig?.serviceArea,
+      enableDirectBooking: tenantConfigResult?.chatbotConfig?.enableDirectBooking,
+      calendarActive: tenantConfigResult?.chatbotConfig?.calendarActive,
+    };
+
+    const toolAuth = await authorizeToolAction({
+      tenantId,
+      action: tool_name,
+      toolArgs: tool_args,
+      tenantConfig: tenantSettings,
+      prospectData: currentData,
+    });
+
+    if (!toolAuth.allowed) {
+      apiLogger.warn("security", "voice_tool_action_unauthorized", {
+        context: { tool_name, reason: toolAuth.reason, tenantId },
+      });
+      await failIdempotencyLock({ tenantId, operationKey, error: toolAuth.reason, dbInstance: db });
+      return res.status(200).json({
+        success: false,
+        error: toolAuth.reason,
+        message: toolAuth.reason,
+      });
+    }
 
     let mergedContext = currentData.context_patch || { contact_info: {}, business_context: {} };
     let flags = currentData.flags || [];

@@ -21,6 +21,7 @@ import {
   failIdempotencyLock,
   markIdempotencyLockUnknown,
 } from "../../lib/idempotencyLocker";
+import { enqueueNotificationJob } from "../../lib/handoffManager";
 
 async function handler(req, res, apiLogger) {
   // ==========================================
@@ -279,6 +280,29 @@ async function handler(req, res, apiLogger) {
       apiLogger.info("lead_lifecycle", "lead_routing_success", {
         context: { lead_id, session_id, destination: "firebase_db", status: "saved" },
       });
+
+      // 🚨 CD07: Create durable notification handoff job linked to the lead
+      if (hasContactInfo || canonicalLead.lifecycle_status === "BOOKED" || data.booking_status === "Meeting Booked") {
+        try {
+          const eventTitle = canonicalLead.lifecycle_status === "BOOKED" || data.booking_status === "Meeting Booked"
+            ? "Meeting Booked! 📅"
+            : "Lead Contact Info Captured 🎯";
+          const eventMessage = `${canonicalLead.name || "A prospect"} submitted lead information (${canonicalLead.email || canonicalLead.phone || "Contact captured"}).`;
+
+          await enqueueNotificationJob({
+            tenantId,
+            leadId: lead_id,
+            title: eventTitle,
+            message: eventMessage,
+            leadData: canonicalLead,
+            eventType: "lead_captured",
+            visitorEmailConfig: data.visitor_email_config || null,
+            dbInstance: db,
+          });
+        } catch (handoffErr) {
+          apiLogger.warn("notification_lifecycle", "handoff_enqueue_warning", { error: handoffErr });
+        }
+      }
 
       const responsePayload = {
         id: lead_id,

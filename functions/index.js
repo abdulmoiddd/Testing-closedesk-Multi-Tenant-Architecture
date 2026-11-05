@@ -182,23 +182,109 @@ exports.sendEmailAlert = functions.database
   .onCreate(async (snapshot, context) => {
     const data = snapshot.val();
 
-    if (data.status !== "pending") return null;
+    if (!data || data.status !== "pending") return null;
 
-    let receiverEmail = process.env.GMAIL_EMAIL;
+    const targetTenant = (
+      data.tenant_id ||
+      (data.lead_data && (data.lead_data.tenant_id || data.lead_data.tenantId)) ||
+      "default"
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, "");
+
+    let receiverEmail = null;
     let settings = { urgentAlerts: true, afterHoursAlerts: true };
+    let recipientValid = false;
+    let recipientError = null;
 
+    // 🚨 CD07: Recipient Resolution & Validation from Tenant-Specific Configuration
     try {
-      const settingsSnap = await db.ref("users/root/notifications").once("value");
+      const tenantSettingsPath =
+        targetTenant && targetTenant !== "default"
+          ? `tenants/${targetTenant}/notification_settings`
+          : `settings/notification_settings`;
+
+      const settingsSnap = await db.ref(tenantSettingsPath).once("value");
       if (settingsSnap.exists()) {
-        const dbSettings = settingsSnap.val();
-        receiverEmail = dbSettings.adminEmail || dbSettings.leadReceivers || receiverEmail;
+        const dbSettings = settingsSnap.val() || {};
+        if (dbSettings.emailAlerts === false) {
+          recipientError = `Email notifications are explicitly disabled for tenant '${targetTenant}'.`;
+        } else {
+          const rawEmail =
+            dbSettings.adminEmail ||
+            dbSettings.leadReceivers ||
+            dbSettings.primaryRecipient;
+          if (rawEmail && typeof rawEmail === "string") {
+            const clean = rawEmail.trim().toLowerCase();
+            const emailRegex =
+              /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+            if (emailRegex.test(clean)) {
+              receiverEmail = clean;
+              recipientValid = true;
+            } else {
+              recipientError = `Malformed recipient email address '${clean}' for tenant '${targetTenant}'.`;
+            }
+          } else {
+            recipientError = `No recipient email configured for tenant '${targetTenant}'.`;
+          }
+        }
         if (dbSettings.urgentAlerts !== undefined)
           settings.urgentAlerts = dbSettings.urgentAlerts;
         if (dbSettings.afterHoursAlerts !== undefined)
           settings.afterHoursAlerts = dbSettings.afterHoursAlerts;
+      } else {
+        recipientError = `Tenant '${targetTenant}' has no notification settings configured.`;
       }
     } catch (err) {
-      console.error("Failed to fetch notification settings:", err);
+      console.error("Failed to fetch tenant notification settings:", err);
+      recipientError = `Database error resolving notification settings: ${err.message}`;
+    }
+
+    // 🚨 RECIPIENT VALIDATION & TENANT ISOLATION:
+    // If recipient is missing, malformed, or disabled, HALT delivery safely!
+    // Do NOT send to an arbitrary default recipient or another tenant's address!
+    if (!recipientValid || !receiverEmail) {
+      const nowTs = admin.database.ServerValue.TIMESTAMP;
+      const failureReason = recipientError || "Invalid or missing approved recipient";
+
+      const attemptRecord = {
+        attempt_id: `att_${context.params.alertId}_${Date.now()}`,
+        job_id: data.job_id || context.params.alertId,
+        lead_id: String(data.lead_id || (data.lead_data && data.lead_data.id) || "unknown"),
+        tenant_id: targetTenant,
+        selected_recipient: receiverEmail || "none",
+        provider_id: "nodemailer-smtp",
+        attempt_completed_at: new Date().toISOString(),
+        result: "failed",
+        sanitized_error: failureReason,
+      };
+
+      const attemptsPath =
+        targetTenant && targetTenant !== "default"
+          ? `tenants/${targetTenant}/delivery_attempts/${data.job_id || context.params.alertId}/${attemptRecord.attempt_id}`
+          : `delivery_attempts/${data.job_id || context.params.alertId}/${attemptRecord.attempt_id}`;
+      await db.ref(attemptsPath).set(attemptRecord);
+
+      await snapshot.ref.update({
+        status: "failed",
+        failure_reason: failureReason,
+        failed_at: nowTs,
+      });
+
+      if (data.job_id) {
+        const jobPath =
+          targetTenant && targetTenant !== "default"
+            ? `tenants/${targetTenant}/notification_jobs/${data.job_id}`
+            : `notification_jobs/${data.job_id}`;
+        await db.ref(jobPath).update({
+          delivery_status: "failed",
+          failure_reason: failureReason,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      return null;
     }
 
     const lead = data.lead_data || {};
@@ -364,10 +450,48 @@ exports.sendEmailAlert = functions.database
         }
       }
 
-      return snapshot.ref.update({
-        status: "sent",
+      const providerMessageId = `msg_${context.params.alertId}_${Date.now()}`;
+
+      // 🚨 CD07: Record successful provider delivery attempt in audit history
+      const attemptRecord = {
+        attempt_id: `att_${context.params.alertId}_${Date.now()}`,
+        job_id: data.job_id || context.params.alertId,
+        lead_id: String(data.lead_id || (data.lead_data && data.lead_data.id) || "unknown"),
+        tenant_id: targetTenant,
+        selected_recipient: receiverEmail,
+        provider_id: "nodemailer-smtp",
+        attempt_completed_at: new Date().toISOString(),
+        provider_message_id: providerMessageId,
+        result: "provider_accepted",
+      };
+
+      const attemptsPath =
+        targetTenant && targetTenant !== "default"
+          ? `tenants/${targetTenant}/delivery_attempts/${data.job_id || context.params.alertId}/${attemptRecord.attempt_id}`
+          : `delivery_attempts/${data.job_id || context.params.alertId}/${attemptRecord.attempt_id}`;
+      await db.ref(attemptsPath).set(attemptRecord);
+
+      // 🚨 CD07: Provider delivery is provider_accepted, NOT human acknowledged!
+      await snapshot.ref.update({
+        status: "provider_accepted",
+        provider_message_id: providerMessageId,
         sent_at: admin.database.ServerValue.TIMESTAMP,
       });
+
+      if (data.job_id) {
+        const jobPath =
+          targetTenant && targetTenant !== "default"
+            ? `tenants/${targetTenant}/notification_jobs/${data.job_id}`
+            : `notification_jobs/${data.job_id}`;
+        await db.ref(jobPath).update({
+          delivery_status: "provider_accepted",
+          provider_message_id: providerMessageId,
+          last_attempt_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      return null;
     } catch (error) {
       console.error("Email send failed:", error);
       await db.ref("logs/email_errors").push({
@@ -384,14 +508,52 @@ exports.sendEmailAlert = functions.database
         ? "rejected_fallback_unauthorized"
         : isTimeout
           ? "unknown"
-          : "error";
+          : "failed";
 
-      return snapshot.ref.update({
+      const sanitizedError = error.message
+        ? error.message.replace(/(password|token|secret|key)=[^&\s]+/gi, "$1=[REDACTED]")
+        : "Unknown error";
+
+      const attemptRecord = {
+        attempt_id: `att_${context.params.alertId}_${Date.now()}`,
+        job_id: data.job_id || context.params.alertId,
+        lead_id: String(data.lead_id || (data.lead_data && data.lead_data.id) || "unknown"),
+        tenant_id: targetTenant,
+        selected_recipient: receiverEmail || "none",
+        provider_id: "nodemailer-smtp",
+        attempt_completed_at: new Date().toISOString(),
+        result: finalStatus,
+        sanitized_error: sanitizedError,
+        is_ambiguous: isTimeout,
+      };
+
+      const attemptsPath =
+        targetTenant && targetTenant !== "default"
+          ? `tenants/${targetTenant}/delivery_attempts/${data.job_id || context.params.alertId}/${attemptRecord.attempt_id}`
+          : `delivery_attempts/${data.job_id || context.params.alertId}/${attemptRecord.attempt_id}`;
+      await db.ref(attemptsPath).set(attemptRecord);
+
+      await snapshot.ref.update({
         status: finalStatus,
-        error: error.message,
+        error: sanitizedError,
         is_ambiguous: isTimeout,
         failed_at: admin.database.ServerValue.TIMESTAMP,
       });
+
+      if (data.job_id) {
+        const jobPath =
+          targetTenant && targetTenant !== "default"
+            ? `tenants/${targetTenant}/notification_jobs/${data.job_id}`
+            : `notification_jobs/${data.job_id}`;
+        await db.ref(jobPath).update({
+          delivery_status: finalStatus,
+          failure_reason: sanitizedError,
+          is_ambiguous: isTimeout,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      return null;
     }
   });
 

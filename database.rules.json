@@ -87,6 +87,23 @@
           ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
           ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
         },
+        "notification_jobs": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".indexOn": ["created_at", "delivery_status", "acknowledgement_status"]
+        },
+        "notification_settings": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
+        },
+        "delivery_attempts": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
+        },
+        "notifications": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
+        },
         "secrets": {
           ".read": false,
           ".write": false
@@ -136,6 +153,18 @@
       ".write": "auth != null && auth.token.role === 'superadmin'"
     },
     "prospects": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'"
+    },
+    "notification_jobs": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'"
+    },
+    "delivery_attempts": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'"
+    },
+    "notifications": {
       ".read": "auth != null && auth.token.role === 'superadmin'",
       ".write": "auth != null && auth.token.role === 'superadmin'"
     }

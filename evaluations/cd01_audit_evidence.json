@@ -1,9 +1,9 @@
 {
   "audit_id": "CD01_BASELINE_EVIDENCE",
-  "generated_at": "2026-11-03T18:39:27.560Z",
+  "generated_at": "2026-11-04T18:27:52.197Z",
   "git": {
-    "headCommit": "6da8781737a63a74a3e81db44d473de3022be583",
-    "branch": "feat/cd05-public-endpoint-controls-budgets"
+    "headCommit": "57d9dcfa12f89e195c56595deeb44722e05caf57",
+    "branch": "feat/cd03-tenant-isolation-secret-protection"
   },
   "runtime": {
     "node": "v26.8.2",
@@ -21,16 +21,14 @@
         "test:ai": "node scripts/run_evaluations.js",
         "audit:cd01": "node scripts/cd01_baseline_audit.js",
         "test:cd02": "node scripts/cd02_security_acceptance_suite.js",
-        "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js",
-        "test:cd04": "node scripts/cd04_oauth_linking_suite.js",
-        "test:cd05": "node scripts/cd05_public_controls_and_budgets_suite.js"
+        "test:cd03": "node scripts/cd03_isolation_and_secrets_suite.js"
       }
     }
   },
   "policy_hashes": {
     "ruleBook": "8125aa618e7c4871d8f5fb62d4c1f9510dcc66c01f49b63fc44588cf8c5f57ee",
     "visionRuleBook": "09bccc15b48f40efda925497b1d8ca5f84a01947ce9bbdfae17a2a5804c71a19",
-    "databaseRules": "2603d6dfc2bdecf30a449aed429197b1eb41b3cd3d281fdc0082f2195a8560e9"
+    "databaseRules": "990811e543aa7f5b020f0ecf86b9dc8d6fa0cfdf6d5343565a9408e2e9b73bb3"
   },
   "evaluation_artifact": {
     "rawReportPath": "evaluations/report_v2.1.0.json",
@@ -93,7 +91,7 @@
   "verified_files": [
     {
       "path": "package.json",
-      "sizeBytes": 1151
+      "sizeBytes": 1053
     },
     {
       "path": "netlify.toml",
@@ -109,7 +107,7 @@
     },
     {
       "path": "database.rules.json",
-      "sizeBytes": 4155
+      "sizeBytes": 4605
     },
     {
       "path": "src/lib/ruleBook.js",
@@ -133,7 +131,7 @@
     },
     {
       "path": "src/pages/api/chat.js",
-      "sizeBytes": 19669
+      "sizeBytes": 17481
     },
     {
       "path": "src/pages/api/app-query.js",
@@ -141,15 +139,15 @@
     },
     {
       "path": "src/pages/api/openai-token.js",
-      "sizeBytes": 11498
+      "sizeBytes": 9919
     },
     {
       "path": "src/pages/api/tts.js",
-      "sizeBytes": 3743
+      "sizeBytes": 1764
     },
     {
       "path": "src/pages/api/sync-voice.js",
-      "sizeBytes": 10038
+      "sizeBytes": 9638
     },
     {
       "path": "src/Closedesk/Dashboard/Booking.jsx",
@@ -157,23 +155,23 @@
     },
     {
       "path": "src/pages/api/auth/google/login.js",
-      "sizeBytes": 2188
+      "sizeBytes": 1304
     },
     {
       "path": "src/pages/api/auth/google/callback.js",
-      "sizeBytes": 4451
+      "sizeBytes": 2621
     },
     {
       "path": "src/pages/api/auth/microsoft/login.js",
-      "sizeBytes": 2209
+      "sizeBytes": 1257
     },
     {
       "path": "src/pages/api/auth/microsoft/callback.js",
-      "sizeBytes": 4258
+      "sizeBytes": 2838
     },
     {
       "path": "src/pages/api/leads.js",
-      "sizeBytes": 10700
+      "sizeBytes": 8866
     },
     {
       "path": "src/pages/api/cron/retention-cleanup.js",
@@ -185,11 +183,11 @@
     },
     {
       "path": "src/pages/api/analyze-image.js",
-      "sizeBytes": 6333
+      "sizeBytes": 4291
     },
     {
       "path": "src/Closedesk/Dashboard/Report.jsx",
-      "sizeBytes": 32962
+      "sizeBytes": 33690
     },
     {
       "path": "src/Closedesk/Dashboard/LiveNotifications.jsx",
@@ -209,11 +207,11 @@
     },
     {
       "path": "src/pages/api/generate-email.js",
-      "sizeBytes": 2979
+      "sizeBytes": 1995
     },
     {
       "path": "functions/index.js",
-      "sizeBytes": 24939
+      "sizeBytes": 24562
     },
     {
       "path": "docs/VOICE_PRIVACY_POLICY.md",

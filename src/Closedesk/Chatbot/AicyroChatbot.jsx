@@ -1074,12 +1074,60 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     uiLogger.info("booking_lifecycle", "booking_creation_started", { context: { session_id: firebaseDbId, target_time: timeText }});
 
     // Default Fallback Email Content (Used if the webhook fails)
-    let emailSubject = "Your Demo is Confirmed!";
-    let emailBody = `Hi ${data.name || "there"},\n\nYour meeting is confirmed for ${timeText}. We look forward to speaking with you!`;
-    let bookingId = `bk_${txId.substring(0,8)}`;
+    let emailSubject = "Your Appointment is Confirmed!";
+    let emailBody = `Hi ${data.name || "there"},\n\nYour appointment is confirmed for ${timeText}. We look forward to speaking with you!`;
+    let bookingId = null;
+    let isCommitted = false;
+    let isRequestOnly = false;
 
+    // 1. Authoritative Appointment Booking via CloseDesk Scheduler
     try {
-      // Attempt to hit the Make.com webhook
+      const bookRes = await fetchWithTrace(
+        "/api/appointments/book",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-tenant-id": tenantId,
+            "x-idempotency-key": `op_book_${firebaseDbId || txId}`,
+          },
+          body: JSON.stringify({
+            tenant_id: tenantId,
+            lead_id: firebaseDbId,
+            start_time: data.booked_slot || new Date().toISOString(),
+            duration_minutes: 60,
+            service: data.service || "General Consultation",
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            customer_agreement: { confirmed: true, channel: "chat" },
+            booking_mode: "confirmed_booking",
+          }),
+        },
+        txId,
+      );
+
+      const bookResult = await bookRes.json();
+
+      if (bookRes.status === 409 || bookResult.code === "SLOT_CAPACITY_EXCEEDED") {
+        setIsProcessing(false);
+        addBotMessage(`⚠️ Slot Unavailable | That time slot was just booked by another customer. Please select a different time or date.`, [], true);
+        setStep(STEPS.SELECT_TIME);
+        return;
+      }
+
+      if (bookResult.status === "request_recorded" || bookResult.bookingMode === "request_only") {
+        isRequestOnly = true;
+      } else if (bookResult.success && bookResult.status === "booking_committed") {
+        isCommitted = true;
+        bookingId = bookResult.appointment_id || bookResult.appointment?.appointment_id;
+      }
+    } catch (schedErr) {
+      uiLogger.warn("booking_lifecycle", "scheduler_network_fallback", { error: schedErr });
+    }
+
+    // 2. Email drafting webhook (if configured)
+    try {
       const response = await fetchWithTrace(
         "/api/generate-email",
         { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ name: data.name, business_type: data.business_type, time: timeText }) },
@@ -1090,34 +1138,54 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
         const generatedEmail = await response.json();
         emailSubject = generatedEmail.subject || emailSubject;
         emailBody = generatedEmail.body || emailBody;
-        bookingId = generatedEmail.messageId || bookingId;
-      } else {
-        uiLogger.warn("ai_tool", "email_generation_warning", { context: { message: `Webhook returned status ${response.status}. Using fallback email content.` }});
       }
     } catch (error) {
       uiLogger.warn("ai_tool", "email_generation_network_error", { context: { message: "Could not reach email generation API. Using fallback email content." }, error });
     }
 
     try {
-      // 🔥 Proceed with the booking regardless of the email webhook's success
       uiLogger.info("ai_tool", "tool_call_success", { context: { tool_name: "create_booking_and_email", tool_call_id: txId, result_status: "success" }, duration_ms: Date.now() - startTime });
-      uiLogger.info("booking_lifecycle", "booking_created", { context: { session_id: firebaseDbId, booking_id: bookingId, target_time: timeText }, duration_ms: Date.now() - startTime });
 
-      if (!hasSentMeetingAlertRef.current) {
-        hasSentMeetingAlertRef.current = true;
-        queueEmailAlert("Meeting Booked! 📅", `${data.name || "A visitor"} confirmed a meeting for ${timeText}.`, data, "end", { visitorEmail: data.email, subject: emailSubject, body: emailBody });
+      if (isCommitted && bookingId) {
+        // Authoritatively confirmed booking
+        uiLogger.info("booking_lifecycle", "booking_created", { context: { session_id: firebaseDbId, booking_id: bookingId, target_time: timeText }, duration_ms: Date.now() - startTime });
+
+        if (!hasSentMeetingAlertRef.current) {
+          hasSentMeetingAlertRef.current = true;
+          queueEmailAlert("Meeting Booked! 📅", `${data.name || "A visitor"} confirmed a meeting for ${timeText}.`, data, "end", { visitorEmail: data.email, subject: emailSubject, body: emailBody });
+        }
+
+        const confirmedLead = await submitLead({
+          ...data,
+          booking_status: "Meeting Booked",
+          requested_action: "Meeting Booked",
+          appointment_id: bookingId,
+          authoritative_commit: true,
+          generated_subject: emailSubject,
+          generated_body: emailBody,
+          conversation_ended_at: new Date().toISOString(),
+        });
+        setIsProcessing(false);
+        addBotMessage(`✅ Appointment Confirmed! | Your appointment is officially booked for ${timeText} (Booking Ref: ${bookingId}). We look forward to meeting with you!`, [{ label: "Close Chat", value: "close" }], true);
+      } else {
+        // Truthful Request-Only handling
+        uiLogger.info("booking_lifecycle", "appointment_request_submitted", { context: { session_id: firebaseDbId, target_time: timeText }});
+
+        const pendingLead = await submitLead({
+          ...data,
+          booking_status: "Appointment Request Submitted",
+          requested_action: "Appointment Request Submitted",
+          conversation_ended_at: new Date().toISOString(),
+        });
+        setIsProcessing(false);
+        addBotMessage(`✅ Request Received! | Your appointment request for ${timeText} has been recorded (Ref: ${pendingLead?.lead_id || "Received"}). Our team will review availability and confirm your booking shortly.`, [{ label: "Close Chat", value: "close" }], true);
       }
-
-      const confirmedLead = await submitLead({ ...data, booking_status: "Meeting Booked", requested_action: "Meeting Booked", generated_subject: emailSubject, generated_body: emailBody, conversation_ended_at: new Date().toISOString() });
-      setIsProcessing(false);
-      addBotMessage(`✅ Contact Confirmed! | Your demo is officially booked for ${timeText}. We have securely saved your details (Ref: ${confirmedLead?.lead_id || "Confirmed"}) and sent a calendar invite to ${data.email || "your email"}.`, [{ label: "Close Chat", value: "close" }], true);
     
     } catch (dbError) {
-      // Only throw a fatal Booking Error if the actual database submission fails
       uiLogger.error("booking_lifecycle", "booking_failed_fatal", { error: dbError, context: { session_id: firebaseDbId, target_time: timeText }});
       
       setIsProcessing(false);
-      addBotMessage(`⚠️ Booking Error | Sorry, I couldn't secure that calendar slot due to a network error. Please try selecting a different time or contact us directly.`, [], true);
+      addBotMessage(`⚠️ Booking Error | Sorry, I couldn't record that appointment due to a network error. Please try selecting a different time or contact us directly.`, [], true);
       setStep(STEPS.AI_CHAT_MODE); 
     }
   }

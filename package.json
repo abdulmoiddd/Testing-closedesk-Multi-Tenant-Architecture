@@ -14,7 +14,8 @@
     "test:cd06": "node scripts/cd06_lead_consistency_suite.js",
     "test:cd07": "node scripts/cd07_handoff_reliability_suite.js",
     "test:cd08": "node scripts/cd08_policy_truthfulness_suite.js",
-    "test:cd09": "node scripts/cd09_voice_lifecycle_suite.js"
+    "test:cd09": "node scripts/cd09_voice_lifecycle_suite.js",
+    "test:cd10": "node scripts/cd10_appointment_workflow_suite.js"
   },
   "engines": {
     "node": ">=20"

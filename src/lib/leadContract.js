@@ -1,4 +1,7 @@
 // src/lib/leadContract.js
+import { verifyBookedEvidence, assertBookingEvidence } from "./appointmentContract";
+
+export { verifyBookedEvidence, assertBookingEvidence };
 
 /**
  * CloseDesk Canonical Lead & Action Contract (CD06)
@@ -103,7 +106,7 @@ export function mapToCanonicalLifecycle(rawStatus, hasContact = false) {
 
   if (clean.includes("BOOK") || clean.includes("MEETING BOOKED")) return LIFECYCLE_STATUS.BOOKED;
   if (clean.includes("ABANDON")) return LIFECYCLE_STATUS.ABANDONED;
-  if (clean.includes("QUALIF")) return LIFECYCLE_STATUS.QUALIFIED;
+  if (clean.includes("QUALIF") || clean.includes("REQUEST")) return LIFECYCLE_STATUS.QUALIFIED;
   if (clean.includes("CLOSE") || clean.includes("WON")) return LIFECYCLE_STATUS.CLOSED;
   if (clean.includes("LOST") || clean.includes("DISQUALIF")) return LIFECYCLE_STATUS.LOST;
   if (clean.includes("CALLBACK") || clean.includes("CONTACT")) return LIFECYCLE_STATUS.CONTACTED;
@@ -162,14 +165,33 @@ export function createCanonicalLead(rawPayload = {}) {
     : null;
 
   // Lifecycle status
-  const lifecycleStatus = rawPayload.lifecycle_status
+  let lifecycleStatus = rawPayload.lifecycle_status
     ? normalizeLifecycleStatus(rawPayload.lifecycle_status)
     : mapToCanonicalLifecycle(rawPayload.booking_status, hasContact);
+
+  let evidenceMissing = null;
+  // CD10 Mandatory BOOKED Rule: If enforceBookingEvidence is enabled and status is BOOKED, verify evidence
+  if (lifecycleStatus === LIFECYCLE_STATUS.BOOKED && rawPayload.enforceBookingEvidence) {
+    const evidenceCheck = verifyBookedEvidence({
+      ...rawPayload,
+      contact,
+      tenant_id: tenantId,
+    });
+    if (!evidenceCheck.valid) {
+      lifecycleStatus = hasContact ? LIFECYCLE_STATUS.QUALIFIED : LIFECYCLE_STATUS.CONTACTED;
+      evidenceMissing = evidenceCheck.missing;
+    }
+  }
 
   // Version counter for concurrency & monotonic ordering
   const currentVersion = typeof rawPayload.version === "number" && rawPayload.version >= 1
     ? Math.floor(rawPayload.version)
     : 1;
+
+  const rawBookingStatus = rawPayload.booking_status || (lifecycleStatus === LIFECYCLE_STATUS.BOOKED ? "Meeting Booked" : "Captured");
+  const effectiveBookingStatus = evidenceMissing
+    ? "Appointment Request Submitted"
+    : rawBookingStatus;
 
   return {
     lead_id: String(rawId),
@@ -189,10 +211,12 @@ export function createCanonicalLead(rawPayload = {}) {
     service_requested: confirmedService,
     requested_action: requestedAction,
     booking_details: {
-      booking_status: rawPayload.booking_status || (lifecycleStatus === LIFECYCLE_STATUS.BOOKED ? "Meeting Booked" : "Captured"),
+      booking_status: effectiveBookingStatus,
       booked_slot: rawPayload.booked_slot || null,
       display_time: rawPayload.display_time || null,
       selected_date: rawPayload.selected_date || null,
+      appointment_id: rawPayload.appointment_id || rawPayload.booking_details?.appointment_id || null,
+      evidence_missing: evidenceMissing,
     },
     conversation_summary: rawPayload.conversation_summary || null,
     full_conversation_transcript: rawPayload.full_conversation_transcript || null,
@@ -209,7 +233,8 @@ export function createCanonicalLead(rawPayload = {}) {
     business_name: businessContext.business_name,
     business_type: businessContext.business_type,
     lead_score: priority === PRIORITY_LEVEL.HIGH || priority === PRIORITY_LEVEL.URGENT ? "High" : priority === PRIORITY_LEVEL.MEDIUM ? "Medium" : "Low",
-    booking_status: rawPayload.booking_status || (lifecycleStatus === LIFECYCLE_STATUS.BOOKED ? "Meeting Booked" : "Captured"),
+    booking_status: effectiveBookingStatus,
+    appointment_id: rawPayload.appointment_id || rawPayload.booking_details?.appointment_id || null,
     last_interaction_at: nowIso,
   };
 }
@@ -235,6 +260,14 @@ export function updateLeadLifecycle(existingLead, newLifecycle, metadata = {}) {
     throw error;
   }
 
+  // CD10 Mandatory BOOKED Rule Assertion
+  if (targetStatus === LIFECYCLE_STATUS.BOOKED && (metadata.strictEvidence || metadata.enforceBookingEvidence)) {
+    assertBookingEvidence({
+      ...existingLead,
+      ...metadata,
+    });
+  }
+
   const newVersion = (existingLead.version || 1) + 1;
   const nowIso = new Date().toISOString();
 
@@ -243,6 +276,12 @@ export function updateLeadLifecycle(existingLead, newLifecycle, metadata = {}) {
     ...existingLead,
     lifecycle_status: targetStatus,
     booking_status: targetStatus === LIFECYCLE_STATUS.BOOKED ? "Meeting Booked" : (existingLead.booking_status || "Captured"),
+    booking_details: {
+      ...(existingLead.booking_details || {}),
+      ...(metadata.booking_details || {}),
+      appointment_id: metadata.appointment_id || existingLead.booking_details?.appointment_id || null,
+      booking_status: targetStatus === LIFECYCLE_STATUS.BOOKED ? "Meeting Booked" : (existingLead.booking_status || "Captured"),
+    },
     version: newVersion,
     updated_at: nowIso,
     last_interaction_at: nowIso,
@@ -251,6 +290,24 @@ export function updateLeadLifecycle(existingLead, newLifecycle, metadata = {}) {
     urgency_level: existingLead.urgency_level || "Low",
     lead_score: existingLead.lead_score || "Low",
   };
+}
+
+/**
+ * Promotes a lead to BOOKED only when all 7 pieces of evidence are verified.
+ */
+export function promoteToBooked(existingLead, bookingEvidence = {}) {
+  const payloadToVerify = {
+    ...existingLead,
+    ...bookingEvidence,
+    authoritative_commit: true,
+  };
+  assertBookingEvidence(payloadToVerify);
+
+  return updateLeadLifecycle(existingLead, LIFECYCLE_STATUS.BOOKED, {
+    ...bookingEvidence,
+    authoritative_commit: true,
+    strictEvidence: true,
+  });
 }
 
 /**

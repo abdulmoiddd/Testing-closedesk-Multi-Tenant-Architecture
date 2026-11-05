@@ -1,9 +1,9 @@
 {
   "ticket": "CD02",
   "title": "Privileged Access and Sessions",
-  "timestamp": "2026-11-05T13:46:09.289Z",
-  "gitCommit": "093feefd2156cda3b443a746534c45e2d8f9f9c2",
-  "gitBranch": "feat/cd09-voice-lifecycle-and-kill-switch",
+  "timestamp": "2026-11-05T14:28:55.253Z",
+  "gitCommit": "e4a1bcc0bb33e8bb19cd81844bc39164ad4ca363",
+  "gitBranch": "feat/cd10-authoritative-appointment-workflow",
   "nodeVersion": "v26.8.2",
   "results": [
     {
@@ -102,7 +102,7 @@
       "description": "hashPassword generates format 'scrypt:<salt>:<hash>' with 16-byte random salt",
       "status": "PASS",
       "details": {
-        "format": "scrypt:05f3d362746b886aa2558b3...",
+        "format": "scrypt:3ae19e84e99ba261cba70c9...",
         "saltLength": 32,
         "hashLength": 128
       }
@@ -210,7 +210,7 @@
       "description": "generateTotp / verifyTotp generates and validates 6-digit RFC 6238 code",
       "status": "PASS",
       "details": {
-        "code": "218343",
+        "code": "965050",
         "secretLength": 32
       }
     },

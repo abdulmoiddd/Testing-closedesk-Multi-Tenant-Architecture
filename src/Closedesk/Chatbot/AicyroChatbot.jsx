@@ -222,13 +222,26 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+      const targetOrigin = (() => {
+        try {
+          const hostParam = new URLSearchParams(window.location.search).get("host");
+          if (hostParam && hostParam !== "null" && hostParam !== "undefined") {
+            return new URL(hostParam).origin;
+          }
+          if (document.referrer) {
+            return new URL(document.referrer).origin;
+          }
+        } catch (_) {}
+        return "*";
+      })();
+
       window.parent.postMessage(
         { 
           type: "CLOSEDESK_WIDGET_RESIZE", 
           isExpanded: isOpen,
           hasPeek: showPeek
         }, 
-        "*"
+        targetOrigin
       );
     }
   }, [isOpen, showPeek]);

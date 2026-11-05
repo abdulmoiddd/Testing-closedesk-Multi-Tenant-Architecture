@@ -16,7 +16,8 @@
     "test:cd08": "node scripts/cd08_policy_truthfulness_suite.js",
     "test:cd09": "node scripts/cd09_voice_lifecycle_suite.js",
     "test:cd10": "node scripts/cd10_appointment_workflow_suite.js",
-    "test:cd11": "node scripts/cd11_tenant_onboarding_suite.js"
+    "test:cd11": "node scripts/cd11_tenant_onboarding_suite.js",
+    "test:cd14": "node scripts/cd14_reproducible_release_suite.js"
   },
   "engines": {
     "node": ">=20"

@@ -11,6 +11,7 @@ import {
 } from "../../lib/idempotencyLocker";
 import { sanitizeFirebaseKey } from "../../lib/sanitizer";
 import { authorizeToolAction } from "../../lib/toolAuthorizer";
+import { validateVoiceSessionForAction } from "../../lib/voiceLifecycle";
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -47,6 +48,23 @@ async function handler(req, res, apiLogger) {
 
   const cleanSessionId = sanitizeFirebaseKey(session_id, "session");
   const getScopedPath = (subPath) => (tenantId && tenantId !== "default" ? `tenants/${tenantId}/${subPath}` : subPath);
+
+  // 🚨 CD09: SERVER-SIDE VOICE SESSION & KILL SWITCH VALIDATION
+  const sessionCheck = await validateVoiceSessionForAction({
+    tenantId,
+    sessionId: cleanSessionId,
+    dbInstance: db,
+  });
+
+  if (!sessionCheck.allowed) {
+    apiLogger.warn("security", "voice_action_rejected_by_session_validator", {
+      context: { tenantId, sessionId: cleanSessionId, reason: sessionCheck.reason, scope: sessionCheck.scope },
+    });
+    return res.status(sessionCheck.status || 403).json({
+      error: sessionCheck.reason,
+      scope: sessionCheck.scope,
+    });
+  }
 
   // --- TRANSCRIPT FLUSH AT CALL END ---
   if (action === "flush_transcript") {

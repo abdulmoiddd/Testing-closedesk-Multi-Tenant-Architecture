@@ -34,6 +34,10 @@
       "log_retention": {
         ".read": "auth != null && auth.token.role === 'superadmin'",
         ".write": "auth != null && auth.token.role === 'superadmin'"
+      },
+      "global_voice": {
+        ".read": true,
+        ".write": "auth != null && auth.token.role === 'superadmin'"
       }
     },
     "tenants": {
@@ -82,6 +86,11 @@
         "voice_nonces": {
           ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
           ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)"
+        },
+        "voice_sessions": {
+          ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".write": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
+          ".indexOn": ["status", "started_at", "last_heartbeat_at"]
         },
         "prospects": {
           ".read": "auth != null && (auth.token.role === 'superadmin' || auth.token.tenant_id === $tenant_id)",
@@ -165,6 +174,10 @@
       ".write": "auth != null && auth.token.role === 'superadmin'"
     },
     "notifications": {
+      ".read": "auth != null && auth.token.role === 'superadmin'",
+      ".write": "auth != null && auth.token.role === 'superadmin'"
+    },
+    "voice_sessions": {
       ".read": "auth != null && auth.token.role === 'superadmin'",
       ".write": "auth != null && auth.token.role === 'superadmin'"
     }

@@ -248,6 +248,7 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
   const hasSentUrgentCallbackAlertRef = useRef(false);
   const [voiceState, setVoiceState] = useState("IDLE");
   const voiceCallRef = useRef(null);
+  const heartbeatTimerRef = useRef(null);
   const activeResponseRef = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -447,13 +448,70 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     fetchWithTrace("/api/sync-voice", { method: "POST", headers: { "Content-Type": "application/json", "x-tenant-id": tenantId }, body: JSON.stringify({ session_id: firebaseDbIdRef.current, action: "log_error", error_stage: stage, error_message: message, raw_error: rawError ? String(rawError) : null }) }, txId).catch(() => {});
   };
 
+  // 🚨 CD09: Safe teardown and mobile backgrounding handling
   useEffect(() => {
-    return () => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && voiceCallRef.current) {
+        const { pc, stream, audioEl, dc } = voiceCallRef.current;
+        if (dc) { try { dc.close(); } catch (_) {} }
+        if (pc) { try { pc.close(); } catch (_) {} }
+        if (stream) {
+          try { stream.getTracks().forEach((track) => track.stop()); } catch (_) {}
+        }
+        if (audioEl) {
+          try { audioEl.pause(); audioEl.srcObject = null; } catch (_) {}
+        }
+        voiceCallRef.current = null;
+        if (heartbeatTimerRef.current) {
+          clearInterval(heartbeatTimerRef.current);
+          heartbeatTimerRef.current = null;
+        }
+        setVoiceState("IDLE");
+        activeResponseRef.current = false;
+        addBotMessage("Voice call ended because the application was minimized or moved to the background. | You can continue communicating with me right here via text.", [], true);
+        setAgentMode("text");
+      }
+    };
+
+    const handlePageHide = () => {
       if (voiceCallRef.current) {
         const { pc, stream, audioEl, dc } = voiceCallRef.current;
-        if (dc) dc.close(); if (pc) pc.close();
-        if (stream) stream.getTracks().forEach((track) => track.stop());
-        if (audioEl) { audioEl.pause(); audioEl.srcObject = null; }
+        if (dc) { try { dc.close(); } catch (_) {} }
+        if (pc) { try { pc.close(); } catch (_) {} }
+        if (stream) {
+          try { stream.getTracks().forEach((track) => track.stop()); } catch (_) {}
+        }
+        if (audioEl) {
+          try { audioEl.pause(); audioEl.srcObject = null; } catch (_) {}
+        }
+        voiceCallRef.current = null;
+      }
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
+      if (voiceCallRef.current) {
+        const { pc, stream, audioEl, dc } = voiceCallRef.current;
+        if (dc) { try { dc.close(); } catch (_) {} }
+        if (pc) { try { pc.close(); } catch (_) {} }
+        if (stream) {
+          try { stream.getTracks().forEach((track) => track.stop()); } catch (_) {}
+        }
+        if (audioEl) {
+          try { audioEl.pause(); audioEl.srcObject = null; } catch (_) {}
+        }
+        voiceCallRef.current = null;
       }
     };
   }, []);
@@ -513,6 +571,12 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
       setVoiceState("PERMISSION_DENIED");
       callLogger.error("voice_lifecycle", "mic_permission_denied", { error });
       logVoiceError("MIC_PERMISSION", "Microphone access denied or failed", error.message || error.name);
+      addBotMessage(
+        "Microphone access was denied or is unavailable. | No worries! You can continue communicating with me right here by typing your message in the chat box below.",
+        [],
+        true
+      );
+      setAgentMode("text");
       return;
     }
 
@@ -523,6 +587,12 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
 
       if (!tokenResponse.ok) {
         logVoiceError("TOKEN_FETCH", "Failed to fetch OpenAI token", data.error);
+        addBotMessage(
+          `Voice unavailable: ${data.error || "Voice features have been disabled."} | Please continue via text chat below.`,
+          [],
+          true
+        );
+        setAgentMode("text");
         throw new Error(data.error || "Failed to fetch session token.");
       }
 
@@ -546,6 +616,31 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
           hasSentStartAlertRef.current = true;
           queueEmailAlert("New Voice Call Started", "A visitor has connected to the AI Voice Agent.", leadDataRef.current, "start");
         }
+
+        // 🚨 CD09: Periodic heartbeat & active-session kill-switch validation
+        if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = setInterval(async () => {
+          try {
+            const hbRes = await fetch("/api/voice/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
+              body: JSON.stringify({ action: "heartbeat", session_id: firebaseDbId }),
+            });
+            if (hbRes.ok) {
+              const hbData = await hbRes.json();
+              if (!hbData.active) {
+                callLogger.warn("voice_lifecycle", "voice_session_revoked_by_server", { hbData });
+                handleEndVoiceCall("revoked_by_server");
+                addBotMessage(
+                  `Voice session ended: ${hbData.reason || "Voice services have been disabled."} | Please continue via text chat below.`,
+                  [],
+                  true
+                );
+                setAgentMode("text");
+              }
+            }
+          } catch (_) {}
+        }, 10000);
       };
 
       dataChannel.onclose = () => {
@@ -581,8 +676,15 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
 
           if (event.type === "input_audio_buffer.speech_started") {
             setVoiceState((prev) => prev === "SPEAKING" ? "INTERRUPTED" : "LISTENING");
-            if (activeResponseRef.current) callLogger.warn("voice_lifecycle", "barge_in", { context: { message: "User interrupted the AI" }});
-            else callLogger.info("voice_lifecycle", "speech_started");
+            if (activeResponseRef.current) {
+              callLogger.warn("voice_lifecycle", "barge_in", { context: { message: "User interrupted the AI" }});
+              try { dataChannel.send(JSON.stringify({ type: "response.cancel" })); } catch (_) {}
+              if (voiceCallRef.current?.audioEl) {
+                try { voiceCallRef.current.audioEl.pause(); } catch (_) {}
+              }
+            } else {
+              callLogger.info("voice_lifecycle", "speech_started");
+            }
             if (turnMetricsRef.current && activeResponseRef.current) { turnMetricsRef.current.interrupted = true; flushTurnTelemetry(); }
             resetTurnMetrics(); turnMetricsRef.current.speech_start = Date.now();
           } 
@@ -666,20 +768,47 @@ export default function AicyroChatbot({ tenantId: propTenantId } = {}) {
     }
   };
 
-  const handleEndVoiceCall = () => {
+  const handleEndVoiceCall = (reason = "user_ended") => {
     try {
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
       if (voiceCallRef.current) {
         const { pc, stream, audioEl, dc } = voiceCallRef.current;
-        if (dc) dc.close(); if (pc) pc.close();
-        if (stream) stream.getTracks().forEach((track) => track.stop());
-        if (audioEl) { audioEl.pause(); audioEl.srcObject = null; }
+        if (dc) { try { dc.close(); } catch (_) {} }
+        if (pc) { try { pc.close(); } catch (_) {} }
+        if (stream) {
+          try {
+            stream.getTracks().forEach((track) => {
+              try { track.stop(); } catch (_) {}
+            });
+          } catch (_) {}
+        }
+        if (audioEl) {
+          try {
+            audioEl.pause();
+            audioEl.srcObject = null;
+          } catch (_) {}
+        }
         voiceCallRef.current = null;
       }
-      setVoiceState("IDLE"); activeResponseRef.current = false;
-      voiceLogger.info("voice_lifecycle", "voice_session_ended", { context: { session_id: firebaseDbId }});
-      logToFirebase("Call Ended", "Voice connection disconnected.", leadDataRef.current);
+      setVoiceState("IDLE");
+      activeResponseRef.current = false;
+      voiceLogger.info("voice_lifecycle", "voice_session_ended", { context: { session_id: firebaseDbId, reason }});
+      logToFirebase("Call Ended", `Voice connection disconnected (${reason}).`, leadDataRef.current);
       submitLead({ ...leadDataRef.current, last_interaction_at: new Date().toISOString() });
-    } catch (error) { voiceLogger.error("webrtc", "end_call_failed", { error }); setVoiceState("IDLE"); }
+
+      // Notify backend to update session status
+      fetch("/api/voice/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
+        body: JSON.stringify({ action: "end", session_id: firebaseDbId, reason }),
+      }).catch(() => {});
+    } catch (error) {
+      voiceLogger.error("webrtc", "end_call_failed", { error });
+      setVoiceState("IDLE");
+    }
   };
 
   const handleToggleMode = async () => {
